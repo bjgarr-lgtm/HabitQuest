@@ -134,6 +134,32 @@ const GAME_SCENARIOS = [
   }
 ];
 
+// V2: Badge catalog (unlock by XP)
+const BADGES = [
+  { id: "starter-star", name: "Starter Star", xpRequired: 50, icon: "⭐" },
+  { id: "calm-master", name: "Calm Master", xpRequired: 120, icon: "🫧" },
+  { id: "quiz-whiz", name: "Quiz Whiz", xpRequired: 200, icon: "🧠" },
+  { id: "streak-hero", name: "Streak Hero", xpRequired: 350, icon: "🔥" },
+  { id: "game-champ", name: "Game Champ", xpRequired: 500, icon: "🏆" },
+];
+
+function recalcLevel(){
+  // simple level curve: +1 level per 200 XP
+  state.level = 1 + Math.floor(state.xp / 200);
+}
+
+function addXP(amount, reason=""){
+  state.xp += amount;
+  recalcLevel();
+  saveState();
+  // keep UI fresh if user is on these tabs
+  updateHomeStats();
+  renderProgress();
+  renderProfile();
+  renderShop();
+}
+
+
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -142,8 +168,16 @@ function loadState(){
       completedDays: [],
       lastCompletedISO: null,
       streak: 0,
-      highScore: 0
+      highScore: 0,
+
+      // V2:
+      xp: 0,
+      level: 1,
+      profileName: "Odin Garrett",
+      ownedBadges: [],
+      ratings: { total: 0, count: 0 }
     };
+
     return JSON.parse(raw);
   }catch{
     return {
@@ -172,6 +206,10 @@ function showView(name){
 
   if(name === "lesson") renderLesson();
   if(name === "progress") renderProgress();
+  if(name === "profile") renderProfile();
+  if(name === "shop") renderShop();
+  if(name === "rate") renderRate();
+
 }
 
 $$(".tab").forEach(btn => {
@@ -179,6 +217,7 @@ $$(".tab").forEach(btn => {
 });
 
 $("#btn-open-lesson").addEventListener("click", () => showView("lesson"));
+$("#btn-open-rate").addEventListener("click", () => showView("rate"));
 $("#btn-start-lesson").addEventListener("click", () => showView("lesson"));
 $("#btn-start-game").addEventListener("click", () => showView("games"));
 
@@ -294,14 +333,22 @@ $("#btn-complete-lesson").addEventListener("click", () => {
   const day = LESSONS[idx].day;
 
   const score = quizScoreForCurrentLesson();
+  // Give a small bonus for perfect quizzes (scales nicely when you move to 12 questions)
+  if(score.correct === score.total){
+    addXP(score.total * 5, "Perfect quiz"); // 5 XP per question
+  }
+
   if(score.correct < score.total){
     $("#lesson-status").textContent = `Almost! Quiz score: ${score.correct}/${score.total}. Answer all correctly to complete.`;
     return;
   }
 
-  if(!state.completedDays.includes(day)){
+  const firstTime = !state.completedDays.includes(day);
+  if(firstTime){
     state.completedDays.push(day);
+    addXP(50, "Lesson complete"); // XP for completing the lesson
   }
+
 
   // streak logic: if last completion was yesterday, +1; if today, no change; else reset to 1
   const todayISO = isoDate(new Date());
@@ -383,6 +430,7 @@ function renderChoiceQuest(){
       saveState();
     }
     renderProgress(); // keep progress updated if user goes there
+    addXP(25, "Choice Quest finished");
     return;
   }
 
@@ -482,12 +530,96 @@ function startBreathing(){
       clearInterval(id);
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
+      addXP(10, "Breathing complete");
       return;
     }
   };
 
   tick();
   const id = setInterval(tick, 1000);
+}
+function renderProfile(){
+  if(!$("#profile-name")) return;
+
+  $("#profile-name").textContent = state.profileName || "Player";
+  $("#profile-xp").textContent = String(state.xp);
+  $("#profile-level").textContent = String(state.level);
+
+  // auto-unlock badges based on XP
+  const newlyUnlocked = BADGES
+    .filter(b => state.xp >= b.xpRequired)
+    .map(b => b.id);
+
+  const merged = new Set([...(state.ownedBadges || []), ...newlyUnlocked]);
+  state.ownedBadges = Array.from(merged);
+  saveState();
+
+  const wrap = $("#owned-badges");
+  const empty = $("#owned-badges-empty");
+  wrap.innerHTML = "";
+
+  if(state.ownedBadges.length === 0){
+    empty.textContent = "No badges yet — earn XP to unlock some!";
+    return;
+  }
+  empty.textContent = "";
+
+  state.ownedBadges.forEach(id => {
+    const b = BADGES.find(x => x.id === id);
+    if(!b) return;
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.textContent = `${b.icon} ${b.name}`;
+    wrap.appendChild(chip);
+  });
+}
+function renderShop(){
+  if(!$("#shop-grid")) return;
+
+  const grid = $("#shop-grid");
+  grid.innerHTML = "";
+
+  BADGES.forEach(b => {
+    const unlocked = state.xp >= b.xpRequired;
+
+    const card = document.createElement("div");
+    card.className = "card shopCard" + (unlocked ? "" : " locked");
+
+    card.innerHTML = `
+      <div class="shopBadge">${b.icon}</div>
+      <h3>${b.name}</h3>
+      <p class="muted">${unlocked ? "Unlocked ✅" : `Locked 🔒 (needs ${b.xpRequired} XP)`}</p>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+function renderRate(){
+  if(!$("#rating-average")) return;
+
+  const { total, count } = state.ratings || { total:0, count:0 };
+  const avg = count === 0 ? null : (total / count);
+
+  $("#rating-average").textContent = avg ? avg.toFixed(1) + " / 5" : "—";
+  $("#rating-count").textContent = count === 0 ? "No ratings yet" : `${count} rating${count===1?"":"s"}`;
+
+  // reset star display
+  $$("#stars .star").forEach(btn => btn.classList.remove("active"));
+
+  // star click handlers (set once)
+  if(!window.__rateBound){
+    window.__rateBound = true;
+    $$("#stars .star").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const stars = Number(btn.dataset.star);
+        state.ratings.total += stars;
+        state.ratings.count += 1;
+        saveState();
+        $("#rating-thanks").textContent = "Thanks for rating! ⭐";
+        renderRate();
+      });
+    });
+  }
 }
 
 // ---------- Progress ----------
@@ -535,6 +667,10 @@ function isoDate(d){
 }
 
 // initial render
+recalcLevel();
 renderLesson();
 renderProgress();
+renderProfile();
+renderShop();
+renderRate();
 5

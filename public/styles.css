@@ -195,3 +195,32 @@ h1{ margin:0; font-size:18px; }
   font-weight:800;
   cursor:pointer;
 }
+
+/* V2: stars + shop */
+.stars{
+  display:flex;
+  gap:10px;
+  margin:12px 0 6px;
+  justify-content:center;
+}
+
+.star{
+  font-size:34px;
+  border:none;
+  background:none;
+  cursor:pointer;
+  color: rgba(255,255,255,0.35);
+  transition: transform 0.08s ease, color 0.08s ease;
+}
+.star:hover{ transform: translateY(-1px) scale(1.06); }
+.star.active{ color: rgba(255,220,90,0.95); }
+
+.shopCard{
+  background: rgba(255,255,255,0.08);
+}
+.shopBadge{
+  font-size:36px;
+}
+.locked{
+  opacity:0.6;
+}
