@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>How to Avoid Addiction</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">🌟</div>
+      <div>
+        <h1>How to Avoid Addiction</h1>
+        <p class="subtitle">Daily lessons + mini‑games to build healthy habits (no ads).</p>
+      </div>
+    </div>
+
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab active" data-view="home">Home</button>
+      <button class="tab" data-view="lesson">Today’s Lesson</button>
+      <button class="tab" data-view="games">Mini‑Games</button>
+      <button class="tab" data-view="progress">Progress</button>
+      <button class="tab" data-view="about">About</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- HOME -->
+    <section class="view" id="view-home">
+      <div class="card hero">
+        <h2>Welcome 👋</h2>
+        <p>
+          This app teaches kids how to make strong choices, handle stress, and ask for help.
+          You’ll do a quick lesson each day, then play a mini‑game to practice.
+        </p>
+
+        <div class="row">
+          <div class="pill">✅ No ads</div>
+          <div class="pill">🆓 Free</div>
+          <div class="pill">🎮 Practice with games</div>
+          <div class="pill">🔒 Saves progress on this device</div>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" id="btn-start-lesson">Start Today’s Lesson</button>
+          <button class="btn" id="btn-start-game">Play Mini‑Game</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Quick Tip of the Day</h3>
+          <p id="tip-text">Loading tip…</p>
+          <button class="btn small" id="btn-new-tip">New tip</button>
+        </div>
+
+        <div class="card">
+          <h3>Your Streak</h3>
+          <p class="big" id="streak-text">0 days</p>
+          <p class="muted">Do one lesson a day to build your streak.</p>
+        </div>
+
+        <div class="card">
+          <h3>Safety</h3>
+          <p class="muted">
+            If you ever feel unsafe, talk to a trusted adult (parent/guardian, teacher, coach).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LESSON -->
+    <section class="view hidden" id="view-lesson">
+      <div class="card">
+        <div class="lessonHeader">
+          <h2 id="lesson-title">Today’s Lesson</h2>
+          <span class="badge" id="lesson-day">Day 1</span>
+        </div>
+        <p class="muted" id="lesson-goal">Goal: …</p>
+
+        <div class="lessonBody" id="lesson-content"></div>
+
+        <div class="divider"></div>
+
+        <h3>Mini Quiz</h3>
+        <p class="muted">Answer 3 quick questions to finish the lesson.</p>
+        <div id="quiz"></div>
+
+        <div class="actions">
+          <button class="btn" id="btn-prev-lesson">Previous</button>
+          <button class="btn" id="btn-next-lesson">Next</button>
+          <button class="btn primary" id="btn-complete-lesson">Mark Lesson Complete ✅</button>
+        </div>
+
+        <p class="muted" id="lesson-status"></p>
+      </div>
+    </section>
+
+    <!-- GAMES -->
+    <section class="view hidden" id="view-games">
+      <div class="card">
+        <h2>Mini‑Games 🎮</h2>
+        <p class="muted">These games practice real-life skills: saying no, handling stress, and choosing healthy options.</p>
+
+        <div class="grid">
+          <div class="card gameCard">
+            <h3>“Choice Quest”</h3>
+            <p class="muted">Pick the healthiest choice in quick scenarios.</p>
+            <button class="btn primary" id="btn-play-choicequest">Play</button>
+          </div>
+
+          <div class="card gameCard">
+            <h3>Breathing Buddy</h3>
+            <p class="muted">A calming timer to practice slowing down.</p>
+            <button class="btn" id="btn-play-breathing">Start</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="card hidden" id="game-area">
+          <div class="gameTop">
+            <h3 id="game-title">Game</h3>
+            <span class="badge" id="game-score">Score: 0</span>
+          </div>
+          <div id="game-content"></div>
+          <div class="actions">
+            <button class="btn" id="btn-exit-game">Exit</button>
+            <button class="btn primary hidden" id="btn-restart-game">Restart</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROGRESS -->
+    <section class="view hidden" id="view-progress">
+      <div class="card">
+        <h2>Progress 📈</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Lessons Completed</h3>
+            <p class="big" id="completed-count">0</p>
+          </div>
+          <div class="card">
+            <h3>Game High Score</h3>
+            <p class="big" id="highscore">0</p>
+          </div>
+          <div class="card">
+            <h3>Streak</h3>
+            <p class="big" id="streak-text-2">0 days</p>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3>Completed Days</h3>
+        <div id="completed-list" class="chips"></div>
+
+        <div class="divider"></div>
+
+        <button class="btn danger" id="btn-reset">Reset Progress (this device)</button>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="view hidden" id="view-about">
+      <div class="card">
+        <h2>About</h2>
+        <p>
+          <strong>How to Avoid Addiction</strong> is a free, kid‑friendly education app with daily lessons and mini‑games.
+          No ads. No paywalls.
+        </p>
+
+        <h3>Donations (Optional)</h3>
+        <p class="muted">
+          In a future version, you can add a donation button that supports addiction prevention efforts.
+          (We’ll keep it safe + parent‑friendly.)
+        </p>
+
+        <h3>Credits</h3>
+        <ul class="muted">
+          <li>Built with HTML/CSS/JavaScript</li>
+          <li>Hosted on Cloudflare (planned)</li>
+          <li>Version control on GitHub</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© <span id="year"></span> How to Avoid Addiction</span>
+    <span class="dot">•</span>
+    <button class="link" id="btn-open-lesson">Open Today’s Lesson</button>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
