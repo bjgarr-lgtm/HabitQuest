@@ -337,7 +337,6 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
   // “Soon” stays soon, but unlock gates are a bit later so it feels paced.
   { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                          status:"soon", unlock:{ type:"xp",     xp:250 } },
@@ -1356,7 +1355,6 @@ function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
   if(id === "habitquest") return startHabitQuest();
-  if(id === "storymap") return openStoryMapOverlay();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
 
