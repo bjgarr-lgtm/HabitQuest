@@ -3,7 +3,7 @@
    NOTE: app.js must contain ONLY JavaScript (no HTML at the bottom).
 */
 
-const $ = (sel) => document.querySelector(sel);
+const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const STORAGE_KEY = "htaa_v2_state";
@@ -26,12 +26,23 @@ function safeNum(x, fallback=0){
 }
 
 function escapeHtml(s){
-  return String(s)
+  return String(s ?? "")
     .replaceAll("&","&amp;")
     .replaceAll("<","&lt;")
     .replaceAll(">","&gt;")
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
+}
+
+// Deterministic “random” so a lesson keeps the same quiz each load.
+function mulberry32(seed){
+  let t = seed >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /* =========================================================
@@ -54,8 +65,8 @@ const GAME_SCENARIOS = [
     prompt: "A friend says: “Try this, everyone’s doing it.” What’s the best response?",
     choices: [
       { text: "“No. I’m not into that. Let’s do something else.”", good: true,  why: "Clear no + switch." },
-      { text: "“Maybe later, don’t tell anyone.”",                  good: false, why: "That keeps risk open." },
-      { text: "“Okay, so you like me.”",                            good: false, why: "Pressure isn’t friendship." }
+      { text: "“Maybe later, don’t tell anyone.”",                 good: false, why: "That keeps risk open." },
+      { text: "“Okay, so you like me.”",                           good: false, why: "Pressure isn’t friendship." }
     ]
   },
   {
@@ -78,90 +89,91 @@ const GAME_SCENARIOS = [
 
 // 25+ badges (XP based)
 const BADGES = [
-  { id:"starter-star",    name:"Starter Star",    xpRequired: 50,   icon:"⭐" },
-  { id:"calm-master",     name:"Calm Master",     xpRequired: 120,  icon:"🫧" },
-  { id:"quiz-whiz",       name:"Quiz Whiz",       xpRequired: 200,  icon:"🧠" },
-  { id:"streak-hero",     name:"Streak Hero",     xpRequired: 350,  icon:"🔥" },
-  { id:"game-champ",      name:"Game Champ",      xpRequired: 500,  icon:"🏆" },
+  { id:"starter-star",    name:"Starter Star",    xpRequired: 50,    icon:"⭐" },
+  { id:"calm-master",     name:"Calm Master",     xpRequired: 120,   icon:"🫧" },
+  { id:"quiz-whiz",       name:"Quiz Whiz",       xpRequired: 200,   icon:"🧠" },
+  { id:"streak-hero",     name:"Streak Hero",     xpRequired: 350,   icon:"🔥" },
+  { id:"game-champ",      name:"Game Champ",      xpRequired: 500,   icon:"🏆" },
 
-  { id:"daily-doer",      name:"Daily Doer",      xpRequired: 650,  icon:"📅" },
-  { id:"focus-falcon",    name:"Focus Falcon",    xpRequired: 800,  icon:"🦅" },
-  { id:"kind-mind",       name:"Kind Mind",       xpRequired: 950,  icon:"💛" },
-  { id:"stress-tamer",    name:"Stress Tamer",    xpRequired: 1100, icon:"🧯" },
-  { id:"brave-voice",     name:"Brave Voice",     xpRequired: 1250, icon:"🗣️" },
+  { id:"daily-doer",      name:"Daily Doer",      xpRequired: 650,   icon:"📅" },
+  { id:"focus-falcon",    name:"Focus Falcon",    xpRequired: 800,   icon:"🦅" },
+  { id:"kind-mind",       name:"Kind Mind",       xpRequired: 950,   icon:"💛" },
+  { id:"stress-tamer",    name:"Stress Tamer",    xpRequired: 1100,  icon:"🧯" },
+  { id:"brave-voice",     name:"Brave Voice",     xpRequired: 1250,  icon:"🗣️" },
 
-  { id:"steady-steps",    name:"Steady Steps",    xpRequired: 1400, icon:"👟" },
-  { id:"boundary-boss",   name:"Boundary Boss",   xpRequired: 1600, icon:"🛡️" },
-  { id:"help-seeker",     name:"Help Seeker",     xpRequired: 1800, icon:"🤝" },
-  { id:"sleep-guardian",  name:"Sleep Guardian",  xpRequired: 2000, icon:"🌙" },
-  { id:"hydration-hero",  name:"Hydration Hero",  xpRequired: 2200, icon:"💧" },
+  { id:"steady-steps",    name:"Steady Steps",    xpRequired: 1400,  icon:"👟" },
+  { id:"boundary-boss",   name:"Boundary Boss",   xpRequired: 1600,  icon:"🛡️" },
+  { id:"help-seeker",     name:"Help Seeker",     xpRequired: 1800,  icon:"🤝" },
+  { id:"sleep-guardian",  name:"Sleep Guardian",  xpRequired: 2000,  icon:"🌙" },
+  { id:"hydration-hero",  name:"Hydration Hero",  xpRequired: 2200,  icon:"💧" },
 
-  { id:"streak-7",        name:"7‑Day Streak",    xpRequired: 2400, icon:"7️⃣" },
-  { id:"streak-14",       name:"14‑Day Streak",   xpRequired: 2700, icon:"1️⃣4️⃣" },
-  { id:"streak-30",       name:"30‑Day Streak",   xpRequired: 3200, icon:"3️⃣0️⃣" },
+  { id:"streak-7",        name:"7‑Day Streak",    xpRequired: 2400,  icon:"7️⃣" },
+  { id:"streak-14",       name:"14‑Day Streak",   xpRequired: 2700,  icon:"1️⃣4️⃣" },
+  { id:"streak-30",       name:"30‑Day Streak",   xpRequired: 3200,  icon:"3️⃣0️⃣" },
 
-  { id:"lesson-10",       name:"10 Lessons",      xpRequired: 3500, icon:"📘" },
-  { id:"lesson-20",       name:"20 Lessons",      xpRequired: 4000, icon:"📗" },
-  { id:"lesson-30",       name:"30 Lessons",      xpRequired: 4600, icon:"📙" },
+  { id:"lesson-10",       name:"10 Lessons",      xpRequired: 3500,  icon:"📘" },
+  { id:"lesson-20",       name:"20 Lessons",      xpRequired: 4000,  icon:"📗" },
+  { id:"lesson-30",       name:"30 Lessons",      xpRequired: 4600,  icon:"📙" },
 
-  { id:"game-grinder",    name:"Game Grinder",    xpRequired: 5200, icon:"🎮" },
-  { id:"calm-pro",        name:"Calm Pro",        xpRequired: 6000, icon:"🧘" },
-  { id:"level-10",        name:"Level 10",        xpRequired: 6800, icon:"🔟" },
-  { id:"legend",          name:"Legend",          xpRequired: 8000, icon:"👑" },
+  { id:"game-grinder",    name:"Game Grinder",    xpRequired: 5200,  icon:"🎮" },
+  { id:"calm-pro",        name:"Calm Pro",        xpRequired: 6000,  icon:"🧘" },
+  { id:"level-10",        name:"Level 10",        xpRequired: 6800,  icon:"🔟" },
+  { id:"legend",          name:"Legend",          xpRequired: 8000,  icon:"👑" },
 
   // extra fun ones
-  { id:"gentle-giant",    name:"Gentle Giant",    xpRequired: 9000, icon:"🐘" },
-  { id:"super-helper",    name:"Super Helper",    xpRequired: 10000,icon:"🦸" },
-  { id:"wise-owl",        name:"Wise Owl",        xpRequired: 12000,icon:"🦉" },
+  { id:"gentle-giant",    name:"Gentle Giant",    xpRequired: 9000,  icon:"🐘" },
+  { id:"super-helper",    name:"Super Helper",    xpRequired: 10000, icon:"🦸" },
+  { id:"wise-owl",        name:"Wise Owl",        xpRequired: 12000, icon:"🦉" },
 ];
 
 // Avatars
 const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
+const CUSTOM_AVATAR_ID = "__custom__";
 
 // Tracks (for filtering lessons)
 const TRACKS = {
-  general:    { name:"General",                 desc:"Healthy choices, stress tools, confidence, asking for help." },
-  nicotine:   { name:"Nicotine / Vaping",       desc:"Cravings, pressure, coping skills, and refusing offers." },
-  alcohol:    { name:"Alcohol",                 desc:"Safer choices, boundaries, and handling social pressure." },
-  gaming:     { name:"Gaming / Screen habits",  desc:"Balance, routines, and stopping when you planned to stop." },
-  socialmedia:{ name:"Social media / Scrolling",desc:"Dopamine loops, focus, and healthier habits." },
-  caffeine:   { name:"Caffeine / Energy drinks",desc:"Sleep/energy basics and alternatives to overstimulation." },
+  general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
+  nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, coping skills, and refusing offers." },
+  alcohol:     { name:"Alcohol",                  desc:"Safer choices, boundaries, and handling social pressure." },
+  gaming:      { name:"Gaming / Screen habits",   desc:"Balance, routines, and stopping when you planned to stop." },
+  socialmedia: { name:"Social media / Scrolling", desc:"Dopamine loops, focus, and healthier habits." },
+  caffeine:    { name:"Caffeine / Energy drinks", desc:"Sleep/energy basics and alternatives to overstimulation." },
 };
 
 // 30 lesson curriculum (includes track tags)
 const CURRICULUM = [
-  { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",               track:"general" },
-  { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                       track:"general" },
-  { title:"Saying No With Confidence",          goal:"Practice refusing pressure calmly.",                      track:"general" },
-  { title:"Friend Pressure vs Real Friends",    goal:"Spot healthy friendships.",                               track:"general" },
-  { title:"Boredom Without Risk",               goal:"Make a fun plan that’s safe.",                            track:"general" },
-  { title:"Feelings Are Signals",               goal:"Name feelings and respond wisely.",                       track:"general" },
-  { title:"Big Emotions Plan",                  goal:"Use a 3-step plan when emotions spike.",                  track:"general" },
-  { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                     track:"general" },
-  { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",              track:"socialmedia" },
-  { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",             track:"general" },
+  { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",                track:"general" },
+  { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                        track:"general" },
+  { title:"Saying No With Confidence",          goal:"Practice refusing pressure calmly.",                       track:"general" },
+  { title:"Friend Pressure vs Real Friends",    goal:"Spot healthy friendships.",                                track:"general" },
+  { title:"Boredom Without Risk",               goal:"Make a fun plan that’s safe.",                             track:"general" },
+  { title:"Feelings Are Signals",               goal:"Name feelings and respond wisely.",                        track:"general" },
+  { title:"Big Emotions Plan",                  goal:"Use a 3-step plan when emotions spike.",                   track:"general" },
+  { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                      track:"general" },
+  { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",               track:"socialmedia" },
+  { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",              track:"general" },
 
-  { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                track:"general" },
-  { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                   track:"caffeine" },
-  { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                 track:"general" },
-  { title:"Goals & Tiny Steps",                 goal:"Make goals and track small wins.",                        track:"general" },
-  { title:"Mistakes & Comebacks",               goal:"Recover from mistakes without shame.",                    track:"general" },
-  { title:"Problem Solving",                    goal:"Use a simple method to solve problems.",                  track:"general" },
-  { title:"Positive Routines",                  goal:"Build routines that make life easier.",                   track:"gaming" },
-  { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                      track:"general" },
-  { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                 track:"general" },
-  { title:"Trusted Adults",                     goal:"Build your support team.",                                track:"general" },
+  { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                 track:"general" },
+  { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                    track:"caffeine" },
+  { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                  track:"general" },
+  { title:"Goals & Tiny Steps",                 goal:"Make goals and track small wins.",                         track:"general" },
+  { title:"Mistakes & Comebacks",               goal:"Recover from mistakes without shame.",                     track:"general" },
+  { title:"Problem Solving",                    goal:"Use a simple method to solve problems.",                   track:"general" },
+  { title:"Positive Routines",                  goal:"Build routines that make life easier.",                    track:"gaming" },
+  { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                       track:"general" },
+  { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                  track:"general" },
+  { title:"Trusted Adults",                     goal:"Build your support team.",                                 track:"general" },
 
-  { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",              track:"nicotine" },
-  { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                   track:"nicotine" },
-  { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",               track:"alcohol" },
-  { title:"Helping a Friend",                   goal:"What to do if a friend is struggling.",                   track:"general" },
-  { title:"Self-Talk",                          goal:"Use kinder thoughts to make better choices.",             track:"general" },
-  { title:"Dealing With Anger",                 goal:"Cool down without hurting anyone.",                       track:"general" },
-  { title:"Dealing With Anxiety",               goal:"Use grounding + breathing tools.",                        track:"general" },
-  { title:"Building Confidence Skills",         goal:"Practice skills that grow confidence.",                   track:"general" },
-  { title:"Being a Leader",                     goal:"Help others make safe choices too.",                      track:"general" },
-  { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                track:"general" },
+  { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",               track:"nicotine" },
+  { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                    track:"nicotine" },
+  { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",                track:"alcohol" },
+  { title:"Helping a Friend",                   goal:"What to do if a friend is struggling.",                    track:"general" },
+  { title:"Self-Talk",                          goal:"Use kinder thoughts to make better choices.",              track:"general" },
+  { title:"Dealing With Anger",                 goal:"Cool down without hurting anyone.",                        track:"general" },
+  { title:"Dealing With Anxiety",               goal:"Use grounding + breathing tools.",                         track:"general" },
+  { title:"Building Confidence Skills",         goal:"Practice skills that grow confidence.",                    track:"general" },
+  { title:"Being a Leader",                     goal:"Help others make safe choices too.",                       track:"general" },
+  { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                 track:"general" },
 ];
 
 function makeLessonContent(title, goal){
@@ -174,22 +186,159 @@ function makeLessonContent(title, goal){
   ];
 }
 
-function make12QuestionQuiz(title){
+/* =========================================================
+   QUIZZES — SPECIFIC PER LESSON + DIFFICULTY RAMP
+   (Deterministic: each Day has its own quiz, and later days are harder.)
+========================================================= */
+
+// Lesson “focus words” so questions feel like THAT lesson (not the same 12 every day).
+const LESSON_FOCUS = {
+  1:  { words:["future","choices","tiny steps","practice"], skill:"Future Me thinking" },
+  2:  { words:["stress","calm","breathing","body"], skill:"Healthy stress tools" },
+  3:  { words:["no","confidence","switch","exit"], skill:"Refusal skills" },
+  4:  { words:["friends","pressure","respect","boundaries"], skill:"Friendship signals" },
+  5:  { words:["boredom","plan","fun","safe"], skill:"Safe fun planning" },
+  6:  { words:["feelings","signals","name it","choose"], skill:"Emotion naming" },
+  7:  { words:["big emotions","3 steps","pause","plan"], skill:"Big feelings plan" },
+  8:  { words:["help","trusted adult","talk","support"], skill:"Asking for help" },
+  9:  { words:["online","trends","dare","influence"], skill:"Online choices" },
+  10: { words:["confidence","self-respect","values","pride"], skill:"Self-respect" },
+  11: { words:["coping tools","healthy","long-term","safe"], skill:"Coping tool picking" },
+  12: { words:["sleep","food","water","brain fuel"], skill:"Brain fuel habits" },
+  13: { words:["school","stress","stack up","reset"], skill:"School stress plan" },
+  14: { words:["goals","tiny steps","track","wins"], skill:"Goal setting" },
+  15: { words:["mistakes","comeback","learn","try again"], skill:"Recovering from mistakes" },
+  16: { words:["problem solving","steps","options","choose"], skill:"Problem solving" },
+  17: { words:["routine","balance","screen time","schedule"], skill:"Routines" },
+  18: { words:["boundaries","time","body","mind"], skill:"Boundaries" },
+  19: { words:["conflict","calm","respect","talk"], skill:"Conflict skills" },
+  20: { words:["support team","trusted adults","check-in","help"], skill:"Support team" },
+  21: { words:["cravings","urges","delay","distract"], skill:"Urge plan" },
+  22: { words:["refuse offers","script","exit plan","practice"], skill:"Offer refusal" },
+  23: { words:["party","pressure","safe choice","plan"], skill:"Social pressure plan" },
+  24: { words:["help a friend","listen","adult help","support"], skill:"Helping friends" },
+  25: { words:["self-talk","kind thoughts","coach voice","try"], skill:"Self-talk" },
+  26: { words:["anger","cool down","space","safe"], skill:"Anger plan" },
+  27: { words:["anxiety","grounding","breathing","present"], skill:"Anxiety tools" },
+  28: { words:["confidence skills","practice","brave steps","build"], skill:"Confidence building" },
+  29: { words:["leader","example","help others","kind"], skill:"Leadership" },
+  30: { words:["review","next steps","keep going","plan"], skill:"Keep going" },
+};
+
+function difficultyForDay(day){
+  if(day <= 5) return 1;
+  if(day <= 12) return 2;
+  if(day <= 20) return 3;
+  return 4;
+}
+
+function makeQuizForLesson(day, title, goal, track){
+  const diff = difficultyForDay(day);
+  const rng = mulberry32(1000 + day * 97);
+  const focus = LESSON_FOCUS[day] || { words:["choices","safe","plan","help"], skill:"Healthy choices" };
+  const w = focus.words;
+
   const q = (question, options, answer) => ({ q: question, options, answer });
-  return [
-    q(`The main goal of today’s lesson (“${title}”) is to…`, ["Make safe choices", "Hide problems", "Take bigger risks"], 0),
-    q("When you feel pressured, a good first step is…", ["Pause and think", "Say yes immediately", "Do it secretly"], 0),
-    q("A healthy coping tool is usually…", ["Safe and helpful long-term", "Risky but exciting", "Always expensive"], 0),
-    q("If you’re stressed, a smart choice is to…", ["Use a calming tool", "Hold it in forever", "Make a risky choice"], 0),
-    q("A strong ‘No’ should be…", ["Clear and calm", "Mean and loud", "Impossible to say"], 0),
-    q("A trusted adult could be…", ["A parent/guardian, teacher, coach", "Only strangers online", "Nobody"], 0),
-    q("Good friends will…", ["Respect your boundaries", "Force you to prove yourself", "Laugh when you’re uncomfortable"], 0),
-    q("If you make a mistake, the best move is…", ["Learn and try again", "Give up forever", "Blame everyone"], 0),
-    q("One way to handle big feelings is…", ["Breathe slowly", "Break something", "Start a fight"], 0),
-    q("A safe plan includes…", ["Healthy options you can actually do", "Only secret risky options", "No help from anyone"], 0),
-    q("The app rewards progress with…", ["XP and unlocks", "Ads and paywalls", "Nothing"], 0),
-    q("Finishing lessons helps you…", ["Build skills over time", "Lose skills over time", "Forget everything"], 0),
+
+  // A few “lesson-specific” anchors (always included)
+  const anchors = [
+    q(`Today’s lesson (“${title}”) is mostly about…`,
+      [`${focus.skill}`, "Hiding problems", "Taking bigger risks"], 0),
+    q(`A helpful question for “${w[0]}” moments is…`,
+      ["Will this help Future Me?", "How do I keep this secret?", "What’s the riskiest option?"], 0),
+    q(`A strong “safe choice” is usually…`,
+      ["Safe and helpful long‑term", "Risky but exciting", "Something you must hide"], 0),
   ];
+
+  // Build difficulty ramp
+  const poolEasy = [
+    q(`When you feel ${w[1] || "pressure"}, the best first step is…`, ["Pause and think", "Say yes fast", "Do it secretly"], 0),
+    q(`A trusted adult could be…`, ["Parent/guardian/teacher/coach", "Only strangers online", "Nobody"], 0),
+    q(`Good friends will…`, ["Respect your boundaries", "Force you to prove yourself", "Laugh when you’re uncomfortable"], 0),
+  ];
+
+  const poolMed = [
+    q(`Pick the best “switch” after saying no:`, ["Let’s do something else.", "You’re annoying.", "Fine, I’ll do it."], 0),
+    q(`If stress is high, a smart tool is…`, ["Slow breathing + water", "Start a fight", "Do something risky"], 0),
+    q(`A “tiny step” is…`, ["Small and doable today", "Huge and impossible", "Only for adults"], 0),
+  ];
+
+  const poolHard = [
+    q(`Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
+      ["Delay + distract + talk to someone", "Keep it secret", "Say yes to fit in"], 0),
+    q(`A good boundary sounds like…`,
+      ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
+    q(`If you make a mistake, the best comeback is…`,
+      ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
+  ];
+
+  const poolBoss = [
+    q(`Boss moment: Your friend laughs at your “no.” Best move is…`,
+      ["Repeat no calmly and step away", "Prove yourself by saying yes", "Start a fight"], 0),
+    q(`Which plan is safest AND realistic?`,
+      ["One you can do today + a trusted adult if needed", "A secret plan nobody knows", "A plan that needs expensive stuff"], 0),
+    q(`When you feel a big urge, it helps to remember…`,
+      ["Urges rise and fall like waves", "Urges never change", "You must obey urges"], 0),
+  ];
+
+  // Choose pools based on difficulty
+  let pool = [...poolEasy];
+  if(diff >= 2) pool = pool.concat(poolMed);
+  if(diff >= 3) pool = pool.concat(poolHard);
+  if(diff >= 4) pool = pool.concat(poolBoss);
+
+  // Add a little track flavor (still kid-safe)
+  if(track === "socialmedia"){
+    pool.push(
+      q("Online dares are safest when you…", ["Skip them and choose your own plan", "Do them for likes", "Hide them from adults"], 0),
+      q("A smart scroll rule is…", ["Set a stop time and follow it", "Scroll until 2AM", "Never stop"], 0)
+    );
+  }
+  if(track === "gaming"){
+    pool.push(
+      q("A healthy gaming habit is…", ["Stop when you planned to stop", "Play forever", "Skip sleep for one more level"], 0),
+      q("Best first step when you feel stuck in a loop:", ["Stand up + water + 2‑minute reset", "Keep clicking", "Get mad at yourself"], 0)
+    );
+  }
+  if(track === "caffeine"){
+    pool.push(
+      q("Brain fuel usually starts with…", ["Sleep + food + water", "Only energy drinks", "Skipping meals"], 0),
+      q("If you’re tired, a smart option is…", ["Drink water and take a short break", "Chug caffeine every time", "Give up"], 0)
+    );
+  }
+  if(track === "nicotine"){
+    pool.push(
+      q("A cravings plan often begins with…", ["Delay and distract", "Hide and panic", "Say yes fast"], 0),
+      q("If someone offers you something risky, you can say…", ["No thanks. I’m good.", "Maybe later secretly.", "Okay to fit in."], 0)
+    );
+  }
+  if(track === "alcohol"){
+    pool.push(
+      q("At a party, a strong plan is…", ["Have an exit plan + buddy/adult backup", "Do whatever the crowd does", "Hide it"], 0),
+      q("Pressure is not friendship. True or false?", ["True", "False"], 0)
+    );
+  }
+
+  // Deterministically pick to 12 total: anchors + 9 from pool
+  // Shuffle-ish
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const picked = [...anchors];
+  for(const item of pool){
+    if(picked.length >= 12) break;
+    // Avoid duplicate question strings
+    if(!picked.some(x => x.q === item.q)) picked.push(item);
+  }
+
+  // If still short, repeat safe ones (rare)
+  while(picked.length < 12){
+    picked.push(poolEasy[Math.floor(rng() * poolEasy.length)]);
+  }
+
+  return picked;
 }
 
 const LESSONS = CURRICULUM.map((c, i) => ({
@@ -198,25 +347,23 @@ const LESSONS = CURRICULUM.map((c, i) => ({
   title: c.title,
   goal: c.goal,
   content: makeLessonContent(c.title, c.goal),
-  quiz: make12QuestionQuiz(c.title)
+  quiz: makeQuizForLesson(i + 1, c.title, c.goal, c.track || "general"),
 }));
 
 // Games catalog (tiles render in #games-grid)
 const GAMES = [
-  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",              status:"ready", unlock:{ type:"free" } },
+  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",               status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                       status:"ready", unlock:{ type:"free" } },
-
-  // NEW: bigger, story-based game
   { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.",status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
   // Coming soon placeholders
-  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                        status:"soon", unlock:{ type:"xp",     xp:120 } },
-  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",     status:"soon", unlock:{ type:"lessons",lessons:3 } },
-  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",     status:"soon", unlock:{ type:"level",  level:3 } },
-  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                   status:"soon", unlock:{ type:"level",  level:4 } },
-  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",             status:"soon", unlock:{ type:"xp",     xp:350 } },
-  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",        status:"soon", unlock:{ type:"lessons",lessons:7 } },
-  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",          status:"soon", unlock:{ type:"xp",     xp:600 } },
+  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                         status:"soon", unlock:{ type:"xp",     xp:120 } },
+  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",      status:"soon", unlock:{ type:"lessons",lessons:3 } },
+  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",      status:"soon", unlock:{ type:"level",  level:3 } },
+  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                    status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",              status:"soon", unlock:{ type:"xp",     xp:350 } },
+  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",         status:"soon", unlock:{ type:"lessons",lessons:7 } },
+  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",           status:"soon", unlock:{ type:"xp",     xp:600 } },
 ];
 
 /* =========================================================
@@ -229,26 +376,29 @@ const DEFAULT_STATE = {
   streak: 0,
   highScore: 0,
 
-  selectedTrack: "general",
-
   xp: 0,
   level: 1,
 
   profileName: "Odin Garrett",
-  avatar: AVATARS[0],
+
+  // Avatar
+  avatar: AVATARS[0],           // emoji or CUSTOM_AVATAR_ID
+  customAvatar: null,           // dataURL string (local only)
 
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
 
   // Habit Quest (story)
   habitQuest: {
-    chapter: 0,
-    scene: 0,
-    hearts: 3,
-    wisdom: 0,
-    tokens: 0,      // earned by completing lessons
-    lastLessonDay: 0
-  }
+    chapter: 0,          // 0..6 (7 chapters)
+    scene: 0,            // within chapter
+    hearts: 3,           // 0..5
+    wisdom: 0,           // grows
+    tokens: 0,           // earned by completing lessons (first-time)
+    lastLessonDay: 0,    // used for story flavor
+  },
+
+  selectedTrack: "general",
 };
 
 function loadState(){
@@ -279,7 +429,6 @@ function normalizeState(s){
   };
 
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
-  merged.avatar = AVATARS.includes(merged.avatar) ? merged.avatar : AVATARS[0];
 
   merged.xp = safeNum(merged.xp, 0);
   merged.level = safeNum(merged.level, 1);
@@ -287,12 +436,22 @@ function normalizeState(s){
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  merged.habitQuest.chapter = safeNum(merged.habitQuest.chapter, 0);
-  merged.habitQuest.scene   = safeNum(merged.habitQuest.scene, 0);
-  merged.habitQuest.hearts  = clamp(safeNum(merged.habitQuest.hearts, 3), 0, 5);
-  merged.habitQuest.wisdom  = safeNum(merged.habitQuest.wisdom, 0);
-  merged.habitQuest.tokens  = safeNum(merged.habitQuest.tokens, 0);
-  merged.habitQuest.lastLessonDay = safeNum(merged.habitQuest.lastLessonDay, 0);
+  // Avatar
+  merged.avatar = (merged.avatar === CUSTOM_AVATAR_ID || AVATARS.includes(merged.avatar)) ? merged.avatar : AVATARS[0];
+  merged.customAvatar = (typeof merged.customAvatar === "string" && merged.customAvatar.startsWith("data:image/"))
+    ? merged.customAvatar
+    : null;
+  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar){
+    merged.avatar = AVATARS[0];
+  }
+
+  // Habit Quest bounds
+  merged.habitQuest.chapter = clamp(safeNum(merged.habitQuest.chapter,0), 0, 6);
+  merged.habitQuest.scene   = clamp(safeNum(merged.habitQuest.scene,0), 0, 99);
+  merged.habitQuest.hearts  = clamp(safeNum(merged.habitQuest.hearts,3), 0, 5);
+  merged.habitQuest.wisdom  = Math.max(0, safeNum(merged.habitQuest.wisdom,0));
+  merged.habitQuest.tokens  = Math.max(0, safeNum(merged.habitQuest.tokens,0));
+  merged.habitQuest.lastLessonDay = Math.max(0, safeNum(merged.habitQuest.lastLessonDay,0));
 
   return merged;
 }
@@ -454,10 +613,10 @@ function renderQuiz(lesson){
     block.style.marginTop = "10px";
     block.style.background = "rgba(255,255,255,0.06)";
 
-    const q = document.createElement("p");
-    q.style.fontWeight = "800";
-    q.textContent = `${qi+1}. ${item.q}`;
-    block.appendChild(q);
+    const qEl = document.createElement("p");
+    qEl.style.fontWeight = "800";
+    qEl.textContent = `${qi+1}. ${item.q}`;
+    block.appendChild(qEl);
 
     item.options.forEach((opt, oi) => {
       const label = document.createElement("label");
@@ -538,8 +697,12 @@ function bindLessonButtons(){
       saveState();
       addXP(50);
 
-      // Habit Quest: earn 1 token for finishing a lesson (used in story)
+      // Habit Quest: +1 token per first-time completed lesson
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+      state.habitQuest.lastLessonDay = score.day;
+      saveState();
+    } else {
+      // Update last lesson day for story flavor (no token)
       state.habitQuest.lastLessonDay = score.day;
       saveState();
     }
@@ -607,7 +770,8 @@ function ensureGameOverlay(){
   `;
   document.body.appendChild(overlay);
 
-  // minimal styling injected (so it works even if CSS is missing)
+  // Minimal styling injected (so it works even if CSS misses something).
+  // IMPORTANT: Explicit text color so buttons/choices never render black.
   const style = document.createElement("style");
   style.textContent = `
     .gameOverlay.hidden{ display:none; }
@@ -621,11 +785,14 @@ function ensureGameOverlay(){
     .gameOverlayInner{
       max-width: 900px;
       margin: 0 auto;
-      background: rgba(20,20,30,0.92);
+      background: rgba(20,20,30,0.94);
       border: 1px solid rgba(255,255,255,0.14);
       border-radius: 16px;
       padding: 16px;
+      color: rgba(255,255,255,0.92);
     }
+    .gameOverlayInner *{ color: inherit; }
+    .gameOverlayInner .muted{ color: rgba(255,255,255,0.72) !important; }
     .gameOverlayTop{
       display:flex; gap:14px; align-items:center; justify-content:space-between;
       flex-wrap: wrap;
@@ -640,21 +807,27 @@ function ensureGameOverlay(){
       background: rgba(255,255,255,0.06);
       cursor:pointer;
       margin-top: 10px;
+      color: rgba(255,255,255,0.92) !important;
     }
     .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-    .choiceGood{ border-color: rgba(80,220,140,0.6); }
-    .choiceBad{ border-color: rgba(255,120,120,0.6); }
+    .choiceBtn.disabled, .choiceBtn:disabled{
+      opacity: .55;
+      cursor:not-allowed;
+    }
+    .choiceGood{ border-color: rgba(80,220,140,0.6) !important; }
+    .choiceBad{ border-color: rgba(255,120,120,0.6) !important; }
     .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
     .hqChip{
       padding: 6px 10px;
       border-radius: 999px;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.14);
+      color: rgba(255,255,255,0.92);
     }
   `;
   document.head.appendChild(style);
 
-  // bind overlay buttons once
+  // Bind overlay buttons once
   $("#go-exit")?.addEventListener("click", closeGameOverlay);
   $("#go-restart")?.addEventListener("click", () => {
     if(gameMode === "choicequest") startChoiceQuest();
@@ -908,83 +1081,14 @@ function startBreathing(){
 }
 
 /* =========================================================
-   GAME: HABIT QUEST (STORY / TURN-BASED)
+   GAME: HABIT QUEST (STORY / TURN-BASED) — 7 CHAPTERS
 ========================================================= */
 
-// A kid-friendly story system:
-// - You have an avatar (emoji)
-// - Scenes have text + choices
-// - Choices can give wisdom, cost a heart, give XP, and can require a token (earned by lessons)
-// - "Lesson integration": uses last completed lesson title/day in a few lines
-const HQ = {
-  chapters: [
-    {
-      name: "Chapter 1: The First Steps",
-      scenes: [
-        {
-          text: (ctx) => `You (${ctx.avatar}) arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
-          choices: [
-            { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch." },
-            { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1, xp:+0 },  why:"Fitting in isn’t worth it." },
-            { text:"Walk away and find a trusted adult.",        good:true,  effects:{ wisdom:+1, xp:+10 }, why:"Asking for help is strong." },
-          ]
-        },
-        {
-          text: (ctx) => `A mentor character appears: “When you feel pressure, try: Pause → No → Switch.” They ask: “Want to practice?”`,
-          choices: [
-            { text:"Practice the 3‑step ‘No’ out loud.", good:true, effects:{ wisdom:+1, xp:+12 }, why:"Practice makes real life easier." },
-            { text:"Ignore them and scroll forever.",     good:false,effects:{ hearts:-1, xp:+0 },  why:"Escapes can become habits." },
-          ]
-        },
-        {
-          text: (ctx) => {
-            const last = ctx.lastLessonTitle ? `You remember your last lesson: “${ctx.lastLessonTitle}.”` : "You remember: small choices add up.";
-            return `${last} A kid nearby looks stressed. What do you do?`;
-          },
-          choices: [
-            { text:"Offer a simple calm tool: 4 slow breaths together.", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Calm tools help fast." },
-            { text:"Tell them to ‘just deal with it’ and leave.",         good:false,effects:{ hearts:-1, xp:+0 },  why:"Kindness matters." },
-            { text:"Help them find a trusted adult.",                     good:true, effects:{ wisdom:+1, xp:+10 }, why:"Support is powerful." },
-          ]
-        },
-        {
-          text: (ctx) => `Gatekeeper: “To enter the next area, you need a Lesson Token.” (You earn tokens by completing lessons.)`,
-          choices: [
-            { text:"Use 1 token to open the gate.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice! You used your lesson power." },
-            { text:"Come back later after finishing a lesson.",          good:true, effects:{ xp:+0 },             why:"Finish a lesson to earn a token." , end:true },
-          ]
-        }
-      ]
-    },
-    {
-      name: "Chapter 2: The Focus Forest",
-      scenes: [
-        {
-          text: (ctx) => `In Focus Forest, a character offers “instant fun” that could become a bad habit. What’s your move?`,
-          choices: [
-            { text:"Pause and ask: “Will this help Future Me?”", good:true, effects:{ wisdom:+1, xp:+15 }, why:"That question protects you." },
-            { text:"Do it without thinking.",                     good:false,effects:{ hearts:-1, xp:+0 },  why:"Pausing is your superpower." },
-          ]
-        },
-        {
-          text: (ctx) => `You find a “Routine Builder” sign: “Tiny steps beat giant promises.” Pick your tiny step.`,
-          choices: [
-            { text:"Drink water + snack (brain fuel).", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Brain fuel helps choices." },
-            { text:"2 minutes tidy reset.",             good:true, effects:{ wisdom:+1, xp:+10 }, why:"Small wins add up." },
-            { text:"1 helpful thought about yourself.", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Kind self-talk matters." },
-          ]
-        },
-        {
-          text: (ctx) => `Boss moment: a crowd pressures you. Your avatar ${ctx.avatar} takes a deep breath…`,
-          choices: [
-            { text:"Say: “No thanks. I’m heading out.”", good:true, effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit." },
-            { text:"Say yes so nobody laughs.",          good:false,effects:{ hearts:-1, xp:+0 },  why:"A real friend won’t demand proof." },
-          ]
-        }
-      ]
-    }
-  ]
-};
+function avatarForStory(){
+  // If user uses photo, we can’t display it inside plain text; use a friendly symbol.
+  if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🖼️";
+  return state.avatar || "🙂";
+}
 
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
@@ -995,11 +1099,255 @@ function getLastLessonTitle(){
 
 function hqCtx(){
   return {
-    avatar: state.avatar || "🙂",
+    avatar: avatarForStory(),
     name: state.profileName || "Player",
-    lastLessonTitle: getLastLessonTitle()
+    completed: state.completedDays.length,
+    lastLessonTitle: getLastLessonTitle(),
+    tokens: safeNum(state.habitQuest.tokens,0),
   };
 }
+
+// 7 chapters, kid-safe, choices include “risky stuff / screens / addictive products”
+// without being graphic; always points back to skills + trusted adults.
+const HQ = {
+  chapters: [
+    {
+      name: "Chapter 1: The First Steps",
+      scenes: [
+        {
+          text: (ctx) => `You (${ctx.avatar}) arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
+          choices: [
+            { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch." },
+            { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1 },        why:"Fitting in isn’t worth it." },
+            { text:"Walk away and find a trusted adult.",        good:true,  effects:{ wisdom:+1, xp:+10 }, why:"Asking for help is strong." },
+          ]
+        },
+        {
+          text: () => `A mentor appears: “When you feel pressure, try: Pause → No → Switch.” Want to practice?`,
+          choices: [
+            { text:"Practice the 3‑step ‘No’ out loud.", good:true,  effects:{ wisdom:+1, xp:+12 }, why:"Practice makes real life easier." },
+            { text:"Ignore them and scroll forever.",    good:false, effects:{ hearts:-1 },        why:"Escapes can become habits." },
+          ]
+        },
+        {
+          text: (ctx) => {
+            const last = ctx.lastLessonTitle ? `You remember your last lesson: “${ctx.lastLessonTitle}.”` : "You remember: small choices add up.";
+            return `${last} A kid nearby looks stressed. What do you do?`;
+          },
+          choices: [
+            { text:"Offer a calm tool: 4 slow breaths together.", good:true,  effects:{ wisdom:+1, xp:+10 }, why:"Calm tools help fast." },
+            { text:"Say “deal with it” and leave.",               good:false, effects:{ hearts:-1 },        why:"Kindness matters." },
+            { text:"Help them find a trusted adult.",             good:true,  effects:{ wisdom:+1, xp:+10 }, why:"Support is powerful." },
+          ]
+        },
+        {
+          text: () => `Gatekeeper: “To enter the next area, you need a Lesson Token.”`,
+          choices: [
+            { text:"Use 1 token to open the gate.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice! Lesson power unlocked." },
+            { text:"Exit and earn a token by completing a lesson.",      good:true, end:true,                     why:"Finish a lesson to earn a token." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 2: The Focus Forest",
+      scenes: [
+        {
+          text: () => `In Focus Forest, a character offers “instant fun” that could turn into a bad habit.`,
+          choices: [
+            { text:"Pause and ask: “Will this help Future Me?”", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"That question protects you." },
+            { text:"Do it without thinking.",                    good:false, effects:{ hearts:-1 },        why:"Pausing is your superpower." },
+          ]
+        },
+        {
+          text: () => `You find a sign: “Tiny steps beat giant promises.” Pick your tiny step.`,
+          choices: [
+            { text:"Drink water + snack (brain fuel).",     good:true, effects:{ wisdom:+1, xp:+10 }, why:"Brain fuel helps choices." },
+            { text:"2‑minute tidy reset.",                  good:true, effects:{ wisdom:+1, xp:+10 }, why:"Small wins add up." },
+            { text:"Write 1 helpful thought about yourself.",good:true, effects:{ wisdom:+1, xp:+10 }, why:"Kind self-talk matters." },
+          ]
+        },
+        {
+          text: (ctx) => `Boss moment: a crowd pressures you. Your avatar ${ctx.avatar} takes a deep breath…`,
+          choices: [
+            { text:"Say: “No thanks. I’m heading out.”", good:true,  effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit." },
+            { text:"Say yes so nobody laughs.",          good:false, effects:{ hearts:-1 },        why:"Real friends don’t demand proof." },
+          ]
+        },
+        {
+          text: () => `A bridge guard says: “Tokens open the bridge.”`,
+          choices: [
+            { text:"Use 1 token to cross.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Forward!" },
+            { text:"Exit and earn a token by completing a lesson.", good:true, end:true, why:"Lessons give tokens." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 3: The Mood Mountain",
+      scenes: [
+        {
+          text: () => `Up the mountain, feelings get big fast. A character says: “When emotions spike, your body needs calm first.”`,
+          choices: [
+            { text:"Try a calm reset: slow breaths + relax shoulders.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Calm first = better choices." },
+            { text:"Yell and storm off.",                               good:false,effects:{ hearts:-1 },        why:"Big reactions can backfire." },
+          ]
+        },
+        {
+          text: () => `Someone offers an “energy boost” product to feel powerful instantly.`,
+          choices: [
+            { text:"Skip it and choose water/food/rest instead.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Brain fuel beats quick tricks." },
+            { text:"Take it to feel cool.",                        good:false,effects:{ hearts:-1 },        why:"Quick boosts can cause problems." },
+          ]
+        },
+        {
+          text: () => `You meet a helper who teaches: “Name it to tame it.” What do you do?`,
+          choices: [
+            { text:"Name the feeling: “I feel stressed.”", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Naming feelings helps control." },
+            { text:"Pretend you feel nothing.",            good:false,effects:{ hearts:-1 },        why:"Ignoring feelings can build pressure." },
+          ]
+        },
+        {
+          text: () => `A tunnel gate needs a token.`,
+          choices: [
+            { text:"Use 1 token to enter the tunnel.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Onward!" },
+            { text:"Exit and earn a token by completing a lesson.",          good:true, end:true,                     why:"Lessons give tokens." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 4: The Friend Zone (the good kind)",
+      scenes: [
+        {
+          text: () => `A new group says: “Prove you’re brave.” You feel pressure.`,
+          choices: [
+            { text:"Say: “No. That’s not for me.” then switch plans.", good:true, effects:{ wisdom:+1, xp:+20 }, why:"You lead your life." },
+            { text:"Do it so you’re accepted.",                        good:false,effects:{ hearts:-1 },        why:"Pressure isn’t friendship." },
+          ]
+        },
+        {
+          text: () => `A friend looks down. They’ve been scrolling for hours and feel worse.`,
+          choices: [
+            { text:"Suggest a break + fun offline activity.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Balance helps your brain." },
+            { text:"Tell them to scroll more.",               good:false,effects:{ hearts:-1 },        why:"More scrolling can make it worse." },
+          ]
+        },
+        {
+          text: () => `A coach-like character says: “Boundaries protect your time and your mind.”`,
+          choices: [
+            { text:"Practice a boundary: “I’m done for today.”", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Boundaries are strength." },
+            { text:"Say yes to everything forever.",             good:false,effects:{ hearts:-1 },        why:"That burns you out." },
+          ]
+        },
+        {
+          text: () => `A gate needs a token.`,
+          choices: [
+            { text:"Use 1 token to open it.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice." },
+            { text:"Exit and earn a token by completing a lesson.", good:true, end:true, why:"Lessons give tokens." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 5: The Party Path",
+      scenes: [
+        {
+          text: () => `There’s a hangout. Someone offers an “adult-only” thing and says, “Don’t tell.”`,
+          choices: [
+            { text:"Say no + leave + get to a trusted adult.", good:true, effects:{ wisdom:+1, xp:+25 }, why:"Secrets are a red flag." },
+            { text:"Stay and hope it’s fine.",                 good:false,effects:{ hearts:-1 },        why:"Risk grows when you stay." },
+          ]
+        },
+        {
+          text: () => `You remember: a plan beats panic. What plan do you pick?`,
+          choices: [
+            { text:"Buddy up + exit plan + adult backup.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"That’s a strong plan." },
+            { text:"No plan; just vibe.",                   good:false,effects:{ hearts:-1 },        why:"Plans protect you." },
+          ]
+        },
+        {
+          text: () => `A friend needs help. What’s the best move?`,
+          choices: [
+            { text:"Listen + stay kind + get a trusted adult.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Help is teamwork." },
+            { text:"Make fun of them.",                         good:false,effects:{ hearts:-1 },        why:"That hurts trust." },
+          ]
+        },
+        {
+          text: () => `One last token gate for this path.`,
+          choices: [
+            { text:"Use 1 token.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Forward!" },
+            { text:"Exit and earn a token by completing a lesson.", good:true, end:true, why:"Lessons give tokens." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 6: The Confidence Castle",
+      scenes: [
+        {
+          text: (ctx) => `Inside the castle, a mirror says: “${ctx.name}, you build confidence by practicing.”`,
+          choices: [
+            { text:"Take a brave step: practice your ‘No’ script.", good:true, effects:{ wisdom:+1, xp:+20 }, why:"Practice builds confidence." },
+            { text:"Say “I can’t” and quit.",                       good:false,effects:{ hearts:-1 },        why:"You can learn skills." },
+          ]
+        },
+        {
+          text: () => `A tricky character tries to distract you with endless screens.`,
+          choices: [
+            { text:"Set a stop time and do a quick reset.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"You control the screen." },
+            { text:"Keep scrolling forever.",               good:false,effects:{ hearts:-1 },        why:"That steals time and energy." },
+          ]
+        },
+        {
+          text: () => `A guide teaches: “Kind self-talk helps you try again.”`,
+          choices: [
+            { text:"Use coach voice: “I can try one small step.”", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Coach voice wins." },
+            { text:"Use mean self-talk.",                          good:false,effects:{ hearts:-1 },        why:"Mean thoughts make it harder." },
+          ]
+        },
+        {
+          text: () => `Final gate: it opens with a token.`,
+          choices: [
+            { text:"Use 1 token to reach the last chapter.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+25 }, why:"You earned this." },
+            { text:"Exit and earn a token by completing a lesson.", good:true, end:true, why:"Lessons give tokens." },
+          ]
+        }
+      ]
+    },
+
+    {
+      name: "Chapter 7: The Leader’s Light",
+      scenes: [
+        {
+          text: () => `You reach the final area. A younger kid copies what others do. What do you show them?`,
+          choices: [
+            { text:"Show a safe choice + invite them to a fun plan.", good:true, effects:{ wisdom:+1, xp:+25 }, why:"Leadership is example." },
+            { text:"Tell them to do risky stuff to be cool.",         good:false,effects:{ hearts:-1 },        why:"That can hurt people." },
+          ]
+        },
+        {
+          text: () => `A final test: Someone pressures the whole group. You can speak up.`,
+          choices: [
+            { text:"Say: “No. Let’s do something else.”", good:true, effects:{ wisdom:+1, xp:+30 }, why:"You protected the group." },
+            { text:"Stay silent even though you feel it’s wrong.", good:false, effects:{ hearts:-1 }, why:"Speaking up can help." },
+          ]
+        },
+        {
+          text: (ctx) => `You did it! You used skills, plans, and support. Your avatar ${ctx.avatar} shines.`,
+          choices: [
+            { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+40 }, why:"Great job!", end:true },
+          ]
+        }
+      ]
+    }
+  ]
+};
 
 function startHabitQuest(){
   gameMode = "habitquest";
@@ -1025,6 +1373,24 @@ function renderHabitQuest(){
 
   const ctx = hqCtx();
 
+  // game over
+  if(hearts <= 0){
+    area.innerHTML = `
+      <p class="big">😵 Oops!</p>
+      <p>You ran out of hearts.</p>
+      <p class="muted">Good news: you can restart and practice better choices.</p>
+    `;
+    $("#go-restart")?.classList.remove("hidden");
+
+    // reset run, keep tokens + progress rewards
+    state.habitQuest.hearts = 3;
+    state.habitQuest.wisdom = 0;
+    state.habitQuest.chapter = 0;
+    state.habitQuest.scene = 0;
+    saveState();
+    return;
+  }
+
   area.innerHTML = `
     <div class="hqRow">
       <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
@@ -1046,25 +1412,6 @@ function renderHabitQuest(){
   const whyEl = $("#hq-why");
   if(!wrap) return;
 
-  // if hearts are 0, game over screen
-  if(hearts <= 0){
-    area.innerHTML = `
-      <p class="big">😵 Oops!</p>
-      <p>You ran out of hearts.</p>
-      <p class="muted">Good news: you can restart and practice better choices.</p>
-    `;
-    $("#go-restart")?.classList.remove("hidden");
-
-    // reset for restart next time
-    state.habitQuest.hearts = 3;
-    state.habitQuest.wisdom = 0;
-    state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0); // keep tokens
-    state.habitQuest.chapter = 0;
-    state.habitQuest.scene = 0;
-    saveState();
-    return;
-  }
-
   scene.choices.forEach((choice) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1076,7 +1423,7 @@ function renderHabitQuest(){
     if(needTok > 0 && tokens < needTok){
       btn.disabled = true;
       btn.classList.add("disabled");
-      btn.textContent = `${choice.text} (needs ${needTok} token)`;
+      btn.textContent = `${choice.text} (needs ${needTok} token${needTok===1?"":"s"})`;
     }
 
     btn.addEventListener("click", () => {
@@ -1096,7 +1443,7 @@ function renderHabitQuest(){
       // xp
       if(eff.xp && safeNum(eff.xp,0) > 0) addXP(eff.xp);
 
-      // small score feedback
+      // score
       if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
       $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
 
@@ -1126,7 +1473,6 @@ function renderHabitQuest(){
           state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + 1;
           saveState();
 
-          // if finished final chapter
           if(newCh + 1 >= HQ.chapters.length){
             renderHabitQuestWin();
             return;
@@ -1153,12 +1499,12 @@ function renderHabitQuestWin(){
 
   area.innerHTML = `
     <p class="big">🏁 You finished Habit Quest (for now)!</p>
-    <p>You made lots of strong choices. Your avatar ${escapeHtml(state.avatar)} is getting wiser.</p>
-    <p class="muted">We can add more chapters next.</p>
+    <p>You made lots of strong choices. Your avatar ${escapeHtml(avatarForStory())} is getting wiser.</p>
+    <p class="muted">We can add more chapters/branches anytime.</p>
   `;
   $("#go-restart")?.classList.remove("hidden");
 
-  // reset story position but keep rewards
+  // reset story position but keep tokens + wisdom + XP earned
   state.habitQuest.chapter = 0;
   state.habitQuest.scene = 0;
   state.habitQuest.hearts = 3;
@@ -1166,29 +1512,121 @@ function renderHabitQuestWin(){
 }
 
 /* =========================================================
-   PROFILE / SHOP
+   PROFILE (AVATARS + UPLOAD)
 ========================================================= */
+function ensureAvatarUploadInput(){
+  // If index.html doesn’t include it, we create it.
+  if($("#avatar-upload")) return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.id = "avatar-upload";
+  input.style.display = "none";
+  document.body.appendChild(input);
+}
+
 function renderAvatars(){
   const grid = $("#avatar-grid");
   if(!grid) return;
   grid.innerHTML = "";
 
-  AVATARS.forEach(a => {
+  const makeChip = (opts) => {
     const chip = document.createElement("button");
-    chip.className = "chip";
+    chip.className = "chip avatarChip";
     chip.type = "button";
-    chip.textContent = a;
 
-    if(state.avatar === a) chip.style.outline = "2px solid rgba(255,255,255,0.6)";
+    if(opts.kind === "img"){
+      const img = document.createElement("img");
+      img.src = opts.src;
+      img.alt = "Custom avatar";
+      img.className = "avatarImg";
+      chip.appendChild(img);
+    } else {
+      chip.textContent = opts.label;
+    }
 
-    chip.addEventListener("click", () => {
-      state.avatar = a;
+    if(opts.active) chip.classList.add("activeAvatar");
+    chip.addEventListener("click", opts.onClick);
+    return chip;
+  };
+
+  // emoji avatars
+  AVATARS.forEach(a => {
+    grid.appendChild(makeChip({
+      kind: "emoji",
+      label: a,
+      active: state.avatar === a,
+      onClick: () => {
+        state.avatar = a;
+        saveState();
+        renderAvatars();
+        renderProfile();
+      }
+    }));
+  });
+
+  // custom avatar (if exists)
+  if(state.customAvatar){
+    grid.appendChild(makeChip({
+      kind: "img",
+      src: state.customAvatar,
+      active: state.avatar === CUSTOM_AVATAR_ID,
+      onClick: () => {
+        state.avatar = CUSTOM_AVATAR_ID;
+        saveState();
+        renderAvatars();
+        renderProfile();
+      }
+    }));
+  }
+
+  // plus button (opens system file dialog)
+  const plus = document.createElement("button");
+  plus.className = "chip avatarChip avatarPlus";
+  plus.type = "button";
+  plus.textContent = "＋";
+  plus.title = "Upload your own photo";
+  plus.addEventListener("click", () => {
+    ensureAvatarUploadInput();
+    $("#avatar-upload")?.click();
+  });
+  grid.appendChild(plus);
+}
+
+function bindAvatarUpload(){
+  ensureAvatarUploadInput();
+  const input = $("#avatar-upload");
+  if(!input) return;
+
+  if(input.__bound) return;
+  input.__bound = true;
+
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if(!file) return;
+
+    if(!file.type.startsWith("image/")){
+      alert("Please upload an image file.");
+      input.value = "";
+      return;
+    }
+
+    if(file.size > 2_000_000){
+      alert("That image is a bit large. Try one under 2MB.");
+      input.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.customAvatar = String(reader.result || "");
+      state.avatar = CUSTOM_AVATAR_ID;
       saveState();
       renderAvatars();
       renderProfile();
-    });
-
-    grid.appendChild(chip);
+      input.value = "";
+    };
+    reader.readAsDataURL(file);
   });
 }
 
@@ -1197,7 +1635,9 @@ function renderProfile(){
 
   renderAvatars();
 
-  $("#profile-name").textContent = `${state.avatar || "🙂"} ${state.profileName || "Player"}`;
+  const avatarLabel = (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) ? "🖼️" : (state.avatar || "🙂");
+  $("#profile-name").textContent = `${avatarLabel} ${state.profileName || "Player"}`.trim();
+
   $("#profile-xp").textContent = String(state.xp);
   $("#profile-level").textContent = String(state.level);
 
@@ -1237,7 +1677,7 @@ function renderShop(){
     const card = document.createElement("div");
     card.className = "card shopCard" + (unlocked ? "" : " locked");
     card.innerHTML = `
-      <div class="shopBadge">${b.icon}</div>
+      <div class="shopBadge">${escapeHtml(b.icon)}</div>
       <h3>${escapeHtml(b.name)}</h3>
       <p class="muted">${unlocked ? "Unlocked ✅" : `Locked 🔒 (needs ${b.xpRequired} XP)`}</p>
     `;
@@ -1328,6 +1768,8 @@ function bindReset(){
     renderRate();
     renderGamesCatalog();
     renderTrackUI();
+
+    ensureGameOverlay();
   });
 }
 
@@ -1345,6 +1787,7 @@ function init(){
   bindLessonButtons();
   bindReset();
   bindRatingStarsOnce();
+  bindAvatarUpload();
 
   $("#btn-new-tip")?.addEventListener("click", randomTip);
   randomTip();

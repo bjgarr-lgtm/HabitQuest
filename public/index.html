@@ -227,6 +227,10 @@
       <div id="avatar-grid" class="chips"></div>
     </div>
 
+    <input id="avatar-upload" type="file" accept="image/*" class="hidden" />
+    <img id="profile-avatar-img" class="hidden profileAvatarImg" alt="Your avatar" />
+
+
     <div class="divider"></div>
 
     <h3>Your Badges</h3>
@@ -297,6 +301,33 @@
     <span class="dot">•</span>
     <button class="link" id="btn-open-rate">Rate this app</button>
   </footer>
+<!-- FULLSCREEN GAME OVERLAY (no scrolling needed) -->
+<div class="gameOverlay hidden" id="game-overlay" role="dialog" aria-modal="true">
+  <div class="gameOverlayInner">
+    <div class="gameOverlayTop">
+      <div>
+        <h2 class="gameOverlayTitle" id="go-title">Game</h2>
+        <p class="gameOverlaySubtitle" id="go-subtitle">…</p>
+      </div>
+
+      <div class="gameOverlayActions">
+        <span class="badge" id="go-score">Score: 0</span>
+        <button class="btn" id="go-exit">Exit</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="go-content"></div>
+
+    <div class="actions">
+      <button class="btn primary hidden" id="go-restart">Restart</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for custom avatar upload -->
+<input id="avatar-upload" type="file" accept="image/*" class="hidden" />
 
   <script src="app.js"></script>
 </body>

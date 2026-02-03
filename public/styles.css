@@ -323,3 +323,159 @@ button, input, select, textarea {
 #view-games #game-content button {
   color: var(--text) !important;
 }
+
+.avatarChip{
+  min-width: 46px;
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+
+.activeAvatar{
+  outline: 2px solid rgba(68,215,182,0.85);
+  box-shadow: 0 0 0 3px rgba(68,215,182,0.15);
+}
+
+.avatarPlus{
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.08);
+}
+
+.avatarImg{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
+.profileAvatarImg{
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+
+/* =========================
+   FULLSCREEN GAME OVERLAY
+========================= */
+.gameOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(4, 6, 10, 0.72);
+  backdrop-filter: blur(14px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.gameOverlayInner{
+  width: min(980px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.06));
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  color: rgba(255,255,255,0.92);
+}
+
+.gameOverlayTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 12px;
+}
+
+.gameOverlayTitle{ margin: 0; font-size: 34px; letter-spacing: -0.5px; }
+.gameOverlaySubtitle{ margin: 6px 0 0; color: rgba(255,255,255,0.7); }
+
+.gameOverlayActions{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+
+/* =========================
+   HABIT QUEST UI
+========================= */
+.hqRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 8px;
+  align-items:center;
+}
+
+.hqChip{
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.choiceBtn{
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92); /* ✅ THIS is the “black text” fix */
+  padding: 12px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+.choiceBtn:hover{ background: rgba(255,255,255,0.10); }
+
+.choiceBtn.disabled,
+.choiceBtn:disabled{
+  opacity: 0.75;
+  color: rgba(255,255,255,0.85) !important; /* ✅ keep readable when disabled */
+  cursor: not-allowed;
+}
+
+/* =========================
+   PROFILE: avatar grid polish + photo avatar
+========================= */
+#avatar-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 10px;
+}
+
+.avatarChip{
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  display:grid;
+  place-items:center;
+  font-size: 22px;
+  cursor:pointer;
+}
+
+.avatarChip:hover{ background: rgba(255,255,255,0.10); }
+.avatarChip.active{ outline: 2px solid rgba(68,215,182,0.85); }
+
+.avatarChipPhoto{
+  background-size: cover;
+  background-position: center;
+}
+
+.avatarChipPlus{
+  font-size: 22px;
+  font-weight: 900;
+}
