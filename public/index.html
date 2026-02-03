@@ -20,6 +20,7 @@
     <nav class="tabs" aria-label="Main navigation">
       <button class="tab active" data-view="home">Home</button>
       <button class="tab" data-view="lesson">Today’s Lesson</button>
+      <button class="tab" data-view="tracks">Tracks</button>
       <button class="tab" data-view="games">Mini‑Games</button>
       <button class="tab" data-view="progress">Progress</button>
       <button class="tab" data-view="profile">Profile</button>
@@ -100,6 +101,36 @@
         <p class="muted" id="lesson-status"></p>
       </div>
     </section>
+
+        <!-- TRACKS -->
+
+    <section class="view hidden" id="view-tracks">
+  <div class="card">
+    <h2>Choose a Focus Track</h2>
+    <p class="muted">Optional: pick a topic to focus your lessons. You can switch anytime.</p>
+
+    <label class="muted" for="track-select">Focus track</label>
+    <select id="track-select" class="select">
+      <option value="general">General (recommended)</option>
+      <option value="nicotine">Nicotine / Vaping</option>
+      <option value="alcohol">Alcohol</option>
+      <option value="gaming">Gaming / Screen habits</option>
+      <option value="socialmedia">Social media / Scrolling</option>
+      <option value="caffeine">Caffeine / Energy drinks</option>
+    </select>
+
+    <div class="divider"></div>
+
+    <h3>What you’ll see</h3>
+    <p class="muted" id="track-preview"></p>
+
+    <div class="actions">
+      <button class="btn primary" id="btn-apply-track">Use this track</button>
+      <button class="btn" id="btn-clear-track">Back to General</button>
+    </div>
+  </div>
+</section>
+
 
     <!-- GAMES -->
     <section class="view hidden" id="view-games">

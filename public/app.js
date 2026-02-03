@@ -2,14 +2,26 @@
    Runs as a static site. Saves progress in localStorage (on this device).
 */
 
-const $ = (sel) => document.querySelector(sel);
+const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const STORAGE_KEY = "htaa_v2_state";
 
-/* -----------------------------
+/* =========================================================
+   HELPERS
+========================================================= */
+function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+function isoDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+/* =========================================================
    CONTENT
---------------------------------*/
+========================================================= */
 
 // Tips
 const TIPS = [
@@ -25,87 +37,97 @@ const GAME_SCENARIOS = [
   {
     prompt: "A friend says: “Try this, everyone’s doing it.” What’s the best response?",
     choices: [
-      { text: "“No. I’m not into that. Let’s do something else.”", good: true, why: "Clear no + switch." },
-      { text: "“Maybe later, don’t tell anyone.”", good: false, why: "That keeps risk open." },
-      { text: "“Okay, so you like me.”", good: false, why: "Pressure isn’t friendship." }
+      { text: "“No. I’m not into that. Let’s do something else.”", good: true,  why: "Clear no + switch." },
+      { text: "“Maybe later, don’t tell anyone.”",                 good: false, why: "That keeps risk open." },
+      { text: "“Okay, so you like me.”",                          good: false, why: "Pressure isn’t friendship." }
     ]
   },
   {
     prompt: "You’re stressed after school. What’s a healthy first move?",
     choices: [
-      { text: "Take 4 deep breaths and drink water.", good: true, why: "Calms your body fast." },
-      { text: "Do something risky to forget it.", good: false, why: "Risky escapes can cause bigger problems." },
-      { text: "Hold it in forever.", good: false, why: "Talking helps." }
+      { text: "Take 4 deep breaths and drink water.", good: true,  why: "Calms your body fast." },
+      { text: "Do something risky to forget it.",     good: false, why: "Risky escapes can cause bigger problems." },
+      { text: "Hold it in forever.",                  good: false, why: "Talking helps." }
     ]
   },
   {
     prompt: "Someone jokes about you for saying no. Best move?",
     choices: [
-      { text: "Stay calm, repeat ‘No’, and step away.", good: true, why: "You protect yourself." },
-      { text: "Prove yourself by saying yes.", good: false, why: "That’s how pressure wins." },
-      { text: "Start a fight.", good: false, why: "Fighting can make things worse." }
+      { text: "Stay calm, repeat ‘No’, and step away.", good: true,  why: "You protect yourself." },
+      { text: "Prove yourself by saying yes.",          good: false, why: "That’s how pressure wins." },
+      { text: "Start a fight.",                         good: false, why: "Fighting can make things worse." }
     ]
   }
 ];
 
 // Badges unlock by XP (XP never decreases)
 const BADGES = [
-  { id: "starter-star", name: "Starter Star", xpRequired: 50, icon: "⭐" },
-  { id: "calm-master", name: "Calm Master", xpRequired: 120, icon: "🫧" },
-  { id: "quiz-whiz", name: "Quiz Whiz", xpRequired: 200, icon: "🧠" },
-  { id: "streak-hero", name: "Streak Hero", xpRequired: 350, icon: "🔥" },
-  { id: "game-champ", name: "Game Champ", xpRequired: 500, icon: "🏆" },
+  { id: "starter-star", name: "Starter Star", xpRequired: 50,  icon: "⭐" },
+  { id: "calm-master",  name: "Calm Master",  xpRequired: 120, icon: "🫧" },
+  { id: "quiz-whiz",    name: "Quiz Whiz",    xpRequired: 200, icon: "🧠" },
+  { id: "streak-hero",  name: "Streak Hero",  xpRequired: 350, icon: "🔥" },
+  { id: "game-champ",   name: "Game Champ",   xpRequired: 500, icon: "🏆" },
 ];
 
 // Games catalog (tiles render in #games-grid)
 const GAMES = [
-  { id:"choicequest", title:"Choice Quest", desc:"Pick the healthiest choice in quick scenarios.", status:"ready", unlock:{ type:"free" } },
-  { id:"breathing", title:"Breathing Buddy", desc:"60-second calm timer that earns XP.", status:"ready", unlock:{ type:"free" } },
+  { id:"choicequest", title:"Choice Quest",   desc:"Pick the healthiest choice in quick scenarios.", status:"ready", unlock:{ type:"free" } },
+  { id:"breathing",   title:"Breathing Buddy",desc:"60-second calm timer that earns XP.",            status:"ready", unlock:{ type:"free" } },
 
-  // Coming soon placeholders (unlock rules still show)
-  { id:"memory", title:"Memory Match", desc:"Match healthy coping tools.", status:"soon", unlock:{ type:"xp", xp:120 } },
-  { id:"coping-sort", title:"Coping Sort", desc:"Sort coping tools into ‘healthy’ vs ‘not helpful’.", status:"soon", unlock:{ type:"lessons", lessons:3 } },
-  { id:"streak-run", title:"Streak Run", desc:"Quick reaction game to keep your streak alive.", status:"soon", unlock:{ type:"level", level:3 } },
-  { id:"focus-dodge", title:"Focus Dodge", desc:"Avoid distractions; build focus.", status:"soon", unlock:{ type:"level", level:4 } },
-  { id:"goal-builder", title:"Goal Builder", desc:"Pick goals + tiny steps to reach them.", status:"soon", unlock:{ type:"xp", xp:350 } },
-  { id:"friendship-quiz", title:"Friendship Signals", desc:"Spot healthy vs unhealthy friend behaviors.", status:"soon", unlock:{ type:"lessons", lessons:7 } },
-  { id:"stress-lab", title:"Stress Lab", desc:"Try safe stress tools and see what works.", status:"soon", unlock:{ type:"xp", xp:600 } }
+  // Coming soon placeholders
+  { id:"memory",         title:"Memory Match",        desc:"Match healthy coping tools.",                       status:"soon", unlock:{ type:"xp",     xp:120 } },
+  { id:"coping-sort",    title:"Coping Sort",         desc:"Sort coping tools into ‘healthy’ vs ‘not helpful’.",status:"soon", unlock:{ type:"lessons", lessons:3 } },
+  { id:"streak-run",     title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",    status:"soon", unlock:{ type:"level",  level:3 } },
+  { id:"focus-dodge",    title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                  status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"goal-builder",   title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",            status:"soon", unlock:{ type:"xp",     xp:350 } },
+  { id:"friendship-quiz",title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",       status:"soon", unlock:{ type:"lessons", lessons:7 } },
+  { id:"stress-lab",     title:"Stress Lab",          desc:"Try safe stress tools and see what works.",         status:"soon", unlock:{ type:"xp",     xp:600 } }
 ];
 
-// 30 lesson curriculum
+// Tracks (for filtering lesson “focus”)
+const TRACKS = {
+  general:    { name: "General",                 desc: "Healthy choices, stress tools, confidence, asking for help." },
+  nicotine:   { name: "Nicotine / Vaping",       desc: "Cravings, pressure, coping skills, and refusing offers." },
+  alcohol:    { name: "Alcohol",                 desc: "Safer choices, boundaries, and handling social pressure." },
+  gaming:     { name: "Gaming / Screen habits",  desc: "Balance, routines, and stopping when you planned to stop." },
+  socialmedia:{ name: "Social media / Scrolling",desc: "Dopamine loops, focus, and healthier habits." },
+  caffeine:   { name: "Caffeine / Energy drinks",desc: "Sleep/energy basics and alternatives to overstimulation." },
+};
+
+// 30 lesson curriculum (NOW includes track tags)
 const CURRICULUM = [
-  { title:"Choices & Your Future", goal:"Learn how small choices add up over time." },
-  { title:"Handling Stress Safely", goal:"Build safe, healthy stress tools." },
-  { title:"Saying No With Confidence", goal:"Practice refusing pressure calmly." },
-  { title:"Friend Pressure vs Real Friends", goal:"Spot healthy friendships." },
-  { title:"Boredom Without Risk", goal:"Make a fun plan that’s safe." },
-  { title:"Feelings Are Signals", goal:"Name feelings and respond wisely." },
-  { title:"Big Emotions Plan", goal:"Use a 3-step plan when emotions spike." },
-  { title:"Asking for Help", goal:"Know who to talk to and how to ask." },
-  { title:"Online Influence", goal:"Handle trends, dares, and social pressure." },
-  { title:"Confidence & Self-Respect", goal:"Build self-respect so pressure loses power." },
+  { title:"Choices & Your Future",                   goal:"Learn how small choices add up over time.",           track:"general" },
+  { title:"Handling Stress Safely",                  goal:"Build safe, healthy stress tools.",                   track:"general" },
+  { title:"Saying No With Confidence",               goal:"Practice refusing pressure calmly.",                  track:"general" },
+  { title:"Friend Pressure vs Real Friends",         goal:"Spot healthy friendships.",                           track:"general" },
+  { title:"Boredom Without Risk",                    goal:"Make a fun plan that’s safe.",                        track:"general" },
+  { title:"Feelings Are Signals",                    goal:"Name feelings and respond wisely.",                   track:"general" },
+  { title:"Big Emotions Plan",                       goal:"Use a 3-step plan when emotions spike.",             track:"general" },
+  { title:"Asking for Help",                         goal:"Know who to talk to and how to ask.",                track:"general" },
+  { title:"Online Influence",                        goal:"Handle trends, dares, and social pressure.",         track:"socialmedia" },
+  { title:"Confidence & Self-Respect",               goal:"Build self-respect so pressure loses power.",        track:"general" },
 
-  { title:"Healthy Coping Tools", goal:"Choose coping tools that help long-term." },
-  { title:"Sleep, Food, Water = Brain Fuel", goal:"Build habits that protect your brain." },
-  { title:"Stress + School", goal:"Use safe tools before stress stacks up." },
-  { title:"Goals & Tiny Steps", goal:"Make goals and track small wins." },
-  { title:"Mistakes & Comebacks", goal:"Recover from mistakes without shame." },
-  { title:"Problem Solving", goal:"Use a simple method to solve problems." },
-  { title:"Positive Routines", goal:"Build routines that make life easier." },
-  { title:"Boundaries", goal:"Protect your time, body, and mind." },
-  { title:"Handling Conflict", goal:"Stay calm and communicate respectfully." },
-  { title:"Trusted Adults", goal:"Build your support team." },
+  { title:"Healthy Coping Tools",                    goal:"Choose coping tools that help long-term.",           track:"general" },
+  { title:"Sleep, Food, Water = Brain Fuel",         goal:"Build habits that protect your brain.",              track:"caffeine" },
+  { title:"Stress + School",                         goal:"Use safe tools before stress stacks up.",            track:"general" },
+  { title:"Goals & Tiny Steps",                      goal:"Make goals and track small wins.",                   track:"general" },
+  { title:"Mistakes & Comebacks",                    goal:"Recover from mistakes without shame.",               track:"general" },
+  { title:"Problem Solving",                         goal:"Use a simple method to solve problems.",             track:"general" },
+  { title:"Positive Routines",                       goal:"Build routines that make life easier.",              track:"gaming" },
+  { title:"Boundaries",                              goal:"Protect your time, body, and mind.",                 track:"general" },
+  { title:"Handling Conflict",                       goal:"Stay calm and communicate respectfully.",            track:"general" },
+  { title:"Trusted Adults",                          goal:"Build your support team.",                           track:"general" },
 
-  { title:"Curiosity vs Risk", goal:"Learn to be curious safely." },
-  { title:"Celebrating Safely", goal:"Have fun without risky choices." },
-  { title:"Helping a Friend", goal:"What to do if a friend is struggling." },
-  { title:"Self-Talk", goal:"Use kinder thoughts to make better choices." },
-  { title:"Dealing With Anger", goal:"Cool down without hurting anyone." },
-  { title:"Dealing With Anxiety", goal:"Use grounding + breathing tools." },
-  { title:"Building Confidence Skills", goal:"Practice skills that grow confidence." },
-  { title:"Being a Leader", goal:"Help others make safe choices too." },
-  { title:"Your Personal Safety Plan", goal:"Make a simple plan for tough moments." },
-  { title:"Review & Next Steps", goal:"Lock in what you learned and keep going." },
+  { title:"Cravings & Urges Plan",                   goal:"Make a plan for urges so they pass safely.",         track:"nicotine" },
+  { title:"Refusing Offers (Practice)",              goal:"Use a confident script and exit plan.",              track:"nicotine" },
+  { title:"Parties & Social Pressure",               goal:"Make choices when others are pushing you.",          track:"alcohol" },
+  { title:"Helping a Friend",                        goal:"What to do if a friend is struggling.",              track:"general" },
+  { title:"Self-Talk",                               goal:"Use kinder thoughts to make better choices.",        track:"general" },
+  { title:"Dealing With Anger",                      goal:"Cool down without hurting anyone.",                  track:"general" },
+  { title:"Dealing With Anxiety",                    goal:"Use grounding + breathing tools.",                   track:"general" },
+  { title:"Building Confidence Skills",              goal:"Practice skills that grow confidence.",              track:"general" },
+  { title:"Being a Leader",                          goal:"Help others make safe choices too.",                 track:"general" },
+  { title:"Review & Next Steps",                     goal:"Lock in what you learned and keep going.",           track:"general" },
 ];
 
 function makeLessonContent(title, goal){
@@ -138,22 +160,24 @@ function make12QuestionQuiz(title){
 
 const LESSONS = CURRICULUM.map((c, i) => ({
   day: i + 1,
+  track: c.track || "general",
   title: c.title,
   goal: c.goal,
   content: makeLessonContent(c.title, c.goal),
   quiz: make12QuestionQuiz(c.title)
 }));
 
-/* -----------------------------
-   STATE (fixes NaN + old saves)
---------------------------------*/
-
+/* =========================================================
+   STATE
+========================================================= */
 const DEFAULT_STATE = {
   currentLessonIndex: 0,
   completedDays: [],
   lastCompletedISO: null,
   streak: 0,
   highScore: 0,
+
+  selectedTrack: "general",
 
   xp: 0,
   level: 1,
@@ -185,17 +209,15 @@ function normalizeState(s){
     }
   };
 
-  merged.xp = Number(merged.xp);
-  if(!Number.isFinite(merged.xp)) merged.xp = 0;
+  merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
 
-  merged.level = Number(merged.level);
-  if(!Number.isFinite(merged.level)) merged.level = 1;
+  merged.xp = Number(merged.xp);            if(!Number.isFinite(merged.xp)) merged.xp = 0;
+  merged.level = Number(merged.level);      if(!Number.isFinite(merged.level)) merged.level = 1;
+  merged.highScore = Number(merged.highScore); if(!Number.isFinite(merged.highScore)) merged.highScore = 0;
+  merged.streak = Number(merged.streak);    if(!Number.isFinite(merged.streak)) merged.streak = 0;
 
-  merged.highScore = Number(merged.highScore);
-  if(!Number.isFinite(merged.highScore)) merged.highScore = 0;
-
-  merged.streak = Number(merged.streak);
-  if(!Number.isFinite(merged.streak)) merged.streak = 0;
+  merged.currentLessonIndex = Number(merged.currentLessonIndex);
+  if(!Number.isFinite(merged.currentLessonIndex)) merged.currentLessonIndex = 0;
 
   return merged;
 }
@@ -207,17 +229,63 @@ function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/* -----------------------------
-   XP / LEVEL
---------------------------------*/
+/* =========================================================
+   TRACKS (FILTERED LESSONS)
+========================================================= */
+function getActiveLessons(){
+  const t = state.selectedTrack || "general";
+  if(t === "general") return LESSONS;
 
+  // Show track lessons + also allow general lessons as “support”
+  const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
+  return filtered.length ? filtered : LESSONS;
+}
+
+function renderTrackUI(){
+  const sel = $("#track-select");
+  const preview = $("#track-preview");
+  const t = state.selectedTrack || "general";
+  if(sel) sel.value = t;
+  if(preview) preview.textContent = (TRACKS[t] ? TRACKS[t].desc : TRACKS.general.desc);
+}
+
+function bindTracks(){
+  const sel = $("#track-select");
+
+  $("#btn-apply-track")?.addEventListener("click", () => {
+    const v = sel?.value || "general";
+    state.selectedTrack = TRACKS[v] ? v : "general";
+    state.currentLessonIndex = 0;
+    saveState();
+    renderTrackUI();
+    showView("lesson");
+  });
+
+  $("#btn-clear-track")?.addEventListener("click", () => {
+    state.selectedTrack = "general";
+    state.currentLessonIndex = 0;
+    saveState();
+    renderTrackUI();
+    showView("lesson");
+  });
+
+  // Live preview when changing dropdown
+  sel?.addEventListener("change", () => {
+    const v = sel.value;
+    $("#track-preview") && ($("#track-preview").textContent = (TRACKS[v]?.desc || TRACKS.general.desc));
+  });
+}
+
+/* =========================================================
+   XP / LEVEL
+========================================================= */
 function recalcLevel(){
   const xp = Number(state.xp);
   state.xp = Number.isFinite(xp) ? xp : 0;
   state.level = 1 + Math.floor(state.xp / 200);
 }
 
-function addXP(amount, reason=""){
+function addXP(amount){
   const a = Number(amount);
   if(!Number.isFinite(a) || a <= 0) return;
 
@@ -233,10 +301,9 @@ function addXP(amount, reason=""){
   renderGamesCatalog();
 }
 
-/* -----------------------------
+/* =========================================================
    NAVIGATION
---------------------------------*/
-
+========================================================= */
 function showView(name){
   $$(".view").forEach(v => v.classList.add("hidden"));
   $(`#view-${name}`)?.classList.remove("hidden");
@@ -244,18 +311,17 @@ function showView(name){
   $$(".tab").forEach(t => t.classList.remove("active"));
   $(`.tab[data-view="${name}"]`)?.classList.add("active");
 
-  if(name === "lesson") renderLesson();
-  if(name === "games") renderGamesCatalog();
+  if(name === "lesson")   renderLesson();
+  if(name === "games")    renderGamesCatalog();
   if(name === "progress") renderProgress();
-  if(name === "profile") renderProfile();
-  if(name === "shop") renderShop();
-  if(name === "rate") renderRate();
+  if(name === "profile")  renderProfile();
+  if(name === "shop")     renderShop();
+  if(name === "rate")     renderRate();
+  if(name === "tracks")   renderTrackUI();
 }
 
 function bindNav(){
-  $$(".tab").forEach(btn => {
-    btn.addEventListener("click", () => showView(btn.dataset.view));
-  });
+  $$(".tab").forEach(btn => btn.addEventListener("click", () => showView(btn.dataset.view)));
 
   $("#btn-open-lesson")?.addEventListener("click", () => showView("lesson"));
   $("#btn-open-rate")?.addEventListener("click", () => showView("rate"));
@@ -263,41 +329,49 @@ function bindNav(){
   $("#btn-start-game")?.addEventListener("click", () => showView("games"));
 }
 
-/* -----------------------------
+/* =========================================================
    TIPS
---------------------------------*/
-
+========================================================= */
 function randomTip(){
-  const tip = TIPS[Math.floor(Math.random()*TIPS.length)];
-  $("#tip-text").textContent = tip;
+  const el = $("#tip-text");
+  if(!el) return;
+  el.textContent = TIPS[Math.floor(Math.random()*TIPS.length)];
 }
 
-/* -----------------------------
+/* =========================================================
    LESSONS + QUIZ
---------------------------------*/
-
+========================================================= */
 function renderLesson(){
-  const idx = clamp(state.currentLessonIndex, 0, LESSONS.length - 1);
-  const lesson = LESSONS[idx];
+  const lessons = getActiveLessons();
+  if(!lessons.length) return;
 
-  $("#lesson-title").textContent = lesson.title;
-  $("#lesson-day").textContent = `Day ${lesson.day}`;
-  $("#lesson-goal").textContent = `Goal: ${lesson.goal}`;
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  state.currentLessonIndex = idx;
+  saveState();
+
+  const lesson = lessons[idx];
+
+  $("#lesson-title") && ($("#lesson-title").textContent = lesson.title);
+  $("#lesson-day")   && ($("#lesson-day").textContent   = `Day ${lesson.day} • Track: ${TRACKS[state.selectedTrack]?.name || "General"}`);
+  $("#lesson-goal")  && ($("#lesson-goal").textContent  = `Goal: ${lesson.goal}`);
 
   const body = $("#lesson-content");
-  body.innerHTML = "";
-  lesson.content.forEach((p) => {
-    const el = document.createElement("p");
-    el.textContent = p;
-    body.appendChild(el);
-  });
+  if(body){
+    body.innerHTML = "";
+    lesson.content.forEach(p => {
+      const el = document.createElement("p");
+      el.textContent = p;
+      body.appendChild(el);
+    });
+  }
 
   renderQuiz(lesson);
-  updateLessonStatus();
+  updateLessonStatus(lesson.day);
 }
 
 function renderQuiz(lesson){
   const quiz = $("#quiz");
+  if(!quiz) return;
   quiz.innerHTML = "";
 
   lesson.quiz.forEach((item, qi) => {
@@ -327,8 +401,7 @@ function renderQuiz(lesson){
       const span = document.createElement("span");
       span.textContent = opt;
 
-      label.appendChild(input);
-      label.appendChild(span);
+      label.append(input, span);
       block.appendChild(label);
     });
 
@@ -337,8 +410,9 @@ function renderQuiz(lesson){
 }
 
 function quizScoreForCurrentLesson(){
-  const idx = clamp(state.currentLessonIndex, 0, LESSONS.length - 1);
-  const lesson = LESSONS[idx];
+  const lessons = getActiveLessons();
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  const lesson = lessons[idx];
 
   let correct = 0;
   lesson.quiz.forEach((item, qi) => {
@@ -346,50 +420,49 @@ function quizScoreForCurrentLesson(){
     if(picked && Number(picked.value) === item.answer) correct++;
   });
 
-  return { correct, total: lesson.quiz.length };
+  return { correct, total: lesson.quiz.length, day: lesson.day };
 }
 
-function updateLessonStatus(){
-  const idx = clamp(state.currentLessonIndex, 0, LESSONS.length - 1);
-  const day = LESSONS[idx].day;
+function updateLessonStatus(day){
+  const el = $("#lesson-status");
+  if(!el) return;
   const done = state.completedDays.includes(day);
-
-  $("#lesson-status").textContent = done
+  el.textContent = done
     ? "✅ You already completed this lesson!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
 
 function bindLessonButtons(){
   $("#btn-prev-lesson")?.addEventListener("click", () => {
-    state.currentLessonIndex = clamp(state.currentLessonIndex - 1, 0, LESSONS.length - 1);
+    const lessons = getActiveLessons();
+    state.currentLessonIndex = clamp(state.currentLessonIndex - 1, 0, lessons.length - 1);
     saveState();
     renderLesson();
   });
 
   $("#btn-next-lesson")?.addEventListener("click", () => {
-    state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, LESSONS.length - 1);
+    const lessons = getActiveLessons();
+    state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, lessons.length - 1);
     saveState();
     renderLesson();
   });
 
   $("#btn-complete-lesson")?.addEventListener("click", () => {
-    const idx = clamp(state.currentLessonIndex, 0, LESSONS.length - 1);
-    const day = LESSONS[idx].day;
-
     const score = quizScoreForCurrentLesson();
 
     if(score.correct < score.total){
-      $("#lesson-status").textContent =
-        `Almost! Quiz score: ${score.correct}/${score.total}. Answer all correctly to complete.`;
+      $("#lesson-status") && ($("#lesson-status").textContent =
+        `Almost! Quiz score: ${score.correct}/${score.total}. Answer all correctly to complete.`);
       return;
     }
 
-    // XP for perfect quiz + lesson completion (first time only)
-    const firstTime = !state.completedDays.includes(day);
+    const firstTime = !state.completedDays.includes(score.day);
     if(firstTime){
-      addXP(score.total * 5, "Perfect quiz");
-      state.completedDays.push(day);
-      addXP(50, "Lesson complete");
+      // XP: quiz + lesson
+      addXP(score.total * 5); // 5 XP per question
+      state.completedDays.push(score.day);
+      saveState();
+      addXP(50);
     }
 
     // streak logic
@@ -399,33 +472,27 @@ function bindLessonButtons(){
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayISO = isoDate(yesterday);
 
-      if(state.lastCompletedISO === yesterdayISO){
-        state.streak += 1;
-      } else {
-        state.streak = 1;
-      }
+      state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
     }
 
     saveState();
     updateHomeStats();
-    updateLessonStatus();
+    updateLessonStatus(score.day);
   });
 }
 
-/* -----------------------------
+/* =========================================================
    HOME STATS
---------------------------------*/
-
+========================================================= */
 function updateHomeStats(){
-  $("#streak-text").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`;
-  $("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`;
+  $("#streak-text")  && ($("#streak-text").textContent  = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
+  $("#streak-text-2")&& ($("#streak-text-2").textContent= `${state.streak} day${state.streak === 1 ? "" : "s"}`);
 }
 
-/* -----------------------------
+/* =========================================================
    GAMES (catalog + playable)
---------------------------------*/
-
+========================================================= */
 let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
@@ -462,20 +529,6 @@ function renderGamesCatalog(){
     const card = document.createElement("div");
     card.className = "card gameCard";
 
-    const top = document.createElement("div");
-    top.className = "gameTileTop";
-
-    const tag1 = document.createElement("span");
-    tag1.className = "tag " + (unlocked ? "good" : "lock");
-    tag1.textContent = unlocked ? "Unlocked ✅" : "Locked 🔒";
-
-    const tag2 = document.createElement("span");
-    tag2.className = "tag " + (game.status === "ready" ? "good" : "soon");
-    tag2.textContent = (game.status === "ready") ? "Playable" : "Coming soon";
-
-    top.appendChild(tag1);
-    top.appendChild(tag2);
-
     const h = document.createElement("h3");
     h.textContent = game.title;
 
@@ -485,44 +538,39 @@ function renderGamesCatalog(){
 
     const p2 = document.createElement("p");
     p2.className = "muted";
-    p2.textContent = reason;
+    p2.textContent = `${reason} • ${game.status === "ready" ? "Playable" : "Coming soon"}`;
 
     const btn = document.createElement("button");
     btn.className = "btn primary";
-    btn.textContent = (game.status === "ready") ? "Play" : "Locked / Soon";
+    btn.textContent = (game.status === "ready" && unlocked) ? "Play" : "Locked / Soon";
 
-    if(!unlocked || game.status !== "ready"){
-      btn.classList.add("disabled");
+    if(!(game.status === "ready" && unlocked)){
       btn.disabled = true;
+      btn.classList.add("disabled");
     } else {
       btn.addEventListener("click", () => launchGame(game.id));
     }
 
-    card.appendChild(top);
-    card.appendChild(h);
-    card.appendChild(p);
-    card.appendChild(p2);
-    card.appendChild(btn);
-
+    card.append(h,p,p2,btn);
     grid.appendChild(card);
   });
 }
 
 function openGameArea(title){
-  $("#game-area").classList.remove("hidden");
-  $("#game-title").textContent = title;
-  $("#game-score").textContent = `Score: ${gameScore}`;
-  $("#btn-restart-game").classList.add("hidden");
+  $("#game-area")?.classList.remove("hidden");
+  $("#game-title") && ($("#game-title").textContent = title);
+  $("#game-score") && ($("#game-score").textContent = `Score: ${gameScore}`);
+  $("#btn-restart-game")?.classList.add("hidden");
 }
 
 function closeGameArea(){
-  $("#game-area").classList.add("hidden");
-  $("#game-content").innerHTML = "";
+  $("#game-area")?.classList.add("hidden");
+  $("#game-content") && ($("#game-content").innerHTML = "");
   gameMode = null;
 }
 
 function bindGameShellButtons(){
-  $("#btn-exit-game")?.addEventListener("click", () => closeGameArea());
+  $("#btn-exit-game")?.addEventListener("click", closeGameArea);
   $("#btn-restart-game")?.addEventListener("click", () => {
     if(gameMode === "choicequest") startChoiceQuest();
     if(gameMode === "breathing") startBreathing();
@@ -545,6 +593,7 @@ function startChoiceQuest(){
 
 function renderChoiceQuest(){
   const area = $("#game-content");
+  if(!area) return;
   area.innerHTML = "";
 
   const scenario = GAME_SCENARIOS[gameIndex];
@@ -554,14 +603,14 @@ function renderChoiceQuest(){
       <p>You finished Choice Quest.</p>
       <p class="muted">Final score: <strong>${gameScore}</strong></p>
     `;
-    $("#btn-restart-game").classList.remove("hidden");
+    $("#btn-restart-game")?.classList.remove("hidden");
 
     if(gameScore > state.highScore){
       state.highScore = gameScore;
       saveState();
     }
 
-    addXP(25, "Choice Quest finished");
+    addXP(25);
     renderProgress();
     return;
   }
@@ -587,7 +636,7 @@ function renderChoiceQuest(){
         gameScore = Math.max(0, gameScore - 3);
       }
 
-      $("#game-score").textContent = `Score: ${gameScore}`;
+      $("#game-score") && ($("#game-score").textContent = `Score: ${gameScore}`);
 
       const why = document.createElement("p");
       why.className = "muted";
@@ -615,6 +664,7 @@ function startBreathing(){
   openGameArea("Breathing Buddy");
 
   const area = $("#game-content");
+  if(!area) return;
   area.innerHTML = "";
 
   const info = document.createElement("p");
@@ -644,7 +694,7 @@ function startBreathing(){
   let phaseT = 0;
   let finished = false;
 
-  const tick = () => {
+  const id = setInterval(() => {
     timerText.textContent = `Time left: ${t}s`;
     ring.textContent = phase;
 
@@ -665,21 +715,16 @@ function startBreathing(){
       timerText.textContent = "Done. You just practiced calming your body.";
       if(!finished){
         finished = true;
-        addXP(10, "Breathing complete");
+        addXP(10);
       }
-      $("#btn-restart-game").classList.remove("hidden");
-      return;
+      $("#btn-restart-game")?.classList.remove("hidden");
     }
-  };
-
-  tick();
-  const id = setInterval(tick, 1000);
+  }, 1000);
 }
 
-/* -----------------------------
+/* =========================================================
    PROFILE / SHOP
---------------------------------*/
-
+========================================================= */
 function renderProfile(){
   if(!$("#profile-name")) return;
 
@@ -687,16 +732,16 @@ function renderProfile(){
   $("#profile-xp").textContent = String(state.xp);
   $("#profile-level").textContent = String(state.level);
 
-  // auto-unlock badges based on XP
+  // auto-unlock badges
   const unlockedIds = BADGES.filter(b => state.xp >= b.xpRequired).map(b => b.id);
-  const merged = new Set([...(state.ownedBadges || []), ...unlockedIds]);
-  state.ownedBadges = Array.from(merged);
+  state.ownedBadges = Array.from(new Set([...(state.ownedBadges||[]), ...unlockedIds]));
   saveState();
 
   const wrap = $("#owned-badges");
   const empty = $("#owned-badges-empty");
-  wrap.innerHTML = "";
+  if(!wrap || !empty) return;
 
+  wrap.innerHTML = "";
   if(state.ownedBadges.length === 0){
     empty.textContent = "No badges yet — earn XP to unlock some!";
     return;
@@ -714,14 +759,12 @@ function renderProfile(){
 }
 
 function renderShop(){
-  if(!$("#shop-grid")) return;
-
   const grid = $("#shop-grid");
-  grid.innerHTML = "";
+  if(!grid) return;
 
+  grid.innerHTML = "";
   BADGES.forEach(b => {
     const unlocked = state.xp >= b.xpRequired;
-
     const card = document.createElement("div");
     card.className = "card shopCard" + (unlocked ? "" : " locked");
     card.innerHTML = `
@@ -733,10 +776,9 @@ function renderShop(){
   });
 }
 
-/* -----------------------------
+/* =========================================================
    RATE (clickable stars)
---------------------------------*/
-
+========================================================= */
 function bindRatingStarsOnce(){
   if(window.__starsBound) return;
   window.__starsBound = true;
@@ -755,7 +797,7 @@ function bindRatingStarsOnce(){
     state.ratings.count += 1;
     saveState();
 
-    $("#rating-thanks").textContent = "Thanks for rating! ⭐";
+    $("#rating-thanks") && ($("#rating-thanks").textContent = "Thanks for rating! ⭐");
     renderRate();
   });
 }
@@ -772,16 +814,17 @@ function renderRate(){
   $("#rating-count").textContent = count === 0 ? "No ratings yet" : `${count} rating${count===1?"":"s"}`;
 }
 
-/* -----------------------------
+/* =========================================================
    PROGRESS
---------------------------------*/
-
+========================================================= */
 function renderProgress(){
-  $("#completed-count").textContent = String(state.completedDays.length);
-  $("#highscore").textContent = String(state.highScore);
-  $("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`;
+  $("#completed-count") && ($("#completed-count").textContent = String(state.completedDays.length));
+  $("#highscore") && ($("#highscore").textContent = String(state.highScore));
+  $("#streak-text-2") && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
 
   const list = $("#completed-list");
+  if(!list) return;
+
   list.innerHTML = "";
   const daysSorted = [...state.completedDays].sort((a,b)=>a-b);
 
@@ -808,6 +851,7 @@ function bindReset(){
     state = normalizeState(loadState());
     saveState();
     recalcLevel();
+
     updateHomeStats();
     renderProgress();
     renderLesson();
@@ -815,32 +859,21 @@ function bindReset(){
     renderShop();
     renderRate();
     renderGamesCatalog();
+    renderTrackUI();
   });
 }
 
-/* -----------------------------
-   HELPERS
---------------------------------*/
-
-function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
-
-function isoDate(d){
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
-
-/* -----------------------------
-   INIT (bind everything once)
---------------------------------*/
-
+/* =========================================================
+   INIT
+========================================================= */
 function init(){
-  $("#year").textContent = new Date().getFullYear();
+  $("#year") && ($("#year").textContent = new Date().getFullYear());
 
   recalcLevel();
+  saveState();
 
   bindNav();
+  bindTracks();
   bindLessonButtons();
   bindGameShellButtons();
   bindReset();
@@ -849,12 +882,15 @@ function init(){
   $("#btn-new-tip")?.addEventListener("click", randomTip);
   randomTip();
 
+  updateHomeStats();
+
   renderLesson();
   renderProgress();
   renderProfile();
   renderShop();
   renderRate();
   renderGamesCatalog();
+  renderTrackUI();
 }
 
 init();
