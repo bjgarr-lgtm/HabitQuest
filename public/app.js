@@ -1246,27 +1246,7 @@ function gameUnlockStatus(game){
 function renderGamesCatalog(){
   const grid = $("#games-grid");
   if(!grid) return;
-
   grid.innerHTML = "";
-
-  // small helper buttons at top (Phase 3)
-  const tools = document.createElement("div");
-  tools.className = "row";
-  tools.style.marginTop = "0";
-  tools.innerHTML = `
-    <button class="btn small" type="button" id="btn-open-map">Open Story Map 🗺️</button>
-    <button class="btn small" type="button" id="btn-open-hq">Open Habit Quest 📖</button>
-  `;
-  grid.appendChild(tools);
-
-  tools.querySelector("#btn-open-map")?.addEventListener("click", () => showView("map"));
-  tools.querySelector("#btn-open-hq")?.addEventListener("click", () => {
-    const g = GAMES.find(x => x.id === "habitquest");
-    if(!g) return;
-    const { unlocked } = gameUnlockStatus(g);
-    if(!unlocked) return alert("Complete 1 lesson to unlock Habit Quest.");
-    startHabitQuest();
-  });
 
   GAMES.forEach(game => {
     const { unlocked, reason } = gameUnlockStatus(game);
@@ -1287,19 +1267,23 @@ function renderGamesCatalog(){
 
     const btn = document.createElement("button");
     btn.className = "btn primary";
-    btn.textContent = (game.status === "ready" && unlocked) ? "Play" : "Locked / Soon";
+    btn.type = "button";
 
-    if(!(game.status === "ready" && unlocked)){
+    const playable = (game.status === "ready" && unlocked);
+    btn.textContent = playable ? (game.id === "storymap" ? "Open" : "Play") : "Locked / Soon";
+
+    if(!playable){
       btn.disabled = true;
       btn.classList.add("disabled");
     }else{
       btn.addEventListener("click", () => launchGame(game.id));
     }
 
-    card.append(h,p,p2,btn);
+    card.append(h, p, p2, btn);
     grid.appendChild(card);
   });
 }
+
 
 function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();

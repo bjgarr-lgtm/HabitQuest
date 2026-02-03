@@ -363,3 +363,28 @@ h1{ margin:0; font-size:18px; }
 #view-games .card{
   width: 100%;
 }
+
+/* Make all game tiles same size + layout */
+.gameCard{
+  display:flex;
+  flex-direction:column;
+  min-height: 190px;
+}
+
+.gameCard .btn{
+  margin-top:auto; /* pushes button to bottom */
+  width: fit-content;
+}
+
+/* =========================
+   Mini-Games grid: true tile layout (fix tiny/offset cards)
+========================= */
+#games-grid.grid{
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/* override the global 12-col span rule for game tiles only */
+#games-grid.grid > .card{
+  grid-column: auto;
+}
