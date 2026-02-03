@@ -1162,7 +1162,7 @@ function startBreathing(){
 }
 
 /* =========================================================
-   HABIT QUEST — BRANCHING NODE GRAPH
+   HABIT QUEST — BRANCHING NODE GRAPH (PHASE 1 EXPANDED)
 ========================================================= */
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
@@ -1187,103 +1187,200 @@ function hqCtx(){
   };
 }
 
-// Helpers for branching state
+/* ---------- Helpers for branching state ---------- */
 function hqMarkVisited(nodeId){
   state.habitQuest.visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
   state.habitQuest.visited[nodeId] = true;
 
   state.habitQuest.history = Array.isArray(state.habitQuest.history) ? state.habitQuest.history : [];
   state.habitQuest.history.push(nodeId);
-  state.habitQuest.history = state.habitQuest.history.slice(-50);
+  state.habitQuest.history = state.habitQuest.history.slice(-80);
 }
-
 function hqSetFlag(key, value){
   state.habitQuest.flags = (state.habitQuest.flags && typeof state.habitQuest.flags === "object") ? state.habitQuest.flags : {};
   state.habitQuest.flags[key] = value;
 }
-
 function hqHasFlag(key){
   return !!(state.habitQuest.flags && state.habitQuest.flags[key]);
 }
-
 function hqCan(choice){
   const req = choice.require || null;
   if(!req) return true;
   const tok = safeNum(req.token, 0);
   if(tok > 0 && safeNum(state.habitQuest.tokens,0) < tok) return false;
   if(req.flag && !hqHasFlag(req.flag)) return false;
+  if(req.minWisdom && safeNum(state.habitQuest.wisdom,0) < safeNum(req.minWisdom,0)) return false;
   return true;
 }
 
-// NODE GRAPH (IDs + branching next pointers)
+/* =========================================================
+   NODE GRAPH (Phase 1 expanded: real branches + mini endings)
+========================================================= */
 const HQ_NODES = {
-  // Chapter 1
+  /* =========================
+     CHAPTER 1 — SUNNY TOWN
+  ========================= */
   hq_start: {
-    chapter: "Chapter 1: The First Steps",
-    text: (ctx) => `You arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `You arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
     choices: [
-      { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch.", next:"hq_mentor" },
-      { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1 },        why:"Fitting in isn’t worth it.", next:"hq_mentor" },
-      { text:"Walk away and find a trusted adult.",        good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"askedAdult", value:true } }, why:"Asking for help is strong.", next:"hq_mentor" },
+      { text:"Say no calmly and suggest a safe activity.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch.", next:"hq_mentor_intro" },
+      { text:"Say yes to fit in.",                         good:false,effects:{ hearts:-1 },        why:"Pressure can push you off track.", next:"hq_trouble_intro" },
+      { text:"Walk away and find a trusted adult.",        good:true, effects:{ wisdom:+1, xp:+12, flag:{ key:"askedAdult", value:true } }, why:"Asking for help is strong.", next:"hq_safe_start" },
     ]
   },
 
-  hq_mentor: {
-    chapter: "Chapter 1: The First Steps",
-    text: () => `A mentor appears: “When you feel pressure, try: Pause → No → Switch.” Want to practice?`,
+  hq_safe_start: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `A trusted adult helps you make an easy plan: “If someone pressures you, you can always leave.”`,
+    choices: [
+      { text:"Save a ‘safe exit plan’ in your head.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"exitPlan", value:true } }, why:"Plans make hard moments easier.", next:"hq_mentor_intro" },
+      { text:"Say “I’m fine” and don’t make a plan.", good:false,effects:{ hearts:-1 }, why:"Having a plan helps future you.", next:"hq_mentor_intro" },
+    ]
+  },
+
+  hq_trouble_intro: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `Uh‑oh. The risky choice causes a problem. You feel embarrassed and stressed.`,
+    choices: [
+      { text:"Tell the truth and ask for help fixing it.", good:true, effects:{ wisdom:+1, xp:+12, flag:{ key:"ownedMistake", value:true } }, why:"Honesty helps you recover faster.", next:"hq_trouble_repair" },
+      { text:"Try to hide it.",                            good:false,effects:{ hearts:-1 },        why:"Secrets usually make stress bigger.", next:"hq_trouble_repair" },
+    ]
+  },
+
+  hq_trouble_repair: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `You get a chance to repair the situation. What do you do first?`,
+    choices: [
+      { text:"Pause → breathe → choose the next right step.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"calmFirst", value:true } }, why:"Calm first = better choices.", next:"hq_mentor_intro" },
+      { text:"Rush and hope it goes away.",                   good:false,effects:{ hearts:-1 },        why:"Rushing usually creates more problems.", next:"hq_mentor_intro" },
+    ]
+  },
+
+  hq_mentor_intro: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `A mentor appears: “When you feel pressure, try: Pause → No → Switch. Want to practice?”`,
     choices: [
       { text:"Practice the 3‑step ‘No’ out loud.", good:true,  effects:{ wisdom:+1, xp:+12, flag:{ key:"practicedNo", value:true } }, why:"Practice makes real life easier.", next:"hq_kid_stressed" },
-      { text:"Ignore them and scroll forever.",    good:false, effects:{ hearts:-1 }, why:"Escapes can become habits.", next:"hq_kid_stressed" },
+      { text:"Skip practice and scroll forever.",   good:false, effects:{ hearts:-1 },               why:"Escapes can become habits.", next:"hq_scroll_loop" },
+    ]
+  },
+
+  hq_scroll_loop: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `You scroll and scroll. It feels good for a minute… then you feel worse.`,
+    choices: [
+      { text:"Stop scrolling and do a 2‑minute reset.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"tidyReset", value:true } }, why:"Short resets break loops.", next:"hq_kid_stressed" },
+      { text:"Keep scrolling anyway.",                  good:false,effects:{ hearts:-1 }, why:"Loops steal your time and mood.", next:"hq_kid_stressed" },
     ]
   },
 
   hq_kid_stressed: {
-    chapter: "Chapter 1: The First Steps",
+    chapter: "Chapter 1: Sunny Town",
     text: (ctx) => {
       const last = ctx.lastLessonTitle ? `You remember your last lesson: “${ctx.lastLessonTitle}.”` : "You remember: small choices add up.";
       return `${last} A kid nearby looks stressed. What do you do?`;
     },
     choices: [
-      // Branch: if you previously asked an adult, you get an extra “team up” option later (flag use)
-      { text:"Offer a calm tool: 4 slow breaths together.", good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"helpedKid", value:true } }, why:"Calm tools help fast.", next:"hq_gate" },
-      { text:"Say “deal with it” and leave.",               good:false, effects:{ hearts:-1 },        why:"Kindness matters.", next:"hq_gate" },
-      { text:"Help them find a trusted adult.",             good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"askedAdult", value:true } }, why:"Support is powerful.", next:"hq_gate" },
+      { text:"Offer a calm tool: 4 slow breaths together.", good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"helpedKid", value:true } }, why:"Calm tools help fast.", next:"hq_help_followup" },
+      { text:"Say “deal with it” and leave.",               good:false, effects:{ hearts:-1 },        why:"Kindness matters.", next:"hq_gate_1" },
+      { text:"Help them find a trusted adult.",             good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"askedAdult", value:true } }, why:"Support is powerful.", next:"hq_gate_1" },
     ]
   },
 
-  hq_gate: {
-    chapter: "Chapter 1: The First Steps",
+  hq_help_followup: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `The kid calms down a bit. They ask: “What do I do next?”`,
+    choices: [
+      { text:"Say: “Let’s talk to a trusted adult together.”", good:true, effects:{ wisdom:+1, xp:+12, flag:{ key:"teamHelp", value:true } }, why:"Teamwork makes asking easier.", next:"hq_gate_1" },
+      { text:"Say: “Just ignore your feelings.”",              good:false,effects:{ hearts:-1 }, why:"Ignoring feelings builds pressure.", next:"hq_gate_1" },
+    ]
+  },
+
+  /* Token sink (worth it): Rest scene restores hearts */
+  hq_campfire_rest: {
+    chapter: "Chapter 1: Sunny Town",
+    text: () => `You find a quiet campfire spot. Rest can refill your energy.`,
+    choices: [
+      { text:"Spend 1 token to rest and restore +1 heart.", require:{ token:1 }, good:true, effects:{ tokens:-1, hearts:+1, xp:+8, flag:{ key:"rested", value:true } }, why:"Rest is a real skill.", next:"hq_gate_1" },
+      { text:"Save tokens and keep going.",                  good:true, effects:{ xp:+2 }, why:"Saving is fine too.", next:"hq_gate_1" },
+    ]
+  },
+
+  hq_gate_1: {
+    chapter: "Chapter 1: Sunny Town",
     text: () => `Gatekeeper: “To enter the next area, you need a Lesson Token.”`,
     choices: [
       { text:"Use 1 token to open the gate.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice! Lesson power unlocked.", next:"hq_forest_intro" },
-      { text:"Exit and earn a token by completing a lesson.",      good:true, end:true,                      why:"Finish a lesson to earn a token." },
+      { text:"Take a detour to the campfire rest spot.",           good:true, effects:{ xp:+2 }, why:"A quick detour can help.", next:"hq_campfire_rest" },
+      { text:"Exit and earn a token by completing a lesson.",      good:true, end:true,          why:"Finish a lesson to earn a token." },
     ]
   },
 
-  // Chapter 2 (Focus Forest) — with a small branch
+  /* =========================
+     CHAPTER 2 — FOCUS FOREST
+  ========================= */
   hq_forest_intro: {
-    chapter: "Chapter 2: The Focus Forest",
+    chapter: "Chapter 2: Focus Forest",
     text: () => `In Focus Forest, someone offers “instant fun” that could turn into a bad habit.`,
     choices: [
-      { text:"Pause and ask: “Will this help Future Me?”", good:true,  effects:{ wisdom:+1, xp:+15, flag:{ key:"usedFutureMe", value:true } }, why:"That question protects you.", next:"hq_forest_step" },
-      { text:"Do it without thinking.",                    good:false, effects:{ hearts:-1 },               why:"Pausing is your superpower.", next:"hq_forest_step" },
+      { text:"Pause and ask: “Will this help Future Me?”", good:true,  effects:{ wisdom:+1, xp:+15, flag:{ key:"usedFutureMe", value:true } }, why:"That question protects you.", next:"hq_forest_split" },
+      { text:"Do it without thinking.",                    good:false, effects:{ hearts:-1 },               why:"Pausing is your superpower.", next:"hq_forest_consequence" },
+    ]
+  },
+
+  hq_forest_consequence: {
+    chapter: "Chapter 2: Focus Forest",
+    text: () => `The “instant fun” turns into instant regret. You feel distracted and annoyed.`,
+    choices: [
+      { text:"Admit it and choose a tiny step back to control.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"comeback", value:true } }, why:"Comebacks are a skill.", next:"hq_forest_split" },
+      { text:"Blame yourself and spiral.",                       good:false,effects:{ hearts:-1 },        why:"Mean self-talk makes it harder.", next:"hq_forest_split" },
+    ]
+  },
+
+  /* Real branch: practicedNo unlocks a stronger path */
+  hq_forest_split: {
+    chapter: "Chapter 2: Focus Forest",
+    text: () => `A group blocks the trail and says, “Prove you’re brave.”`,
+    choices: [
+      { text:"Use your practiced script: “No thanks. I’m heading out.”", require:{ flag:"practicedNo" }, good:true, effects:{ wisdom:+1, xp:+18, flag:{ key:"strongNo", value:true } }, why:"Practice paid off.", next:"hq_forest_step" },
+      { text:"Basic no: “No.” (and step away)", good:true, effects:{ wisdom:+1, xp:+12 }, why:"A simple no is still strong.", next:"hq_forest_step" },
+      { text:"Freeze and wait for them to stop.", good:false, effects:{ hearts:-1 }, why:"Freezing happens—let’s build a plan.", next:"hq_forest_recover" },
+    ]
+  },
+
+  hq_forest_recover: {
+    chapter: "Chapter 2: Focus Forest",
+    text: () => `You froze. That’s okay. What’s the best next move?`,
+    choices: [
+      { text:"Do 2 slow breaths, then repeat ‘No’ and leave.", good:true, effects:{ wisdom:+1, xp:+12, flag:{ key:"recovered", value:true } }, why:"You can recover mid‑moment.", next:"hq_forest_step" },
+      { text:"Say yes just to end the moment.",                good:false,effects:{ hearts:-1 }, why:"That teaches pressure that it works.", next:"hq_forest_step" },
     ]
   },
 
   hq_forest_step: {
-    chapter: "Chapter 2: The Focus Forest",
+    chapter: "Chapter 2: Focus Forest",
     text: () => `You find a sign: “Tiny steps beat giant promises.” Pick your tiny step.`,
     choices: [
-      { text:"Drink water + snack (brain fuel).",       good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"brainFuel", value:true } }, why:"Brain fuel helps choices.", next:"hq_forest_boss" },
-      { text:"2‑minute tidy reset.",                    good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"tidyReset", value:true } }, why:"Small wins add up.", next:"hq_forest_boss" },
-      { text:"Write 1 helpful thought about yourself.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"kindThought", value:true } }, why:"Kind self-talk matters.", next:"hq_forest_boss" },
+      { text:"Drink water + snack (brain fuel).",       good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"brainFuel", value:true } }, why:"Brain fuel helps choices.", next:"hq_forest_bonus_offer" },
+      { text:"2‑minute tidy reset.",                    good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"tidyReset", value:true } }, why:"Small wins add up.", next:"hq_forest_bonus_offer" },
+      { text:"Write 1 kind thought about yourself.",    good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"kindThought", value:true } }, why:"Kind self-talk matters.", next:"hq_forest_bonus_offer" },
+    ]
+  },
+
+  /* Token sink: “bonus scene” worth buying */
+  hq_forest_bonus_offer: {
+    chapter: "Chapter 2: Focus Forest",
+    text: () => `A friendly guide whispers: “Want a secret training scene? It costs 1 token but gives a big boost.”`,
+    choices: [
+      { text:"Spend 1 token for secret training (+30 XP).", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+30, flag:{ key:"didSecretTraining", value:true } }, why:"Worth it—big skill boost.", next:"hq_forest_boss" },
+      { text:"Skip it and keep going.",                      good:true, effects:{ xp:+2 }, why:"Saving is okay.", next:"hq_forest_boss" },
     ]
   },
 
   hq_forest_boss: {
-    chapter: "Chapter 2: The Focus Forest",
+    chapter: "Chapter 2: Focus Forest",
     text: (ctx) => {
-      // a tiny conditional line based on flags (branch flavor)
       const bonus = ctx.flags && ctx.flags.helpedKid ? "You feel proud you helped someone earlier—confidence boost." : "You take a steady breath.";
       return `Boss moment: a crowd pressures you. ${bonus}`;
     },
@@ -1294,7 +1391,7 @@ const HQ_NODES = {
   },
 
   hq_bridge: {
-    chapter: "Chapter 2: The Focus Forest",
+    chapter: "Chapter 2: Focus Forest",
     text: () => `A bridge guard says: “Tokens open the bridge.”`,
     choices: [
       { text:"Use 1 token to cross.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Forward!", next:"hq_mountain_intro" },
@@ -1302,9 +1399,11 @@ const HQ_NODES = {
     ]
   },
 
-  // Chapter 3 (Mood Mountain) — short demo branch: “askedAdult” unlocks a safer extra choice
+  /* =========================
+     CHAPTER 3 — MOOD MOUNTAIN
+  ========================= */
   hq_mountain_intro: {
-    chapter: "Chapter 3: The Mood Mountain",
+    chapter: "Chapter 3: Mood Mountain",
     text: () => `Up the mountain, feelings get big fast. A character says: “When emotions spike, your body needs calm first.”`,
     choices: [
       { text:"Try a calm reset: slow breaths + relax shoulders.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Calm first = better choices.", next:"hq_mountain_boost" },
@@ -1313,40 +1412,137 @@ const HQ_NODES = {
   },
 
   hq_mountain_boost: {
-    chapter: "Chapter 3: The Mood Mountain",
+    chapter: "Chapter 3: Mood Mountain",
     text: () => `Someone offers an “energy boost” product to feel powerful instantly.`,
     choices: [
       { text:"Skip it and choose water/food/rest instead.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Brain fuel beats quick tricks.", next:"hq_mountain_nameit" },
       { text:"Take it to feel cool.",                        good:false,effects:{ hearts:-1 },        why:"Quick boosts can cause problems.", next:"hq_mountain_nameit" },
-      // only if you ever asked an adult (flag gate)
-      { text:"Text/check in with a trusted adult first.", require:{ flag:"askedAdult" }, good:true, effects:{ wisdom:+1, xp:+18 }, why:"Support makes choices easier.", next:"hq_mountain_nameit" },
+      { text:"Text/check in with a trusted adult first.", require:{ flag:"askedAdult" }, good:true, effects:{ wisdom:+1, xp:+18, flag:{ key:"checkedIn", value:true } }, why:"Support makes choices easier.", next:"hq_mountain_nameit" },
     ]
   },
 
   hq_mountain_nameit: {
-    chapter: "Chapter 3: The Mood Mountain",
+    chapter: "Chapter 3: Mood Mountain",
     text: () => `You meet a helper who teaches: “Name it to tame it.” What do you do?`,
     choices: [
-      { text:"Name the feeling: “I feel stressed.”", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"namedFeeling", value:true } }, why:"Naming feelings helps control.", next:"hq_tunnel" },
-      { text:"Pretend you feel nothing.",            good:false,effects:{ hearts:-1 },        why:"Ignoring feelings can build pressure.", next:"hq_tunnel" },
+      { text:"Name the feeling: “I feel stressed.”", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"namedFeeling", value:true } }, why:"Naming feelings helps control.", next:"hq_mountain_choice_room" },
+      { text:"Pretend you feel nothing.",            good:false,effects:{ hearts:-1 },        why:"Ignoring feelings can build pressure.", next:"hq_mountain_choice_room" },
     ]
   },
 
-  hq_tunnel: {
-    chapter: "Chapter 3: The Mood Mountain",
+  /* Real branch room with multiple exits + flags */
+  hq_mountain_choice_room: {
+    chapter: "Chapter 3: Mood Mountain",
+    text: () => `You reach a fork with three paths: “Confidence Ridge”, “Kind Canyon”, and “Exit Tunnel”.`,
+    choices: [
+      { text:"Take Confidence Ridge (practice boundaries).", good:true, effects:{ xp:+8 }, why:"Let’s build confidence skills.", next:"hq_ridge_boundaries" },
+      { text:"Take Kind Canyon (help a friend scene).",      good:true, effects:{ xp:+8 }, why:"Kindness is strength.", next:"hq_canyon_friend" },
+      { text:"Head to the Exit Tunnel (token gate).",        good:true, effects:{ xp:+2 }, why:"You can continue the main path.", next:"hq_tunnel_gate" },
+    ]
+  },
+
+  hq_ridge_boundaries: {
+    chapter: "Chapter 3: Confidence Ridge",
+    text: () => `A person steps too close and won’t stop. You need a boundary.`,
+    choices: [
+      { text:"Say: “Stop. I need space.”", good:true, effects:{ wisdom:+1, xp:+15, flag:{ key:"setBoundary", value:true } }, why:"Clear boundaries protect you.", next:"hq_ridge_payoff" },
+      { text:"Laugh awkwardly and hope they stop.", good:false, effects:{ hearts:-1 }, why:"Hoping isn’t a plan.", next:"hq_ridge_payoff" },
+    ]
+  },
+
+  hq_ridge_payoff: {
+    chapter: "Chapter 3: Confidence Ridge",
+    text: () => `The moment ends. You learn: boundaries are normal and healthy.`,
+    choices: [
+      { text:"Return to the fork.", good:true, effects:{ xp:+4 }, why:"Choose your next path.", next:"hq_mountain_choice_room" },
+    ]
+  },
+
+  hq_canyon_friend: {
+    chapter: "Chapter 3: Kind Canyon",
+    text: () => `A friend looks upset. They whisper: “I’m not okay.”`,
+    choices: [
+      { text:"Listen and help them find a trusted adult.", good:true, effects:{ wisdom:+1, xp:+18, flag:{ key:"helpedFriend", value:true } }, why:"Getting real support is the safest move.", next:"hq_canyon_follow" },
+      { text:"Say: “That’s not my problem.”",              good:false,effects:{ hearts:-1 }, why:"Friends need kindness.", next:"hq_canyon_follow" },
+    ]
+  },
+
+  hq_canyon_follow: {
+    chapter: "Chapter 3: Kind Canyon",
+    text: () => `Your friend asks: “What do I say?”`,
+    choices: [
+      { text:"Suggest a simple start: “I need help. I don’t feel safe.”", good:true, effects:{ wisdom:+1, xp:+12 }, why:"Simple words are enough.", next:"hq_mountain_choice_room" },
+      { text:"Tell them to keep it secret.",                              good:false,effects:{ hearts:-1 },        why:"Secrets block support.", next:"hq_mountain_choice_room" },
+    ]
+  },
+
+  /* =========================
+     MAIN EXIT — TOKEN GATE + MINI ENDINGS
+  ========================= */
+  hq_tunnel_gate: {
+    chapter: "Chapter 3: Exit Tunnel",
     text: () => `A tunnel gate needs a token.`,
     choices: [
-      { text:"Use 1 token to enter the tunnel.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Onward!", next:"hq_win" },
-      { text:"Exit and earn a token by completing a lesson.",          good:true, end:true,                     why:"Lessons give tokens." },
+      { text:"Use 1 token to enter the tunnel.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Onward!", next:"hq_tunnel_inside" },
+      { text:"Exit and earn a token by completing a lesson.",          good:true, end:true,                      why:"Lessons give tokens." },
     ]
   },
 
-  // Demo “ending”
-  hq_win: {
-    chapter: "Chapter 4+: Coming Soon",
-    text: () => `You made it through the demo branch! We can extend this graph with more nodes, chapters, and backgrounds.`,
+  hq_tunnel_inside: {
+    chapter: "Chapter 3: Exit Tunnel",
+    text: () => `Inside the tunnel, you hear two exits: “Fast Exit” and “Skill Exit.”`,
     choices: [
-      { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+40 }, why:"Great job!", end:true },
+      { text:"Fast Exit (end the run now).",          good:true, effects:{ xp:+10 }, why:"You made it through!", next:"hq_ending_fast" },
+      { text:"Skill Exit (harder, bigger reward).",   good:true, effects:{ xp:+5 },  why:"Brave choice.", next:"hq_skill_exit_1" },
+    ]
+  },
+
+  /* Skill Exit path: small challenge + flag gates */
+  hq_skill_exit_1: {
+    chapter: "Skill Exit",
+    text: () => `A final test: a crowd pressures you again. This time you can use your tools.`,
+    choices: [
+      { text:"Use ‘Pause → No → Switch’ (strong).", require:{ flag:"practicedNo" }, good:true, effects:{ wisdom:+1, xp:+20 }, why:"Your practice shows up when it counts.", next:"hq_skill_exit_2" },
+      { text:"Use a basic no and leave.", good:true, effects:{ wisdom:+1, xp:+14 }, why:"Simple is still strong.", next:"hq_skill_exit_2" },
+      { text:"Freeze again.",             good:false,effects:{ hearts:-1 },         why:"Freezing happens—recover next.", next:"hq_skill_exit_recover" },
+    ]
+  },
+
+  hq_skill_exit_recover: {
+    chapter: "Skill Exit",
+    text: () => `Recover move: what do you do after freezing?`,
+    choices: [
+      { text:"Breathe, repeat ‘No’, then exit.", good:true, effects:{ wisdom:+1, xp:+14, flag:{ key:"recoveredTwice", value:true } }, why:"Recovery is a superpower.", next:"hq_skill_exit_2" },
+      { text:"Say yes to end pressure.",         good:false,effects:{ hearts:-1 }, why:"Pressure learns it works.", next:"hq_skill_exit_2" },
+    ]
+  },
+
+  hq_skill_exit_2: {
+    chapter: "Skill Exit",
+    text: (ctx) => {
+      const extra = (ctx.flags && (ctx.flags.helpedFriend || ctx.flags.teamHelp)) ? "You also showed kindness—real leadership." : "You stayed steady under pressure.";
+      return `You reach the final door. ${extra}`;
+    },
+    choices: [
+      { text:"Finish with a healthy plan: water + rest + talk to someone if needed.", good:true, effects:{ wisdom:+1, xp:+25, flag:{ key:"finishedSkillExit", value:true } }, why:"That’s a real-life plan.", next:"hq_ending_skill" },
+      { text:"Finish with a secret plan nobody knows.", good:false, effects:{ hearts:-1 }, why:"Secrets block support.", next:"hq_ending_fast" },
+    ]
+  },
+
+  /* Mini endings */
+  hq_ending_fast: {
+    chapter: "Mini Ending: Fast Exit",
+    text: () => `Mini‑ending: You escaped the tunnel and kept yourself safe. Next time, try the Skill Exit for a bigger win.`,
+    choices: [
+      { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+10 }, why:"Nice job!", end:true },
+    ]
+  },
+
+  hq_ending_skill: {
+    chapter: "Mini Ending: Skill Exit",
+    text: () => `Mini‑ending: You used your tools under pressure. That’s real strength. (We can keep extending the story graph.)`,
+    choices: [
+      { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+20 }, why:"Big win!", end:true },
     ]
   },
 };
@@ -1360,8 +1556,6 @@ function hqApplyEffects(eff){
   if(e.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(e.hearts,0), 0, 5);
   if(e.wisdom) state.habitQuest.wisdom = Math.max(0, safeNum(state.habitQuest.wisdom,0) + safeNum(e.wisdom,0));
   if(e.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(e.tokens,0));
-
-  // flag setter: { flag:{ key, value } }
   if(e.flag && typeof e.flag === "object"){
     const key = safeStr(e.flag.key, "");
     if(key) hqSetFlag(key, e.flag.value);
@@ -1381,7 +1575,6 @@ function hqResetRun(){
 function startHabitQuest(){
   gameMode = "habitquest";
   gameScore = 0;
-
   openGameOverlay("Habit Quest", "Branching story: your choices change the path.");
   renderHabitQuest();
 }
@@ -1414,24 +1607,23 @@ function renderHabitQuest(){
   hqMarkVisited(state.habitQuest.nodeId);
   saveState();
 
-  // Header chips (includes image when custom)
+  // Header chips
   area.innerHTML = `
     <div class="hqRow">
       <div class="hqChip">📖 ${escapeHtml(node.chapter || "Habit Quest")}</div>
       <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
       <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
       <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
-      <div class="hqChip">
+      <div class="hqChip youChip">
         ${
           ctx.avatarIsCustom && ctx.avatarImg
             ? `<img class="hqAvatarImg" src="${ctx.avatarImg}" alt="You" />`
-            : `<span style="font-size:18px; line-height:1;">${escapeHtml(ctx.avatarEmoji || "🙂")}</span>`
+            : `<span class="emojiAvatar">${escapeHtml(ctx.avatarEmoji || "🙂")}</span>`
         }
         <span>You</span>
       </div>
     </div>
     <div class="divider"></div>
-
     <p id="hq-node-text" style="font-weight:900; font-size:18px; margin-top:10px;"></p>
     <div id="hq-choices"></div>
     <p class="muted" id="hq-why" style="margin-top:12px;"></p>
@@ -1456,6 +1648,7 @@ function renderHabitQuest(){
       const needTok = choice.require?.token ? safeNum(choice.require.token,0) : 0;
       if(needTok > 0) btn.textContent = `${choice.text} (needs ${needTok} token${needTok===1?"":"s"})`;
       if(choice.require?.flag) btn.textContent = `${choice.text} (locked)`;
+      if(choice.require?.minWisdom) btn.textContent = `${choice.text} (needs wisdom)`;
     }
 
     btn.addEventListener("click", () => {
@@ -1466,8 +1659,10 @@ function renderHabitQuest(){
       hqApplyEffects(choice.effects || {});
       saveState();
 
+      // XP
       if(choice.effects?.xp && safeNum(choice.effects.xp,0) > 0) addXP(choice.effects.xp);
 
+      // score feedback
       if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
       overlay.querySelector("#go-score") && (overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`);
 
