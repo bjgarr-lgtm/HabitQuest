@@ -337,7 +337,6 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
-  { id:"storymap",   title:"Story Map",      desc:"See which Habit Quest nodes you’ve visited.", status:"ready", unlock:{ type:"free" } },
   { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
   // “Soon” stays soon, but unlock gates are a bit later so it feels paced.
@@ -621,6 +620,7 @@ function showView(name){
   if(name === "tracks")   renderTrackUI();
   if(name === "map")      renderStoryMap();
   if(name === "home")     renderHomeRecommendation();
+  if(name === "habitquest") renderHabitQuestLanding();
 }
 
 function bindNav(){
@@ -635,6 +635,31 @@ function bindNav(){
   $("#btn-start-lesson")?.addEventListener("click", () => showView("lesson"));
   $("#btn-start-game")?.addEventListener("click", () => showView("games"));
 }
+
+function renderHabitQuestLanding(){
+  const wrap = $("#hq-wrap");
+  if(!wrap) return;
+
+  const gate = gameUnlockStatus({ unlock:{ type:"lessons", lessons:1 } });
+  wrap.innerHTML = `
+    <div class="card">
+      <h2 style="margin-top:0;">Habit Quest 📖</h2>
+      <p class="muted">A branching story where your choices change the path.</p>
+      <p class="muted">${escapeHtml(gate.reason)} • ${gate.unlocked ? "Playable" : "Locked"}</p>
+      <div class="actions">
+        <button class="btn primary" id="btn-hq-play" type="button" ${gate.unlocked ? "" : "disabled"}>
+          ${gate.unlocked ? "Play Habit Quest" : "Locked"}
+        </button>
+      </div>
+      <p class="muted" style="margin-top:10px;">
+        Story Map is available inside Habit Quest (top bar) — no extra card needed.
+      </p>
+    </div>
+  `;
+
+  $("#btn-hq-play")?.addEventListener("click", () => startHabitQuest());
+}
+
 
 /* =========================================================
    TIPS
@@ -1248,40 +1273,90 @@ function renderGamesCatalog(){
   if(!grid) return;
   grid.innerHTML = "";
 
-  GAMES.forEach(game => {
-    const { unlocked, reason } = gameUnlockStatus(game);
-
+  const makeTile = ({ title, desc, statusLine, buttonText, onClick, disabled=false, extraClass="" }) => {
     const card = document.createElement("div");
-    card.className = "card gameCard";
+    card.className = `card gameCard ${extraClass}`.trim();
 
     const h = document.createElement("h3");
-    h.textContent = game.title;
+    h.textContent = title;
 
     const p = document.createElement("p");
     p.className = "muted";
-    p.textContent = game.desc;
+    p.textContent = desc;
 
     const p2 = document.createElement("p");
     p2.className = "muted";
-    p2.textContent = `${reason} • ${game.status === "ready" ? "Playable" : "Coming soon"}`;
+    p2.textContent = statusLine;
 
     const btn = document.createElement("button");
     btn.className = "btn primary";
     btn.type = "button";
+    btn.textContent = buttonText;
 
-    const playable = (game.status === "ready" && unlocked);
-    btn.textContent = playable ? (game.id === "storymap" ? "Open" : "Play") : "Locked / Soon";
-
-    if(!playable){
+    if(disabled){
       btn.disabled = true;
       btn.classList.add("disabled");
     }else{
-      btn.addEventListener("click", () => launchGame(game.id));
+      btn.addEventListener("click", onClick);
     }
 
     card.append(h, p, p2, btn);
-    grid.appendChild(card);
-  });
+    return card;
+  };
+
+  // ✅ FEATURED Habit Quest tile FIRST (bigger)
+  const hqGate = gameUnlockStatus({ unlock:{ type:"lessons", lessons:1 } }); // same gate as habitquest in GAMES
+  grid.appendChild(makeTile({
+    title: "Habit Quest 📖",
+    desc: "Branching story adventure where your choices change the path.",
+    statusLine: `${hqGate.reason} • ${hqGate.unlocked ? "Playable" : "Locked"}`,
+    buttonText: hqGate.unlocked ? "Play" : "Locked",
+    disabled: !hqGate.unlocked,
+    onClick: () => launchGame("habitquest"),
+    extraClass: "featured"
+  }));
+
+  // ✅ Normal game tiles (NO Story Map tile)
+  GAMES
+    .filter(g => g.id !== "storymap") // <-- removes Story Map card entirely
+    .forEach(game => {
+      const { unlocked, reason } = gameUnlockStatus(game);
+
+      const btnText =
+        (game.status === "ready" && unlocked) ? "Play" : "Locked / Soon";
+
+      const disabled =
+        !(game.status === "ready" && unlocked);
+
+      const card = document.createElement("div");
+      card.className = "card gameCard";
+
+      const h = document.createElement("h3");
+      h.textContent = game.title;
+
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = game.desc;
+
+      const p2 = document.createElement("p");
+      p2.className = "muted";
+      p2.textContent = `${reason} • ${game.status === "ready" ? "Playable" : "Coming soon"}`;
+
+      const btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.type = "button";
+      btn.textContent = btnText;
+
+      if(disabled){
+        btn.disabled = true;
+        btn.classList.add("disabled");
+      }else{
+        btn.addEventListener("click", () => launchGame(game.id));
+      }
+
+      card.append(h, p, p2, btn);
+      grid.appendChild(card);
+    });
 }
 
 

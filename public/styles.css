@@ -376,6 +376,16 @@ h1{ margin:0; font-size:18px; }
   width: fit-content;
 }
 
+/* Featured top tile */
+.gameCard.featured{
+  grid-column: span 12;
+  min-height: 220px;
+}
+@media (max-width: 860px){
+  .gameCard.featured{ grid-column: span 12; }
+}
+
+
 /* =========================
    Mini-Games grid: true tile layout (fix tiny/offset cards)
 ========================= */
