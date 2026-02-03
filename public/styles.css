@@ -678,3 +678,33 @@ button, input, select, textarea {
   color: #111;
   background: #fff;
 }
+
+/* Custom avatar delete button inside avatar chips */
+.avatarChip{ position: relative; }
+
+.avatarDelete{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  width:20px;
+  height:20px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.55);
+  color: rgba(255,255,255,0.92);
+  font-weight: 900;
+  line-height: 18px;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  padding:0;
+}
+.avatarDelete:hover{ background: rgba(255,85,119,0.35); }
+
+/* Inline avatar image used inside Habit Quest sentence */
+.avatarInlineImg{
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+}

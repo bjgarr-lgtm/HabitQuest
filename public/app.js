@@ -135,6 +135,52 @@ const BADGES = [
 
 const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
 const CUSTOM_AVATAR_ID = "__custom__";
+const CUSTOM_AVATAR_PREFIX = "custom:";
+
+function uid(){
+  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+}
+
+function isCustomAvatarRef(v){
+  return typeof v === "string" && v.startsWith(CUSTOM_AVATAR_PREFIX);
+}
+
+function getCustomAvatarById(id){
+  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+  return list.find(a => a && a.id === id) || null;
+}
+
+function getSelectedCustomAvatar(){
+  if(!isCustomAvatarRef(state.avatar)) return null;
+  const id = state.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+  return getCustomAvatarById(id);
+}
+
+// For UI that needs an element, not a string:
+function makeAvatarNode({ size=20, alt="You" } = {}){
+  const wrap = document.createElement("span");
+  wrap.className = "avatarNode";
+  wrap.style.display = "inline-grid";
+  wrap.style.placeItems = "center";
+  wrap.style.width = size + "px";
+  wrap.style.height = size + "px";
+
+  const custom = getSelectedCustomAvatar();
+  if(custom && custom.dataURL){
+    const img = document.createElement("img");
+    img.src = custom.dataURL;
+    img.alt = alt;
+    img.className = "avatarInlineImg";
+    img.style.width = size + "px";
+    img.style.height = size + "px";
+    wrap.appendChild(img);
+    return wrap;
+  }
+
+  wrap.textContent = (state.avatar && !isCustomAvatarRef(state.avatar)) ? state.avatar : "🙂";
+  wrap.style.fontSize = Math.max(14, Math.floor(size * 0.9)) + "px";
+  return wrap;
+}
 
 const TRACKS = {
   general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
@@ -368,8 +414,8 @@ const DEFAULT_STATE = {
 
   profileName: "Player",
 
-  avatar: AVATARS[0],        // emoji or CUSTOM_AVATAR_ID
-  customAvatar: null,        // dataURL string (local only)
+  avatar: AVATARS[0],          // emoji OR "custom:<id>"
+  customAvatars: [],           // [{ id, dataURL, createdISO }]
 
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
@@ -422,13 +468,41 @@ function normalizeState(s){
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  merged.avatar = (merged.avatar === CUSTOM_AVATAR_ID || AVATARS.includes(merged.avatar)) ? merged.avatar : AVATARS[0];
-  merged.customAvatar = (typeof merged.customAvatar === "string" && merged.customAvatar.startsWith("data:image/"))
-    ? merged.customAvatar
-    : null;
-  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar){
+  // normalize custom avatar list
+  merged.customAvatars = Array.isArray(safe.customAvatars) ? safe.customAvatars : [];
+  merged.customAvatars = merged.customAvatars
+    .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
+    .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
+
+  // Back-compat: if older save had customAvatar + CUSTOM_AVATAR_ID, convert into customAvatars[0]
+  if(typeof safe.customAvatar === "string" && safe.customAvatar.startsWith("data:image/")){
+    const exists = merged.customAvatars.some(a => a.dataURL === safe.customAvatar);
+    if(!exists){
+      merged.customAvatars.unshift({ id: uid(), dataURL: safe.customAvatar, createdISO: isoDate(new Date()) });
+    }
+  }
+
+  // normalize avatar selection
+  const isEmoji = AVATARS.includes(merged.avatar);
+  const isCustomRef = isCustomAvatarRef(merged.avatar);
+
+  if(!isEmoji && !isCustomRef){
+    // Older build used "__custom__"
+    if(merged.avatar === CUSTOM_AVATAR_ID && merged.customAvatars.length){
+      merged.avatar = CUSTOM_AVATAR_PREFIX + merged.customAvatars[0].id;
+    } else {
+      merged.avatar = AVATARS[0];
+    }
+  }
+
+// If selected custom ref points to missing avatar, fallback
+if(isCustomAvatarRef(merged.avatar)){
+  const id = merged.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+  if(!getCustomAvatarById(id)){
     merged.avatar = AVATARS[0];
   }
+}
+
 
   merged.habitQuest.chapter = clamp(safeNum(merged.habitQuest.chapter,0), 0, 6);
   merged.habitQuest.scene   = clamp(safeNum(merged.habitQuest.scene,0), 0, 99);
@@ -1477,7 +1551,7 @@ area.innerHTML = `
   <div class="divider"></div>
 
   <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
-  <p>${escapeHtml(scene.text({ avatar: ctx.avatarEmoji, name: ctx.name, lastLessonTitle: ctx.lastLessonTitle, tokens: ctx.tokens }))}</p>
+  <p id="hq-scene-text"></p>
 
   <div id="hq-choices"></div>
   <p class="muted" id="hq-why" style="margin-top:12px;"></p>
@@ -1487,6 +1561,32 @@ area.innerHTML = `
   const wrap = area.querySelector("#hq-choices");
   const whyEl = area.querySelector("#hq-why");
   if(!wrap) return;
+
+  // Render scene text with inline avatar node (supports uploaded images)
+  const sceneP = area.querySelector("#hq-scene-text");
+  if(sceneP){
+    sceneP.textContent = ""; // clear
+    const raw = String(scene.text(ctx));
+
+    // Replace the first occurrence of "You (" + something + ")" with a real avatar node.
+    // Your story format starts like: "You (<avatar>) arrive..."
+    // We'll keep it flexible and just replace "You (" ... ")"
+    const m = raw.match(/^You\s*\((.*?)\)\s*/);
+    if(m){
+      // prefix "You ("
+      sceneP.appendChild(document.createTextNode("You ("));
+      sceneP.appendChild(makeAvatarNode({ size: 18, alt: "You" }));
+      sceneP.appendChild(document.createTextNode(") "));
+
+      // rest of the sentence after the match
+      const rest = raw.slice(m[0].length);
+      sceneP.appendChild(document.createTextNode(rest));
+    } else {
+      // fallback
+      sceneP.textContent = raw;
+    }
+  }
+
 
   scene.choices.forEach((choice) => {
     const btn = document.createElement("button");
@@ -1632,19 +1732,53 @@ function renderAvatars(){
     }));
   });
 
-  if(state.customAvatar){
-    grid.appendChild(makeChip({
+  // custom avatars (many)
+  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+  list.forEach((a) => {
+    const ref = CUSTOM_AVATAR_PREFIX + a.id;
+
+    const chip = makeChip({
       kind: "img",
-      src: state.customAvatar,
-      active: state.avatar === CUSTOM_AVATAR_ID,
+      src: a.dataURL,
+      active: state.avatar === ref,
       onClick: () => {
-        state.avatar = CUSTOM_AVATAR_ID;
+        state.avatar = ref;
         saveState();
         renderAvatars();
         renderProfile();
       }
-    }));
-  }
+    });
+
+    // add delete "×" button inside chip
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "avatarDelete";
+    del.textContent = "×";
+    del.title = "Delete this uploaded avatar";
+
+    del.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if(!confirm("Delete this uploaded avatar from this device?")) return;
+
+      state.customAvatars = (Array.isArray(state.customAvatars) ? state.customAvatars : [])
+        .filter(x => x && x.id !== a.id);
+
+      // if it was selected, fallback
+      if(state.avatar === ref){
+        state.avatar = AVATARS[0];
+      }
+
+      saveState();
+      renderAvatars();
+      renderProfile();
+    });
+
+    chip.appendChild(del);
+    grid.appendChild(chip);
+  });
+
 
   if(state.customAvatar){
   const del = document.createElement("button");
@@ -1710,13 +1844,22 @@ function bindAvatarUpload(){
 
     const reader = new FileReader();
     reader.onload = () => {
-      state.customAvatar = String(reader.result || "");
-      state.avatar = CUSTOM_AVATAR_ID;
+      const dataURL = String(reader.result || "");
+      if(!dataURL.startsWith("data:image/")) return;
+
+      const item = { id: uid(), dataURL, createdISO: isoDate(new Date()) };
+      state.customAvatars = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+      state.customAvatars.unshift(item);
+
+      // auto-select the new upload
+      state.avatar = CUSTOM_AVATAR_PREFIX + item.id;
+
       saveState();
       renderAvatars();
       renderProfile();
       input.value = "";
     };
+
     reader.readAsDataURL(file);
   });
 }
@@ -1732,24 +1875,24 @@ function renderProfile(){
   const emojiEl = $("#profile-avatar-emoji");
   const imgEl   = $("#profile-avatar-img");
 
-  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
+const selectedCustom = getSelectedCustomAvatar();
+const usingCustom = !!(selectedCustom && selectedCustom.dataURL);
 
+if(imgEl){
   if(usingCustom){
-    if(imgEl){
-      imgEl.src = state.customAvatar;
-      imgEl.classList.remove("hidden");
-    }
-    if(emojiEl) emojiEl.classList.add("hidden");
-  } else {
-    if(emojiEl){
-      emojiEl.textContent = state.avatar || "🙂";
-      emojiEl.classList.remove("hidden");
-    }
-    if(imgEl){
-      imgEl.removeAttribute("src");
-      imgEl.classList.add("hidden");
-    }
+    imgEl.src = selectedCustom.dataURL;
+    imgEl.classList.remove("hidden");
+  }else{
+    imgEl.removeAttribute("src");
+    imgEl.classList.add("hidden");
   }
+}
+
+const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "";
+if(nameTextEl){
+  nameTextEl.textContent = `${emoji} ${displayName}`.trim();
+}
+
 
   // stats
   $("#profile-xp") && ($("#profile-xp").textContent = String(state.xp));
@@ -1782,7 +1925,24 @@ function renderProfile(){
       });
     }
   }
+  // Profile header avatar preview (emoji or selected upload)
+  const headerEmojiEl = document.getElementById("profile-avatar-emoji");
+  const headerImgEl = document.getElementById("profile-avatar-img");
+  if(headerEmojiEl && headerImgEl){
+    if(usingCustom){
+      headerImgEl.src = selectedCustom.dataURL;
+      headerImgEl.classList.remove("hidden");
+      headerEmojiEl.textContent = "";
+    }else{
+      headerImgEl.removeAttribute("src");
+      headerImgEl.classList.add("hidden");
+      headerEmojiEl.textContent = (!isCustomAvatarRef(state.avatar) ? (state.avatar || "🙂") : "🙂");
+    }
+  }
 
+  // lessons count pill
+  document.getElementById("profile-lessons") && (document.getElementById("profile-lessons").textContent = String(state.completedDays.length));
+  
   bindProfileNameEditor();
 }
 
