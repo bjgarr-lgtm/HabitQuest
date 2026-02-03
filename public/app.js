@@ -833,13 +833,25 @@ function ensureGameOverlay(){
   `;
   document.head.appendChild(style);
 
-  // Bind buttons (RELIABLE)
-  overlay.querySelector("#go-exit")?.addEventListener("click", closeGameOverlay);
-  overlay.querySelector("#go-restart")?.addEventListener("click", () => {
-    if(gameMode === "choicequest") startChoiceQuest();
-    if(gameMode === "breathing") startBreathing();
-    if(gameMode === "habitquest") startHabitQuest();
+    // bind overlay buttons once (event delegation = cannot "miss" the button)
+  overlay.addEventListener("click", (e) => {
+    const exitBtn = e.target.closest("#go-exit");
+    if (exitBtn) {
+      e.preventDefault();
+      closeGameOverlay();
+      return;
+    }
+
+    const restartBtn = e.target.closest("#go-restart");
+    if (restartBtn) {
+      e.preventDefault();
+      if (gameMode === "choicequest") startChoiceQuest();
+      if (gameMode === "breathing") startBreathing();
+      if (gameMode === "habitquest") startHabitQuest();
+      return;
+    }
   });
+
 
   // Optional: click outside the card closes (kid-friendly)
   overlay.addEventListener("click", (e) => {
@@ -883,6 +895,13 @@ function closeGameOverlay(){
   if(breathingTimerId){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
+  }
+  const ov = $("#game-overlay");
+  if (ov){
+    ov.classList.add("hidden");
+    ov.style.display = "none"; // hard stop
+    // allow it to reopen normally later
+    setTimeout(() => { ov.style.display = ""; }, 0);
   }
 
   document.body.style.overflow = "";
