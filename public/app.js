@@ -3,14 +3,19 @@
    NOTE: app.js must contain ONLY JavaScript (no HTML at the bottom).
 */
 
+"use strict";
+
+/* =========================================================
+   DOM HELPERS
+========================================================= */
 const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+/* =========================================================
+   STORAGE + HELPERS
+========================================================= */
 const STORAGE_KEY = "htaa_v2_state";
 
-/* =========================================================
-   HELPERS
-========================================================= */
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
 function isoDate(d){
@@ -230,12 +235,9 @@ function makeQuizForLesson(day, title, goal, track){
   const q = (question, options, answer) => ({ q: question, options, answer });
 
   const anchors = [
-    q(`Today’s lesson (“${title}”) is mostly about…`,
-      [`${focus.skill}`, "Hiding problems", "Taking bigger risks"], 0),
-    q(`A helpful question for “${w[0]}” moments is…`,
-      ["Will this help Future Me?", "How do I keep this secret?", "What’s the riskiest option?"], 0),
-    q(`A strong “safe choice” is usually…`,
-      ["Safe and helpful long‑term", "Risky but exciting", "Something you must hide"], 0),
+    q(`Today’s lesson (“${title}”) is mostly about…`, [`${focus.skill}`, "Hiding problems", "Taking bigger risks"], 0),
+    q(`A helpful question for “${w[0]}” moments is…`, ["Will this help Future Me?", "How do I keep this secret?", "What’s the riskiest option?"], 0),
+    q(`A strong “safe choice” is usually…`, ["Safe and helpful long‑term", "Risky but exciting", "Something you must hide"], 0),
   ];
 
   const poolEasy = [
@@ -253,10 +255,8 @@ function makeQuizForLesson(day, title, goal, track){
   const poolHard = [
     q(`Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
       ["Delay + distract + talk to someone", "Keep it secret", "Say yes to fit in"], 0),
-    q(`A good boundary sounds like…`,
-      ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
-    q(`If you make a mistake, the best comeback is…`,
-      ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
+    q(`A good boundary sounds like…`, ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
+    q(`If you make a mistake, the best comeback is…`, ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
   ];
 
   const poolBoss = [
@@ -273,39 +273,39 @@ function makeQuizForLesson(day, title, goal, track){
   if(diff >= 3) pool = pool.concat(poolHard);
   if(diff >= 4) pool = pool.concat(poolBoss);
 
-  // track flavor
+  // Track flavor
   if(track === "socialmedia"){
     pool.push(
       q("Online dares are safest when you…", ["Skip them and choose your own plan", "Do them for likes", "Hide them from adults"], 0),
-      q("A smart scroll rule is…", ["Set a stop time and follow it", "Scroll until 2AM", "Never stop"], 0)
+      q("A smart scroll rule is…", ["Set a stop time and follow it", "Scroll until 2AM", "Never stop"], 0),
     );
   }
   if(track === "gaming"){
     pool.push(
       q("A healthy gaming habit is…", ["Stop when you planned to stop", "Play forever", "Skip sleep for one more level"], 0),
-      q("Best first step when you feel stuck in a loop:", ["Stand up + water + 2‑minute reset", "Keep clicking", "Get mad at yourself"], 0)
+      q("Best first step when you feel stuck in a loop:", ["Stand up + water + 2‑minute reset", "Keep clicking", "Get mad at yourself"], 0),
     );
   }
   if(track === "caffeine"){
     pool.push(
       q("Brain fuel usually starts with…", ["Sleep + food + water", "Only energy drinks", "Skipping meals"], 0),
-      q("If you’re tired, a smart option is…", ["Drink water and take a short break", "Chug caffeine every time", "Give up"], 0)
+      q("If you’re tired, a smart option is…", ["Drink water and take a short break", "Chug caffeine every time", "Give up"], 0),
     );
   }
   if(track === "nicotine"){
     pool.push(
       q("A cravings plan often begins with…", ["Delay and distract", "Hide and panic", "Say yes fast"], 0),
-      q("If someone offers you something risky, you can say…", ["No thanks. I’m good.", "Maybe later secretly.", "Okay to fit in."], 0)
+      q("If someone offers you something risky, you can say…", ["No thanks. I’m good.", "Maybe later secretly.", "Okay to fit in."], 0),
     );
   }
   if(track === "alcohol"){
     pool.push(
       q("At a party, a strong plan is…", ["Have an exit plan + buddy/adult backup", "Do whatever the crowd does", "Hide it"], 0),
-      q("Pressure is not friendship. True or false?", ["True", "False"], 0)
+      q("Pressure is not friendship. True or false?", ["True", "False"], 0),
     );
   }
 
-  // shuffle deterministically
+  // Shuffle deterministically
   for(let i = pool.length - 1; i > 0; i--){
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -319,6 +319,7 @@ function makeQuizForLesson(day, title, goal, track){
   while(picked.length < 12){
     picked.push(poolEasy[Math.floor(rng() * poolEasy.length)]);
   }
+
   return picked;
 }
 
@@ -334,15 +335,15 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                        status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
+  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.",status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
-  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                    status:"soon", unlock:{ type:"xp",     xp:120 } },
-  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.", status:"soon", unlock:{ type:"lessons",lessons:3 } },
-  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.", status:"soon", unlock:{ type:"level",  level:3 } },
-  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",               status:"soon", unlock:{ type:"level",  level:4 } },
-  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",         status:"soon", unlock:{ type:"xp",     xp:350 } },
-  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",    status:"soon", unlock:{ type:"lessons",lessons:7 } },
-  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",      status:"soon", unlock:{ type:"xp",     xp:600 } },
+  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                          status:"soon", unlock:{ type:"xp",     xp:120 } },
+  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",       status:"soon", unlock:{ type:"lessons",lessons:3 } },
+  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",       status:"soon", unlock:{ type:"level",  level:3 } },
+  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                     status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",               status:"soon", unlock:{ type:"xp",     xp:350 } },
+  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",          status:"soon", unlock:{ type:"lessons",lessons:7 } },
+  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",            status:"soon", unlock:{ type:"xp",     xp:600 } },
 ];
 
 /* =========================================================
@@ -360,20 +361,18 @@ const DEFAULT_STATE = {
 
   profileName: "Odin Garrett",
 
-  // Avatar
-  avatar: AVATARS[0],     // emoji or CUSTOM_AVATAR_ID
-  customAvatar: null,     // dataURL (local only)
+  avatar: AVATARS[0],        // emoji or CUSTOM_AVATAR_ID
+  customAvatar: null,        // dataURL string (local only)
 
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
 
-  // Habit Quest
   habitQuest: {
-    chapter: 0,       // 0..6 (7 chapters)
+    chapter: 0,        // 0..6
     scene: 0,
     hearts: 3,
     wisdom: 0,
-    tokens: 0,        // earned by first-time lesson completes
+    tokens: 0,         // +1 token per FIRST-TIME lesson completion
     lastLessonDay: 0,
   },
 
@@ -419,7 +418,9 @@ function normalizeState(s){
   merged.customAvatar = (typeof merged.customAvatar === "string" && merged.customAvatar.startsWith("data:image/"))
     ? merged.customAvatar
     : null;
-  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar) merged.avatar = AVATARS[0];
+  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar){
+    merged.avatar = AVATARS[0];
+  }
 
   merged.habitQuest.chapter = clamp(safeNum(merged.habitQuest.chapter,0), 0, 6);
   merged.habitQuest.scene   = clamp(safeNum(merged.habitQuest.scene,0), 0, 99);
@@ -494,6 +495,7 @@ function recalcLevel(){
 function addXP(amount){
   const a = safeNum(amount, 0);
   if(a <= 0) return;
+
   state.xp = safeNum(state.xp, 0) + a;
   recalcLevel();
   saveState();
@@ -507,9 +509,12 @@ function addXP(amount){
 }
 
 /* =========================================================
-   NAV
+   NAVIGATION
 ========================================================= */
 function showView(name){
+  // Always restore scroll when switching views (prevents “stuck no scroll” bugs)
+  document.body.style.overflow = "";
+
   $$(".view").forEach(v => v.classList.add("hidden"));
   $(`#view-${name}`)?.classList.remove("hidden");
 
@@ -662,26 +667,24 @@ function bindLessonButtons(){
     }
 
     const firstTime = !state.completedDays.includes(score.day);
-
     if(firstTime){
       addXP(score.total * 5); // 5 XP per question
       state.completedDays.push(score.day);
-      saveState();
       addXP(50);
 
-      // Habit Quest: +1 token per FIRST-TIME completed lesson
+      // +1 token per FIRST-TIME lesson completion
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
-
-    // Always update last lesson day for story flavor
+    // always update story flavor
     state.habitQuest.lastLessonDay = score.day;
 
-    // streak logic
+    // streak
     const todayISO = isoDate(new Date());
     if(state.lastCompletedISO !== todayISO){
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayISO = isoDate(yesterday);
+
       state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
     }
@@ -689,6 +692,8 @@ function bindLessonButtons(){
     saveState();
     updateHomeStats();
     updateLessonStatus(score.day);
+    renderProgress();
+    renderGamesCatalog();
   });
 }
 
@@ -701,34 +706,25 @@ function updateHomeStats(){
 }
 
 /* =========================================================
-   GAME OVERLAY — ROCK SOLID OPEN/CLOSE
+   GAME OVERLAY — HARD FIX (NO STUCK SCROLL, ALWAYS OPENS/CLOSES)
 ========================================================= */
 let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
 let breathingTimerId = null;
 
-function setRestartVisible(visible){
-  const b = document.getElementById("go-restart");
-  if(!b) return;
-  b.style.display = visible ? "inline-flex" : "none";
-}
+function overlayEl(){ return document.getElementById("game-overlay"); }
 
 function ensureGameOverlay(){
-  let overlay = document.getElementById("game-overlay");
-  if(overlay){
-    // Always force hidden on boot / reload
-    overlay.style.display = "none";
-    overlay.setAttribute("aria-hidden", "true");
-    return;
-  }
+  // If an old overlay exists from previous broken code, remove it cleanly.
+  const old = overlayEl();
+  if(old) old.remove();
 
-  overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "game-overlay";
-  overlay.style.display = "none";
-  overlay.setAttribute("aria-hidden", "true");
   overlay.className = "gameOverlay";
-
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.style.display = "none"; // start hidden ALWAYS
   overlay.innerHTML = `
     <div class="gameOverlayInner" role="dialog" aria-modal="true" aria-label="Game overlay">
       <div class="gameOverlayTop">
@@ -753,124 +749,121 @@ function ensureGameOverlay(){
   `;
   document.body.appendChild(overlay);
 
-  // CSS for overlay (self-contained)
-  const style = document.createElement("style");
-  style.textContent = `
-    .gameOverlay{
-      position:fixed; inset:0; z-index:9999;
-      background: rgba(0,0,0,0.70);
-      backdrop-filter: blur(8px);
-      padding: 14px;
-      overflow:auto;
-      color: rgba(255,255,255,0.92);
-    }
-    .gameOverlayInner{
-      max-width: 900px;
-      margin: 0 auto;
-      background: rgba(20,20,30,0.92);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 16px;
-      padding: 16px;
-    }
-    .gameOverlayTop{
-      display:flex; gap:14px; align-items:center; justify-content:space-between;
-      flex-wrap: wrap;
-    }
-    .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+  // Inject overlay CSS once
+  if(!document.getElementById("__overlay_css")){
+    const style = document.createElement("style");
+    style.id = "__overlay_css";
+    style.textContent = `
+      .gameOverlay{
+        position:fixed; inset:0; z-index:9999;
+        background: rgba(0,0,0,0.70);
+        backdrop-filter: blur(8px);
+        padding: 14px;
+        overflow:auto;
+        color: rgba(255,255,255,0.92);
+      }
+      .gameOverlayInner{
+        max-width: 900px;
+        margin: 0 auto;
+        background: rgba(20,20,30,0.92);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .gameOverlayTop{
+        display:flex; gap:14px; align-items:center; justify-content:space-between;
+        flex-wrap: wrap;
+      }
+      .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+      .choiceBtn{
+        display:block; width:100%;
+        text-align:left;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.92);
+        cursor:pointer;
+        margin-top: 10px;
+      }
+      .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
+      .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
+      .choiceGood{ border-color: rgba(80,220,140,0.6); }
+      .choiceBad{ border-color: rgba(255,120,120,0.6); }
+      .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+      .hqChip{
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.14);
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
-    .choiceBtn{
-      display:block; width:100%;
-      text-align:left;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.16);
-      background: rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.92);
-      cursor:pointer;
-      margin-top: 10px;
-    }
-    .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-    .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
-    .choiceGood{ border-color: rgba(80,220,140,0.6); }
-    .choiceBad{ border-color: rgba(255,120,120,0.6); }
+  // Buttons (reliable because we bind AFTER creation)
+  overlay.querySelector("#go-exit")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeGameOverlay();
+  });
 
-    .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
-    .hqChip{
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.14);
-    }
-  `;
-  document.head.appendChild(style);
+  overlay.querySelector("#go-restart")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if(gameMode === "choicequest") startChoiceQuest();
+    if(gameMode === "breathing") startBreathing();
+    if(gameMode === "habitquest") startHabitQuest();
+  });
 
-  // One click handler = never “miss” the button
+  // Click backdrop closes (optional)
   overlay.addEventListener("click", (e) => {
-    const exitBtn = e.target.closest("#go-exit");
-    if(exitBtn){
-      e.preventDefault();
-      closeGameOverlay();
-      return;
-    }
+    if(e.target === overlay) closeGameOverlay();
+  });
 
-    const restartBtn = e.target.closest("#go-restart");
-    if(restartBtn){
-      e.preventDefault();
-      if(gameMode === "choicequest") startChoiceQuest();
-      if(gameMode === "breathing") startBreathing();
-      if(gameMode === "habitquest") startHabitQuest();
-      return;
-    }
-
-    // click outside card closes (optional)
-    if(e.target === overlay){
+  // Escape closes
+  window.addEventListener("keydown", (e) => {
+    if(e.key === "Escape" && overlayEl() && overlayEl().style.display === "block"){
       closeGameOverlay();
     }
   });
 }
 
 function openGameOverlay(title, subtitle=""){
-  ensureGameOverlay();
-  const overlay = document.getElementById("game-overlay");
+  const overlay = overlayEl();
   if(!overlay) return;
 
   overlay.style.display = "block";
   overlay.setAttribute("aria-hidden", "false");
 
-  const titleEl = document.getElementById("go-title");
-  const subEl   = document.getElementById("go-sub");
-  const scoreEl = document.getElementById("go-score");
+  document.body.style.overflow = "hidden"; // lock scroll ONLY while open
+
+  const titleEl = overlay.querySelector("#go-title");
+  const subEl = overlay.querySelector("#go-sub");
+  const scoreEl = overlay.querySelector("#go-score");
+  const restartBtn = overlay.querySelector("#go-restart");
   if(titleEl) titleEl.textContent = title;
-  if(subEl)   subEl.textContent   = subtitle;
+  if(subEl) subEl.textContent = subtitle;
   if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
-
-  setRestartVisible(false);
-
-  // clear old content
-  const c = document.getElementById("go-content");
-  if(c) c.innerHTML = "";
-
-  document.body.style.overflow = "hidden";
+  if(restartBtn) restartBtn.style.display = "none";
 }
 
 function closeGameOverlay(){
-  const overlay = document.getElementById("game-overlay");
+  const overlay = overlayEl();
   if(!overlay) return;
 
   overlay.style.display = "none";
   overlay.setAttribute("aria-hidden", "true");
 
-  const c = document.getElementById("go-content");
-  if(c) c.innerHTML = "";
+  // ALWAYS restore scroll (this is the “can’t scroll” fix)
+  document.body.style.overflow = "";
 
-  gameMode = null;
+  const c = overlay.querySelector("#go-content");
+  if(c) c.innerHTML = "";
 
   if(breathingTimerId){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
   }
-
-  document.body.style.overflow = "";
+  gameMode = null;
 }
 
 /* =========================================================
@@ -937,8 +930,8 @@ function renderGamesCatalog(){
 
 function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
-  if(id === "breathing")   return startBreathing();
-  if(id === "habitquest")  return startHabitQuest();
+  if(id === "breathing") return startBreathing();
+  if(id === "habitquest") return startHabitQuest();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
 
@@ -955,9 +948,9 @@ function startChoiceQuest(){
 }
 
 function renderChoiceQuest(){
-  const area = document.getElementById("go-content");
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
   if(!area) return;
-
   area.innerHTML = "";
 
   const scenario = GAME_SCENARIOS[gameIndex];
@@ -967,13 +960,14 @@ function renderChoiceQuest(){
       <p>You finished Choice Quest.</p>
       <p class="muted">Final score: <strong>${gameScore}</strong></p>
     `;
-    setRestartVisible(true);
+
+    const restartBtn = overlay.querySelector("#go-restart");
+    if(restartBtn) restartBtn.style.display = "inline-block";
 
     if(gameScore > state.highScore){
       state.highScore = gameScore;
       saveState();
     }
-
     addXP(25);
     renderProgress();
     return;
@@ -1001,8 +995,7 @@ function renderChoiceQuest(){
         gameScore = Math.max(0, gameScore - 3);
       }
 
-      const scoreEl = document.getElementById("go-score");
-      if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
+      overlay.querySelector("#go-score") && (overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`);
 
       const why = document.createElement("p");
       why.className = "muted";
@@ -1034,9 +1027,10 @@ function startBreathing(){
   gameScore = 0;
 
   openGameOverlay("Breathing Buddy", "Calm your body for 60 seconds.");
-  const area = document.getElementById("go-content");
-  if(!area) return;
 
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
   area.innerHTML = "";
 
   const info = document.createElement("p");
@@ -1064,7 +1058,7 @@ function startBreathing(){
   let t = 60;
   let phase = "In";
   let phaseT = 0;
-  let rewarded = false;
+  let finished = false;
 
   if(breathingTimerId) clearInterval(breathingTimerId);
   breathingTimerId = setInterval(() => {
@@ -1088,18 +1082,18 @@ function startBreathing(){
 
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
-
-      if(!rewarded){
-        rewarded = true;
+      if(!finished){
+        finished = true;
         addXP(10);
       }
-      setRestartVisible(true);
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
     }
   }, 1000);
 }
 
 /* =========================================================
-   GAME: HABIT QUEST (7 CHAPTERS)
+   HABIT QUEST (7 CHAPTERS)
 ========================================================= */
 function avatarForStory(){
   if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🖼️";
@@ -1163,7 +1157,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 2: The Focus Forest",
       scenes: [
@@ -1198,7 +1191,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 3: The Mood Mountain",
       scenes: [
@@ -1232,7 +1224,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 4: The Friend Zone (the good kind)",
       scenes: [
@@ -1266,7 +1257,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 5: The Party Path",
       scenes: [
@@ -1300,7 +1290,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 6: The Confidence Castle",
       scenes: [
@@ -1334,7 +1323,6 @@ const HQ = {
         }
       ]
     },
-
     {
       name: "Chapter 7: The Leader’s Light",
       scenes: [
@@ -1366,12 +1354,14 @@ const HQ = {
 function startHabitQuest(){
   gameMode = "habitquest";
   gameScore = 0;
+
   openGameOverlay("Habit Quest", "Story adventure: make choices, learn skills, earn XP.");
   renderHabitQuest();
 }
 
 function renderHabitQuest(){
-  const area = document.getElementById("go-content");
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
   const ch = clamp(safeNum(state.habitQuest.chapter,0), 0, HQ.chapters.length - 1);
@@ -1382,7 +1372,6 @@ function renderHabitQuest(){
   const hearts = clamp(safeNum(state.habitQuest.hearts,3), 0, 5);
   const wisdom = safeNum(state.habitQuest.wisdom,0);
   const tokens = safeNum(state.habitQuest.tokens,0);
-
   const ctx = hqCtx();
 
   if(hearts <= 0){
@@ -1391,7 +1380,8 @@ function renderHabitQuest(){
       <p>You ran out of hearts.</p>
       <p class="muted">Good news: you can restart and practice better choices.</p>
     `;
-    setRestartVisible(true);
+    const restartBtn = overlay.querySelector("#go-restart");
+    if(restartBtn) restartBtn.style.display = "inline-block";
 
     state.habitQuest.hearts = 3;
     state.habitQuest.wisdom = 0;
@@ -1418,11 +1408,9 @@ function renderHabitQuest(){
     <p class="muted" id="hq-why" style="margin-top:12px;"></p>
   `;
 
-  const wrap = document.getElementById("hq-choices");
-  const whyEl = document.getElementById("hq-why");
+  const wrap = area.querySelector("#hq-choices");
+  const whyEl = area.querySelector("#hq-why");
   if(!wrap) return;
-
-  wrap.innerHTML = "";
 
   scene.choices.forEach((choice) => {
     const btn = document.createElement("button");
@@ -1433,12 +1421,12 @@ function renderHabitQuest(){
     const needTok = choice.require?.token ? safeNum(choice.require.token,0) : 0;
     if(needTok > 0 && tokens < needTok){
       btn.disabled = true;
-      btn.classList.add("disabled");
       btn.textContent = `${choice.text} (needs ${needTok} token${needTok===1?"":"s"})`;
     }
 
     btn.addEventListener("click", () => {
-      $$(".choiceBtn").forEach(x => x.disabled = true);
+      wrap.querySelectorAll(".choiceBtn").forEach(x => x.disabled = true);
+
       if(whyEl) whyEl.textContent = choice.why ? choice.why : "";
 
       const eff = choice.effects || {};
@@ -1450,8 +1438,7 @@ function renderHabitQuest(){
       if(eff.xp && safeNum(eff.xp,0) > 0) addXP(eff.xp);
 
       if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
-      const scoreEl = document.getElementById("go-score");
-      if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
+      overlay.querySelector("#go-score") && (overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`);
 
       const next = document.createElement("button");
       next.type = "button";
@@ -1493,11 +1480,13 @@ function renderHabitQuest(){
     wrap.appendChild(btn);
   });
 
-  setRestartVisible(true);
+  const restartBtn = overlay.querySelector("#go-restart");
+  if(restartBtn) restartBtn.style.display = "inline-block";
 }
 
 function renderHabitQuestWin(){
-  const area = document.getElementById("go-content");
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
   area.innerHTML = `
@@ -1505,7 +1494,9 @@ function renderHabitQuestWin(){
     <p>You made lots of strong choices. Your avatar ${escapeHtml(avatarForStory())} is getting wiser.</p>
     <p class="muted">We can add more chapters/branches anytime.</p>
   `;
-  setRestartVisible(true);
+
+  const restartBtn = overlay.querySelector("#go-restart");
+  if(restartBtn) restartBtn.style.display = "inline-block";
 
   state.habitQuest.chapter = 0;
   state.habitQuest.scene = 0;
@@ -1757,6 +1748,8 @@ function bindReset(){
     saveState();
     recalcLevel();
 
+    closeGameOverlay(); // also restores scroll
+
     updateHomeStats();
     renderProgress();
     renderLesson();
@@ -1765,9 +1758,6 @@ function bindReset(){
     renderRate();
     renderGamesCatalog();
     renderTrackUI();
-
-    closeGameOverlay();
-    ensureGameOverlay();
   });
 }
 
@@ -1775,14 +1765,16 @@ function bindReset(){
    INIT
 ========================================================= */
 function init(){
+  // Hard reset any “stuck no scroll” from older builds
+  document.body.style.overflow = "";
+
   $("#year") && ($("#year").textContent = new Date().getFullYear());
 
   recalcLevel();
   saveState();
 
-  // Overlay exists but MUST NOT show on load
+  // Create overlay ONCE, but keep it hidden until a game starts
   ensureGameOverlay();
-  closeGameOverlay();
 
   bindNav();
   bindTracks();
@@ -1804,7 +1796,7 @@ function init(){
   renderGamesCatalog();
   renderTrackUI();
 
-  // Start on Home
+  // Default view
   showView("home");
 }
 
