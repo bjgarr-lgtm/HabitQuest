@@ -337,6 +337,7 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
+  { id:"storymap",   title:"Story Map",      desc:"See which Habit Quest nodes you’ve visited.", status:"ready", unlock:{ type:"free" } },
   { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
   // “Soon” stays soon, but unlock gates are a bit later so it feels paced.
@@ -1101,6 +1102,124 @@ function closeGameOverlay(){
   gameMode = null;
 }
 
+function openStoryMapOverlay(){
+  gameMode = "storymap";
+  gameScore = 0;
+  openGameOverlay("Story Map", "Visited nodes + where choices can go.");
+
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const visited = (state.habitQuest && state.habitQuest.visited && typeof state.habitQuest.visited === "object")
+    ? state.habitQuest.visited
+    : {};
+
+  const rows = Object.entries(HQ_NODES).map(([id, node]) => {
+    const v = !!visited[id];
+    const chapter = node.chapter || "";
+    const nexts = (Array.isArray(node.choices) ? node.choices : [])
+      .map(c => (c && c.next) ? c.next : null)
+      .filter(Boolean);
+
+    const uniqNexts = Array.from(new Set(nexts));
+    return { id, v, chapter, nexts: uniqNexts };
+  });
+
+  rows.sort((a,b) => {
+    // visited first, then by chapter, then id
+    if(a.v !== b.v) return a.v ? -1 : 1;
+    const ca = a.chapter.toLowerCase();
+    const cb = b.chapter.toLowerCase();
+    if(ca < cb) return -1;
+    if(ca > cb) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  area.innerHTML = `
+    <p class="muted" style="margin-top:0;">
+      Visited: <strong>${Object.keys(visited).length}</strong> / <strong>${rows.length}</strong>
+    </p>
+
+    <div class="card" style="margin-top:10px; background: rgba(255,255,255,0.06);">
+      <p style="margin:0 0 10px; font-weight:900;">Jump to a node (dev‑friendly)</p>
+      <div class="row" style="margin:0;">
+        <input id="sm-jump" class="textInput" placeholder="ex: hq_forest_boss" />
+        <button class="btn small" id="sm-jump-btn" type="button">Jump</button>
+      </div>
+      <p class="muted" style="margin:10px 0 0;">Tip: copy a nodeId from the list below.</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card" style="background: rgba(255,255,255,0.06);">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+        <p style="margin:0; font-weight:900;">Nodes</p>
+        <button class="btn small" id="sm-clear-visited" type="button">Clear visited (only)</button>
+      </div>
+      <div id="sm-list" style="margin-top:12px;"></div>
+    </div>
+  `;
+
+  const list = area.querySelector("#sm-list");
+  if(list){
+    list.innerHTML = rows.map(r => {
+      const badge = r.v ? "✅ Visited" : "⬜ Not visited";
+      const nextLine = r.nexts.length ? r.nexts.join(", ") : "—";
+      return `
+        <div class="card" style="margin:10px 0; background: rgba(255,255,255,0.05);">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-weight:900;">${escapeHtml(r.id)}</div>
+              <div class="muted" style="margin-top:4px;">${escapeHtml(r.chapter)}</div>
+              <div class="muted" style="margin-top:6px;">Next: ${escapeHtml(nextLine)}</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <span class="badge">${badge}</span>
+              <button class="btn small" data-jump="${escapeHtml(r.id)}" type="button">Jump</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // jump handlers
+  const doJump = (nodeId) => {
+    const id = safeStr(nodeId, "");
+    if(!id) return;
+    if(!HQ_NODES[id]) {
+      alert("Unknown nodeId: " + id);
+      return;
+    }
+    state.habitQuest.nodeId = id;
+    saveState();
+    closeGameOverlay();
+    startHabitQuest(); // re-open Habit Quest at that node
+  };
+
+  area.querySelector("#sm-jump-btn")?.addEventListener("click", () => {
+    const v = area.querySelector("#sm-jump")?.value || "";
+    doJump(v);
+  });
+
+  area.querySelectorAll("button[data-jump]").forEach(btn => {
+    btn.addEventListener("click", () => doJump(btn.getAttribute("data-jump")));
+  });
+
+  area.querySelector("#sm-clear-visited")?.addEventListener("click", () => {
+    if(!confirm("Clear visited nodes? (Does not change flags/tokens/hearts)")) return;
+    state.habitQuest.visited = {};
+    state.habitQuest.history = [];
+    saveState();
+    openStoryMapOverlay(); // refresh
+  });
+
+  const restartBtn = overlay?.querySelector("#go-restart");
+  if(restartBtn) restartBtn.style.display = "none"; // story map doesn’t need restart
+}
+
+
 /* =========================================================
    GAMES CATALOG
 ========================================================= */
@@ -1186,8 +1305,10 @@ function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
   if(id === "habitquest") return startHabitQuest();
+  if(id === "storymap") return openStoryMapOverlay();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
+
 
 /* =========================================================
    GAME: CHOICE QUEST
