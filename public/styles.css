@@ -479,3 +479,109 @@ button, input, select, textarea {
   font-size: 22px;
   font-weight: 900;
 }
+
+/* =========================
+   PROFILE: compact + clean
+========================= */
+
+.profileHeader{
+  display:flex;
+  gap:16px;
+  align-items:flex-start;
+  justify-content:space-between;
+  flex-wrap:wrap;
+}
+
+.profileIdentity{
+  display:flex;
+  gap:14px;
+  align-items:flex-start;
+  min-width: 280px;
+  flex: 1 1 360px;
+}
+
+.profileAvatar{
+  width:56px;
+  height:56px;
+  border-radius:16px;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  flex: 0 0 auto;
+}
+
+.profileAvatar span{
+  font-size:28px;
+  line-height:1;
+}
+
+.profileAvatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.profileNameBlock{
+  min-width: 220px;
+  flex: 1 1 auto;
+}
+
+.profileNameRow{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:6px;
+}
+
+.textInput{
+  flex: 1 1 auto;
+  min-width: 0;             /* KEY: prevents overflow in flex rows */
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  outline: none;
+}
+
+.textInput:focus{
+  border-color: rgba(124,92,255,0.65);
+  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
+}
+
+.profileStats{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  flex: 0 1 auto;
+}
+
+.statPill{
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  min-width: 140px;
+}
+
+.statValue{
+  font-weight: 900;
+  font-size: 22px;
+  margin-top: 2px;
+}
+
+.profileTwoCol{
+  display:grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap:12px;
+}
+
+@media (max-width: 860px){
+  .profileTwoCol{ grid-template-columns: 1fr; }
+  .profileStats{ justify-content:flex-start; }
+}
