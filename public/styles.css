@@ -225,48 +225,7 @@ h1{ margin:0; font-size:18px; }
   opacity:0.6;
 }
 
-/* =========================
-   FIX: Game portal text color
-========================= */
-#view-games,
-#view-games .card,
-#view-games .gameCard,
-#game-area,
-#game-content {
-  color: rgba(255,255,255,0.92);
-}
 
-#view-games .muted,
-#game-area .muted,
-#game-content .muted {
-  color: rgba(255,255,255,0.70) !important;
-}
-
-#view-games h2,
-#view-games h3,
-#game-area h3,
-#game-content p {
-  color: rgba(255,255,255,0.92);
-}
-
-#view-games .gameCard button,
-#game-area button,
-#game-content button {
-  color: rgba(255,255,255,0.92) !important;
-}
-
-#view-games .choice {
-  color: rgba(255,255,255,0.92);
-}
-
-/* If your game cards use inputs/selects anywhere */
-#view-games input,
-#view-games select,
-#view-games textarea {
-  color: rgba(255,255,255,0.92);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-}
 
 /* =========================
    Profile layout polish
@@ -293,30 +252,44 @@ h1{ margin:0; font-size:18px; }
   margin-bottom: 8px;
 }
 
-/* =========================================================
-   HARD FIX: Game portal buttons/text turning black
-   Put this at the VERY END of styles.css
-========================================================= */
+/* =========================
+   FIX: Game portal unreadable (black) text
+   Works even for disabled <button> + nested spans
+========================= */
 
 #game-area,
-#game-area * ,
-#game-content,
-#game-content * {
+#game-area * {
   color: var(--text) !important;
-  -webkit-text-fill-color: var(--text) !important; /* helps Safari/WebKit */
 }
 
+/* Force button text color on Chromium/Safari */
 #game-area button,
-#game-content button,
-#game-area .choice,
-#game-content .choice {
+#game-area button * {
   color: var(--text) !important;
   -webkit-text-fill-color: var(--text) !important;
 }
 
-/* Keep primary buttons readable (they intentionally have dark text) */
-#game-area .btn.primary,
-#game-content .btn.primary {
-  color: #f40707 !important;
-  -webkit-text-fill-color: #057ff9 !important;
+/* Disabled buttons often override color — force it back */
+#game-area button:disabled,
+#game-area button:disabled * {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
+  opacity: 1 !important; /* prevents that greyed-out “dead” look */
+}
+
+/* If your choices are buttons with class="choice" */
+#game-area .choice,
+#game-area .choice * {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
+/* If the choices are inputs/textarea instead */
+#game-area input,
+#game-area textarea,
+#game-area select {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid var(--border) !important;
 }
