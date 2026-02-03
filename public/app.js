@@ -620,7 +620,14 @@ function showView(name){
   if(name === "tracks")   renderTrackUI();
   if(name === "map")      renderStoryMap();
   if(name === "home")     renderHomeRecommendation();
-  if(name === "habitquest") renderHabitQuestLanding();
+  if(name === "habitquest"){
+    $("#hq-current-node") && 
+      ($("#hq-current-node").textContent = state.habitQuest.nodeId);
+    $("#hq-token-count") && 
+      ($("#hq-token-count").textContent = state.habitQuest.tokens);
+    $("#hq-heart-count") && 
+      ($("#hq-heart-count").textContent = state.habitQuest.hearts);
+  }
 }
 
 function bindNav(){
@@ -651,9 +658,6 @@ function renderHabitQuestLanding(){
           ${gate.unlocked ? "Play Habit Quest" : "Locked"}
         </button>
       </div>
-      <p class="muted" style="margin-top:10px;">
-        Story Map is available inside Habit Quest (top bar) — no extra card needed.
-      </p>
     </div>
   `;
 
@@ -1304,18 +1308,6 @@ function renderGamesCatalog(){
     return card;
   };
 
-  // ✅ FEATURED Habit Quest tile FIRST (bigger)
-  const hqGate = gameUnlockStatus({ unlock:{ type:"lessons", lessons:1 } }); // same gate as habitquest in GAMES
-  grid.appendChild(makeTile({
-    title: "Habit Quest 📖",
-    desc: "Branching story adventure where your choices change the path.",
-    statusLine: `${hqGate.reason} • ${hqGate.unlocked ? "Playable" : "Locked"}`,
-    buttonText: hqGate.unlocked ? "Play" : "Locked",
-    disabled: !hqGate.unlocked,
-    onClick: () => launchGame("habitquest"),
-    extraClass: "featured"
-  }));
-
   // ✅ Normal game tiles (NO Story Map tile)
   GAMES
     .filter(g => g.id !== "storymap") // <-- removes Story Map card entirely
@@ -1876,10 +1868,15 @@ function renderHabitQuest(){
       </div>
     </div>
 
-    <div class="actions" style="margin-top:10px;">
-      <button class="btn small" type="button" id="btn-hq-resetrun">New Run (reset) ↩️</button>
-      <button class="btn small" type="button" id="btn-hq-openmap">Story Map 🗺️</button>
+    <div class="actions" style="margin-top:10px; justify-content:space-between;">
+      <div class="row">
+        <button class="btn small danger" id="btn-hq-resetrun">New Run</button>
+      </div>
+      <div class="row">
+        <button class="btn small" id="btn-hq-openmap">Story Map</button>
+      </div>
     </div>
+
 
     <div class="divider"></div>
 
@@ -2436,6 +2433,15 @@ function init(){
   renderHomeRecommendation();
 
   showView("home");
+
+  $("#btn-hq-play")?.addEventListener("click", () => startHabitQuest());
+  $("#btn-hq-new")?.addEventListener("click", () => {
+    if(confirm("Start a new Habit Quest run?")) {
+      hqResetRun();
+      startHabitQuest();
+    }
+  });
+
 }
 
 init();

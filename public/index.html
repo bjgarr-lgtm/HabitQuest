@@ -153,7 +153,27 @@
 
     <!-- HABIT QUEST (TAB) -->
     <section class="view hidden" id="view-habitquest">
-      <div id="hq-wrap"></div>
+      <div class="card hero">
+        <h2>Habit Quest 📖</h2>
+        <p class="muted">
+          A branching story where your choices shape the path.
+          Practice saying no, handling pressure, and making strong decisions.
+        </p>
+
+        <div class="actions">
+          <button class="btn primary" id="btn-hq-play">Continue Story</button>
+          <button class="btn" id="btn-hq-new">New Run</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <h3>Your Progress</h3>
+        <p class="muted">
+          Current node: <code id="hq-current-node">hq_start</code><br/>
+          Tokens: <strong id="hq-token-count">0</strong> •
+          Hearts: <strong id="hq-heart-count">3</strong>
+        </p>
+      </div>
     </section>
 
 
