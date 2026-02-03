@@ -81,6 +81,7 @@ h1{ margin:0; font-size:18px; }
 }
 
 .hero h2{ margin-top:0; font-size:22px; }
+
 .grid{
   margin-top:14px;
   display:grid;
@@ -183,7 +184,7 @@ h1{ margin:0; font-size:18px; }
   cursor:pointer;
 }
 
-/* stars + shop */
+/* Stars + shop */
 .stars{
   display:flex;
   gap:10px;
@@ -205,24 +206,41 @@ h1{ margin:0; font-size:18px; }
 .shopBadge{ font-size:36px; }
 .locked{ opacity:0.6; }
 
-/* form inputs */
-.textInput{
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  color: var(--text);
-  outline: none;
-}
-.textInput:focus{
-  border-color: rgba(124,92,255,0.65);
-  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
+/* Profile polish */
+.profileGrid { align-items: stretch; }
+
+#avatar-grid{ display:flex; flex-wrap:wrap; gap: 10px; }
+
+.avatarChip{
+  position: relative;
+  min-width: 46px;
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  border-radius: 999px;
 }
 
-/* =========================
-   Profile polish
-========================= */
+.activeAvatar{
+  outline: 2px solid rgba(68,215,182,0.85);
+  box-shadow: 0 0 0 3px rgba(68,215,182,0.15);
+}
+
+.avatarPlus{
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.08);
+}
+
+.avatarImg{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
 .profileHeader{
   display:flex;
   gap:16px;
@@ -230,6 +248,7 @@ h1{ margin:0; font-size:18px; }
   justify-content:space-between;
   flex-wrap:wrap;
 }
+
 .profileIdentity{
   display:flex;
   gap:14px;
@@ -237,6 +256,7 @@ h1{ margin:0; font-size:18px; }
   min-width: 280px;
   flex: 1 1 360px;
 }
+
 .profileAvatar{
   width:56px;
   height:56px;
@@ -250,7 +270,26 @@ h1{ margin:0; font-size:18px; }
 }
 .profileAvatar span{ font-size:28px; line-height:1; }
 .profileAvatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.profileNameBlock{ min-width: 220px; flex: 1 1 auto; }
 .profileNameRow{ display:flex; gap:10px; align-items:center; margin-top:6px; }
+
+.textInput{
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  outline: none;
+}
+.textInput:focus{
+  border-color: rgba(124,92,255,0.65);
+  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
+}
+
 .profileStats{
   display:flex;
   gap:10px;
@@ -270,6 +309,7 @@ h1{ margin:0; font-size:18px; }
   font-size: 22px;
   margin-top: 2px;
 }
+
 .profileTwoCol{
   display:grid;
   grid-template-columns: 1.2fr 0.8fr;
@@ -280,38 +320,17 @@ h1{ margin:0; font-size:18px; }
   .profileStats{ justify-content:flex-start; }
 }
 
-/* avatar grid */
-#avatar-grid{ display:flex; flex-wrap:wrap; gap:10px; }
-.avatarChip{
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  display:grid;
-  place-items:center;
-  font-size: 22px;
-  cursor:pointer;
-  position: relative;
+/* Tracks dropdown readability */
+#view-tracks select {
+  color: #111;
+  background: #fff;
 }
-.avatarChip:hover{ background: rgba(255,255,255,0.10); }
-.activeAvatar{
-  outline: 2px solid rgba(68,215,182,0.85);
-  box-shadow: 0 0 0 3px rgba(68,215,182,0.15);
+#view-tracks select option {
+  color: #111;
+  background: #fff;
 }
-.avatarPlus{
-  font-size: 22px;
-  font-weight: 900;
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.08);
-}
-.avatarImg{
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 1px solid rgba(255,255,255,0.18);
-}
+
+/* Custom avatar delete */
 .avatarDelete{
   position:absolute;
   top:-6px;
@@ -331,128 +350,4 @@ h1{ margin:0; font-size:18px; }
 }
 .avatarDelete:hover{ background: rgba(255,85,119,0.35); }
 
-/* =========================
-   FULLSCREEN GAME OVERLAY
-========================= */
-.gameOverlay{
-  position:fixed;
-  inset:0;
-  z-index:9999;
-  background: rgba(0,0,0,0.70);
-  backdrop-filter: blur(8px);
-  padding: 14px;
-  overflow:auto;
-  color: rgba(255,255,255,0.92);
-}
-.gameOverlayInner{
-  max-width: 1180px;
-  margin: 18px auto;
-  background: rgba(20,20,30,0.92);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-}
-.gameOverlayTop{
-  display:flex; gap:14px; align-items:center; justify-content:space-between;
-  flex-wrap: wrap;
-}
-.gameOverlayStats{ display:flex; gap:10px; align-items:center; }
-
-/* Choice buttons (overlay games) */
-.choiceBtn{
-  display:block; width:100%;
-  text-align:left;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
-  cursor:pointer;
-  margin-top: 10px;
-  font-weight: 700;
-}
-.choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-.choiceBtn:disabled{ opacity:0.75; cursor:not-allowed; }
-.choiceGood{ border-color: rgba(80,220,140,0.6); }
-.choiceBad{ border-color: rgba(255,120,120,0.6); }
-
-/* Habit Quest HUD */
-.hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
-.hqChip{
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.14);
-  display:flex; align-items:center; gap:8px;
-}
-.hqChip.youChip{ font-weight: 800; }
-.hqAvatarImg{
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid rgba(255,255,255,0.18);
-}
-.emojiAvatar{ font-size: 20px; line-height: 1; }
-
-/* Habit Quest Save Slots (Phase 2) */
-.hqSlots{
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  border-radius: 14px;
-}
-.hqSlotsRow{
-  margin-top: 8px;
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:center;
-}
-.select{
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.92);
-  outline: none;
-}
-
-/* Story Map (Phase 2) */
-.mapTools{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:center;
-}
-.mapList{
-  display:flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.mapRow{
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  border-radius: 14px;
-  padding: 12px;
-}
-.mapRowTop{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-.mapNodeId{
-  font-weight: 900;
-  letter-spacing: 0.2px;
-}
-.mapMeta{
-  margin-top: 6px;
-  font-size: 12px;
-}
-.mapRowActions{
-  margin-top: 10px;
-}
+/* (Overlay styles injected by app.js too; this is fine.) */

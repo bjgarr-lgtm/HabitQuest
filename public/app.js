@@ -16,6 +16,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const STORAGE_KEY = "htaa_v2_state";
 
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
 function isoDate(d){
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,"0");
@@ -39,9 +40,6 @@ function escapeHtml(s){
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
 }
-function uid(){
-  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
-}
 // Deterministic “random” so a lesson keeps the same quiz each load.
 function mulberry32(seed){
   let t = seed >>> 0;
@@ -51,6 +49,9 @@ function mulberry32(seed){
     r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
+function uid(){
+  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 }
 
 /* =========================================================
@@ -245,17 +246,20 @@ function makeQuizForLesson(day, title, goal, track){
     q(`A trusted adult could be…`, ["Parent/guardian/teacher/coach", "Only strangers online", "Nobody"], 0),
     q(`Good friends will…`, ["Respect your boundaries", "Force you to prove yourself", "Laugh when you’re uncomfortable"], 0),
   ];
+
   const poolMed = [
     q(`Pick the best “switch” after saying no:`, ["Let’s do something else.", "You’re annoying.", "Fine, I’ll do it."], 0),
     q(`If stress is high, a smart tool is…`, ["Slow breathing + water", "Start a fight", "Do something risky"], 0),
     q(`A “tiny step” is…`, ["Small and doable today", "Huge and impossible", "Only for adults"], 0),
   ];
+
   const poolHard = [
     q(`Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
       ["Delay + distract + talk to someone", "Keep it secret", "Say yes to fit in"], 0),
     q(`A good boundary sounds like…`, ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
     q(`If you make a mistake, the best comeback is…`, ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
   ];
+
   const poolBoss = [
     q(`Boss moment: Your friend laughs at your “no.” Best move is…`,
       ["Repeat no calmly and step away", "Prove yourself by saying yes", "Start a fight"], 0),
@@ -328,26 +332,34 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 }));
 
 /* =========================================================
-   GAMES (unlock pacing tweak)
+   GAMES CATALOG (PHASE 3 pacing tweak)
 ========================================================= */
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest",  title:"Habit Quest",     desc:"Branching story: your choices change the path.",              status:"ready", unlock:{ type:"lessons", lessons:1 } },
+  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
-  // pacing tweaks (so you don’t wait forever)
-  { id:"memory",      title:"Memory Match",    desc:"Match healthy coping tools.",                                 status:"soon",  unlock:{ type:"xp",     xp:80 } },
-  { id:"coping-sort", title:"Coping Sort",     desc:"Sort coping tools into helpful vs not helpful.",              status:"soon",  unlock:{ type:"lessons",lessons:2 } },
-  { id:"streak-run",  title:"Streak Run",      desc:"Quick reaction game to keep your streak alive.",              status:"soon",  unlock:{ type:"level",  level:2 } },
-  { id:"focus-dodge", title:"Focus Dodge",     desc:"Avoid distractions; build focus.",                            status:"soon",  unlock:{ type:"level",  level:3 } },
-  { id:"goal-builder",title:"Goal Builder",    desc:"Pick goals + tiny steps to reach them.",                      status:"soon",  unlock:{ type:"xp",     xp:220 } },
-  { id:"friendship-quiz", title:"Friendship Signals", desc:"Spot healthy vs unhealthy friend behaviors.",          status:"soon",  unlock:{ type:"lessons",lessons:5 } },
-  { id:"stress-lab",  title:"Stress Lab",      desc:"Try safe stress tools and see what works.",                   status:"soon",  unlock:{ type:"xp",     xp:420 } },
+  // “Soon” stays soon, but unlock gates are a bit later so it feels paced.
+  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                          status:"soon", unlock:{ type:"xp",     xp:250 } },
+  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",       status:"soon", unlock:{ type:"lessons",lessons:5 } },
+  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",       status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                     status:"soon", unlock:{ type:"level",  level:5 } },
+  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",               status:"soon", unlock:{ type:"xp",     xp:600 } },
+  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",          status:"soon", unlock:{ type:"lessons",lessons:10 } },
+  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",            status:"soon", unlock:{ type:"xp",     xp:900 } },
 ];
 
 /* =========================================================
    STATE
 ========================================================= */
+function blankSaveSlot(){
+  return {
+    savedISO: null,
+    label: "",
+    data: null, // { nodeId, hearts, wisdom, tokens, flags, visited, history, lastLessonDay }
+  };
+}
+
 const DEFAULT_STATE = {
   currentLessonIndex: 0,
   completedDays: [],
@@ -357,22 +369,18 @@ const DEFAULT_STATE = {
   xp: 0,
   level: 1,
   profileName: "Player",
-
   avatar: AVATARS[0],
   customAvatars: [],
-
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
+  selectedTrack: "general",
 
-  // Lesson stats for recommendations
-  lessonStats: {
-    // day -> { attempts, lastCorrect, lastTotal, lastISO }
+  // PHASE 3: store “struggles” to recommend next lesson
+  quizAttempts: {
+    // day -> { attempts, wrongTotal, lastISO }
   },
 
-  // Daily reward book-keeping
-  dailyRewardISO: null,
-
-  // Habit Quest save schema
+  // Habit Quest (branching)
   habitQuest: {
     nodeId: "hq_start",
     hearts: 3,
@@ -382,17 +390,10 @@ const DEFAULT_STATE = {
     flags: {},
     visited: {},
     history: [],
-    activeSlot: 0,
   },
 
-  // 3 save slots (bookmark runs)
-  habitQuestSlots: [
-    { name:"Slot 1", savedISO:null, data:null },
-    { name:"Slot 2", savedISO:null, data:null },
-    { name:"Slot 3", savedISO:null, data:null },
-  ],
-
-  selectedTrack: "general",
+  // PHASE 3: save slots (3)
+  habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
 };
 
 function loadState(){
@@ -416,24 +417,24 @@ function normalizeState(s){
       ...DEFAULT_STATE.ratings,
       ...(safe.ratings && typeof safe.ratings === "object" ? safe.ratings : {})
     },
-    lessonStats: (safe.lessonStats && typeof safe.lessonStats === "object") ? safe.lessonStats : { ...DEFAULT_STATE.lessonStats },
+    quizAttempts: (safe.quizAttempts && typeof safe.quizAttempts === "object") ? safe.quizAttempts : {},
     habitQuest: {
       ...DEFAULT_STATE.habitQuest,
       ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
     },
-    habitQuestSlots: Array.isArray(safe.habitQuestSlots) ? safe.habitQuestSlots : DEFAULT_STATE.habitQuestSlots.map(x=>({ ...x })),
+    habitQuestSlots: Array.isArray(safe.habitQuestSlots) ? safe.habitQuestSlots : DEFAULT_STATE.habitQuestSlots,
   };
 
   merged.profileName = safeStr(merged.profileName, "Player").slice(0, 24);
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
-
   merged.xp = safeNum(merged.xp, 0);
   merged.level = safeNum(merged.level, 1);
   merged.highScore = safeNum(merged.highScore, 0);
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  merged.customAvatars = Array.isArray(merged.customAvatars) ? merged.customAvatars : [];
+  // Normalize custom avatar list
+  merged.customAvatars = Array.isArray(safe.customAvatars) ? safe.customAvatars : [];
   merged.customAvatars = merged.customAvatars
     .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
     .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
@@ -471,21 +472,19 @@ function normalizeState(s){
   merged.habitQuest.lastLessonDay = Math.max(0, safeNum(hq.lastLessonDay, 0));
   merged.habitQuest.flags = (hq.flags && typeof hq.flags === "object") ? hq.flags : {};
   merged.habitQuest.visited = (hq.visited && typeof hq.visited === "object") ? hq.visited : {};
-  merged.habitQuest.history = Array.isArray(hq.history) ? hq.history.slice(-50) : [];
-  merged.habitQuest.activeSlot = clamp(safeNum(hq.activeSlot, 0), 0, 2);
+  merged.habitQuest.history = Array.isArray(hq.history) ? hq.history.slice(-80) : [];
 
-  // Normalize save slots structure
-  merged.habitQuestSlots = (Array.isArray(merged.habitQuestSlots) ? merged.habitQuestSlots : []).slice(0,3);
-  while(merged.habitQuestSlots.length < 3){
-    merged.habitQuestSlots.push({ name:`Slot ${merged.habitQuestSlots.length+1}`, savedISO:null, data:null });
-  }
-  merged.habitQuestSlots = merged.habitQuestSlots.map((slot, i) => {
-    const obj = (slot && typeof slot === "object") ? slot : {};
-    return {
-      name: safeStr(obj.name, `Slot ${i+1}`).slice(0, 24),
-      savedISO: (typeof obj.savedISO === "string" ? obj.savedISO : null),
-      data: (obj.data && typeof obj.data === "object") ? obj.data : null,
-    };
+  // Save slots normalize (3)
+  const slots = Array.isArray(merged.habitQuestSlots) ? merged.habitQuestSlots : [];
+  while(slots.length < 3) slots.push(blankSaveSlot());
+  merged.habitQuestSlots = slots.slice(0, 3).map(slot => {
+    const out = blankSaveSlot();
+    if(slot && typeof slot === "object"){
+      out.savedISO = safeStr(slot.savedISO, null);
+      out.label = safeStr(slot.label, "").slice(0, 24);
+      out.data = (slot.data && typeof slot.data === "object") ? slot.data : null;
+    }
+    return out;
   });
 
   return merged;
@@ -524,6 +523,7 @@ function getActiveLessons(){
   const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
   return filtered.length ? filtered : LESSONS;
 }
+
 function renderTrackUI(){
   const sel = $("#track-select");
   const preview = $("#track-preview");
@@ -531,6 +531,7 @@ function renderTrackUI(){
   if(sel) sel.value = t;
   if(preview) preview.textContent = (TRACKS[t] ? TRACKS[t].desc : TRACKS.general.desc);
 }
+
 function bindTracks(){
   const sel = $("#track-select");
   $("#btn-apply-track")?.addEventListener("click", () => {
@@ -539,6 +540,7 @@ function bindTracks(){
     state.currentLessonIndex = 0;
     saveState();
     renderTrackUI();
+    renderHomeRecommendation();
     showView("lesson");
   });
   $("#btn-clear-track")?.addEventListener("click", () => {
@@ -546,6 +548,7 @@ function bindTracks(){
     state.currentLessonIndex = 0;
     saveState();
     renderTrackUI();
+    renderHomeRecommendation();
     showView("lesson");
   });
   sel?.addEventListener("change", () => {
@@ -582,6 +585,7 @@ function recalcLevel(){
   state.xp = safeNum(state.xp, 0);
   state.level = 1 + Math.floor(state.xp / 200);
 }
+
 function addXP(amount){
   const a = safeNum(amount, 0);
   if(a <= 0) return;
@@ -594,6 +598,7 @@ function addXP(amount){
   renderShop();
   renderRate();
   renderGamesCatalog();
+  renderHomeRecommendation();
 }
 
 /* =========================================================
@@ -613,7 +618,10 @@ function showView(name){
   if(name === "shop")     renderShop();
   if(name === "rate")     renderRate();
   if(name === "tracks")   renderTrackUI();
+  if(name === "map")      renderStoryMap();
+  if(name === "home")     renderHomeRecommendation();
 }
+
 function bindNav(){
   $$(".tab").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -637,77 +645,84 @@ function randomTip(){
 }
 
 /* =========================================================
-   RECOMMENDED NEXT LESSON (Phase 2)
+   RECOMMENDED NEXT LESSON (PHASE 3)
 ========================================================= */
-function recordLessonAttempt(day, correct, total){
-  state.lessonStats = (state.lessonStats && typeof state.lessonStats === "object") ? state.lessonStats : {};
-  const key = String(day);
-  const prev = state.lessonStats[key] || { attempts:0, lastCorrect:0, lastTotal:0, lastISO:null };
-  state.lessonStats[key] = {
-    attempts: safeNum(prev.attempts,0) + 1,
-    lastCorrect: safeNum(correct,0),
-    lastTotal: safeNum(total,0),
-    lastISO: isoDate(new Date()),
-  };
+function recordQuizAttempt(day, wrongCount){
+  const d = String(day);
+  state.quizAttempts = (state.quizAttempts && typeof state.quizAttempts === "object") ? state.quizAttempts : {};
+  const cur = state.quizAttempts[d] && typeof state.quizAttempts[d] === "object"
+    ? state.quizAttempts[d]
+    : { attempts: 0, wrongTotal: 0, lastISO: null };
+
+  cur.attempts = safeNum(cur.attempts, 0) + 1;
+  cur.wrongTotal = safeNum(cur.wrongTotal, 0) + Math.max(0, safeNum(wrongCount, 0));
+  cur.lastISO = isoDate(new Date());
+  state.quizAttempts[d] = cur;
   saveState();
 }
 
-function computeRecommendedLessonIndex(){
+function getRecommendedLesson(){
   const lessons = getActiveLessons();
-  if(!lessons.length) return 0;
+  if(!lessons.length) return null;
 
-  // 1) Prefer a not-completed lesson in the selected track (or general)
-  const completedSet = new Set(state.completedDays || []);
-  const desiredTrack = state.selectedTrack || "general";
+  // Prefer: next uncompleted lesson in your active list
+  const uncompleted = lessons.filter(l => !state.completedDays.includes(l.day));
+  if(uncompleted.length) return uncompleted[0];
 
-  // 2) If user recently struggled on a lesson (not perfect), recommend repeating it
-  //    Look at last 7 days of attempts.
-  const stats = state.lessonStats || {};
-  const today = new Date();
-  const recent = [];
+  // If all complete in track, recommend a “review” based on highest wrongTotal historically
+  let best = null;
+  let bestScore = -1;
   for(const l of lessons){
-    const st = stats[String(l.day)];
-    if(!st) continue;
-    if(typeof st.lastISO !== "string") continue;
-    const d = new Date(st.lastISO + "T00:00:00");
-    const diffDays = Math.floor((today - d) / (1000*60*60*24));
-    if(diffDays >= 0 && diffDays <= 7 && safeNum(st.lastCorrect,0) < safeNum(st.lastTotal,0)){
-      recent.push({ day:l.day, idx: lessons.findIndex(x=>x.day===l.day), score: safeNum(st.lastCorrect,0)/Math.max(1,safeNum(st.lastTotal,1)) });
+    const stat = state.quizAttempts?.[String(l.day)];
+    const score = stat ? safeNum(stat.wrongTotal, 0) : 0;
+    if(score > bestScore){
+      bestScore = score;
+      best = l;
     }
   }
-  recent.sort((a,b)=>a.score - b.score);
-  if(recent[0] && Number.isFinite(recent[0].idx) && recent[0].idx >= 0){
-    return recent[0].idx;
-  }
-
-  // 3) Otherwise: next not-completed lesson that matches track (or general)
-  for(let i=0;i<lessons.length;i++){
-    const l = lessons[i];
-    const okTrack = (desiredTrack === "general") ? true : (l.track === desiredTrack || l.track === "general");
-    if(okTrack && !completedSet.has(l.day)) return i;
-  }
-
-  // 4) Fallback: first lesson not completed
-  for(let i=0;i<lessons.length;i++){
-    if(!completedSet.has(lessons[i].day)) return i;
-  }
-  // 5) Everything completed: keep current
-  return clamp(state.currentLessonIndex, 0, lessons.length-1);
+  return best || lessons[0];
 }
 
-function renderRecommendedLessonUI(){
-  const el = $("#recommended-lesson");
-  const btn = $("#btn-go-recommended");
-  if(!el || !btn) return;
+function goToLessonDay(day){
   const lessons = getActiveLessons();
-  const idx = computeRecommendedLessonIndex();
-  const l = lessons[idx] || lessons[0];
-  el.textContent = l ? `Recommended next: Day ${l.day} — ${l.title}` : "Recommended next: —";
-  btn.onclick = () => {
-    state.currentLessonIndex = clamp(idx, 0, lessons.length-1);
+  const idx = lessons.findIndex(l => l.day === day);
+  if(idx >= 0){
+    state.currentLessonIndex = idx;
     saveState();
     showView("lesson");
-  };
+  }
+}
+
+function renderHomeRecommendation(){
+  const boxTitle = $("#rec-title");
+  const boxDesc  = $("#rec-desc");
+  const btn      = $("#btn-go-recommended");
+  if(!boxTitle || !boxDesc || !btn) return;
+
+  const rec = getRecommendedLesson();
+  if(!rec){
+    boxTitle.textContent = "Recommended next lesson";
+    boxDesc.textContent = "Start with Today’s Lesson!";
+    btn.disabled = true;
+    return;
+  }
+
+  const isDone = state.completedDays.includes(rec.day);
+  const trackName = TRACKS[state.selectedTrack]?.name || "General";
+  boxTitle.textContent = `Recommended: Day ${rec.day} — ${rec.title}`;
+  boxDesc.textContent = isDone
+    ? `Review (Track: ${trackName}). You’ve done this, but it’s a good refresh.`
+    : `Next up (Track: ${trackName}). Goal: ${rec.goal}`;
+
+  btn.disabled = false;
+  if(!btn.__bound){
+    btn.__bound = true;
+    btn.addEventListener("click", () => {
+      const r = getRecommendedLesson();
+      if(!r) return;
+      goToLessonDay(r.day);
+    });
+  }
 }
 
 /* =========================================================
@@ -717,7 +732,6 @@ function renderLesson(){
   const lessons = getActiveLessons();
   if(!lessons.length) return;
 
-  // auto-set current lesson to something smart if it’s out of bounds
   const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
   state.currentLessonIndex = idx;
   saveState();
@@ -736,7 +750,6 @@ function renderLesson(){
       body.appendChild(el);
     });
   }
-
   renderQuiz(lesson);
   updateLessonStatus(lesson.day);
 }
@@ -745,6 +758,7 @@ function renderQuiz(lesson){
   const quiz = $("#quiz");
   if(!quiz) return;
   quiz.innerHTML = "";
+
   lesson.quiz.forEach((item, qi) => {
     const block = document.createElement("div");
     block.className = "card";
@@ -801,20 +815,21 @@ function updateLessonStatus(day){
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
 
-function applyDailyStreakReward(){
-  const todayISO = isoDate(new Date());
-  if(state.dailyRewardISO === todayISO) return;
+function applyDailyStreakBonusIfAny(prevLastISO, newLastISO){
+  // If the user completed yesterday and completes today, reward a small bonus.
+  // (We only call this when a completion actually happens.)
+  const today = isoDate(new Date());
+  if(newLastISO !== today) return;
 
-  // small daily XP reward
-  addXP(10);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayISO = isoDate(yesterday);
 
-  // token bonus every 3-day streak milestone (3,6,9,...)
-  if(state.streak > 0 && state.streak % 3 === 0){
-    state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+  if(prevLastISO === yesterdayISO){
+    // PHASE 3: streak bonus
+    state.habitQuest.tokens = safeNum(state.habitQuest.tokens, 0) + 1; // bonus token
+    addXP(15); // bonus XP
   }
-
-  state.dailyRewardISO = todayISO;
-  saveState();
 }
 
 function bindLessonButtons(){
@@ -834,29 +849,36 @@ function bindLessonButtons(){
 
   $("#btn-complete-lesson")?.addEventListener("click", () => {
     const score = quizScoreForCurrentLesson();
+    const wrong = score.total - score.correct;
 
-    // record attempt for recommendations
-    recordLessonAttempt(score.day, score.correct, score.total);
-
-    if(score.correct < score.total){
+    // record attempt if not perfect (helps recommendation)
+    if(wrong > 0){
+      recordQuizAttempt(score.day, wrong);
       $("#lesson-status") && ($("#lesson-status").textContent =
-        `Almost! Quiz score: ${score.correct}/${score.total}. Try again — you’ve got this.`);
-      renderRecommendedLessonUI();
+        `Almost! Quiz score: ${score.correct}/${score.total}. Fix the missed ones and try again.`);
+      renderHomeRecommendation();
       return;
     }
 
     const firstTime = !state.completedDays.includes(score.day);
+
     if(firstTime){
-      // lesson XP
+      // quiz perfect reward
       addXP(score.total * 5);
+
       state.completedDays.push(score.day);
+
+      // completion bonus
       addXP(50);
 
-      // +1 token per FIRST-TIME lesson completion (Habit Quest)
+      // +1 token per FIRST-TIME lesson completion
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
 
-    // streak
+    state.habitQuest.lastLessonDay = score.day;
+
+    // streak logic + PHASE 3 daily streak bonus
+    const prevLastISO = state.lastCompletedISO;
     const todayISO = isoDate(new Date());
     if(state.lastCompletedISO !== todayISO){
       const yesterday = new Date();
@@ -864,20 +886,16 @@ function bindLessonButtons(){
       const yesterdayISO = isoDate(yesterday);
       state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
+
+      applyDailyStreakBonusIfAny(prevLastISO, state.lastCompletedISO);
     }
-
-    // daily reward (Phase 2)
-    applyDailyStreakReward();
-
-    // used by Habit Quest text flavor
-    state.habitQuest.lastLessonDay = score.day;
 
     saveState();
     updateHomeStats();
     updateLessonStatus(score.day);
     renderProgress();
     renderGamesCatalog();
-    renderRecommendedLessonUI();
+    renderHomeRecommendation();
   });
 }
 
@@ -887,7 +905,6 @@ function bindLessonButtons(){
 function updateHomeStats(){
   $("#streak-text")   && ($("#streak-text").textContent   = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
   $("#streak-text-2") && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
-  renderRecommendedLessonUI();
 }
 
 /* =========================================================
@@ -925,12 +942,104 @@ function ensureGameOverlay(){
       <div class="divider"></div>
       <div id="go-content"></div>
       <div class="actions" style="margin-top:14px;">
-        <button class="btn" id="go-map" type="button" style="display:none;">Story Map</button>
-        <button class="btn" id="go-restart" type="button" style="display:none;">Restart</button>
+        <button class="btn primary" id="go-restart" type="button" style="display:none;">Restart</button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
+
+  if(!document.getElementById("__overlay_css")){
+    const style = document.createElement("style");
+    style.id = "__overlay_css";
+    style.textContent = `
+      .gameOverlay{
+        position:fixed; inset:0; z-index:9999;
+        background: rgba(0,0,0,0.70);
+        backdrop-filter: blur(8px);
+        padding: 14px;
+        overflow:auto;
+        color: rgba(255,255,255,0.92);
+      }
+      .gameOverlayInner{
+        max-width: 1100px;
+        margin: 0 auto;
+        background: rgba(20,20,30,0.92);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .gameOverlayTop{
+        display:flex; gap:14px; align-items:center; justify-content:space-between;
+        flex-wrap: wrap;
+      }
+      .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+      .choiceBtn{
+        display:block; width:100%;
+        text-align:left;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.92);
+        cursor:pointer;
+        margin-top: 10px;
+        font-weight: 800;
+      }
+      .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
+      .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
+      .choiceGood{ border-color: rgba(80,220,140,0.6); }
+      .choiceBad{ border-color: rgba(255,120,120,0.6); }
+      .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+      .hqChip{
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.14);
+        display:flex; align-items:center; gap:8px;
+        font-size: 12px;
+      }
+      .hqAvatarImg{
+        width:22px;height:22px;border-radius:10px;object-fit:cover;
+        border:1px solid rgba(255,255,255,0.18);
+      }
+      .hqSlotRow{
+        display:flex; gap:10px; flex-wrap:wrap;
+        margin-top: 12px;
+      }
+      .hqSlotCard{
+        flex: 1 1 220px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+        border-radius: 14px;
+        padding: 12px;
+      }
+      .mapTable{
+        width:100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      .mapTable th, .mapTable td{
+        text-align:left;
+        padding: 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.12);
+        vertical-align: top;
+        font-size: 13px;
+      }
+      .mapPill{
+        display:inline-flex;
+        align-items:center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+        font-size: 12px;
+        margin-right: 6px;
+      }
+      .mapPill.ok{ border-color: rgba(80,220,140,0.5); }
+      .mapPill.no{ border-color: rgba(255,120,120,0.5); }
+    `;
+    document.head.appendChild(style);
+  }
 
   overlay.querySelector("#go-exit")?.addEventListener("click", (e) => {
     e.preventDefault();
@@ -942,12 +1051,6 @@ function ensureGameOverlay(){
     if(gameMode === "choicequest") startChoiceQuest();
     if(gameMode === "breathing") startBreathing();
     if(gameMode === "habitquest") startHabitQuest();
-    if(gameMode === "map") renderStoryMap();
-  });
-
-  overlay.querySelector("#go-map")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openStoryMap();
   });
 
   overlay.addEventListener("click", (e) => {
@@ -972,19 +1075,17 @@ function openGameOverlay(title, subtitle=""){
   const subEl = overlay.querySelector("#go-sub");
   const scoreEl = overlay.querySelector("#go-score");
   const restartBtn = overlay.querySelector("#go-restart");
-  const mapBtn = overlay.querySelector("#go-map");
 
   if(titleEl) titleEl.textContent = title;
   if(subEl) subEl.textContent = subtitle;
   if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
-
   if(restartBtn) restartBtn.style.display = "none";
-  if(mapBtn) mapBtn.style.display = "none";
 }
 
 function closeGameOverlay(){
   const overlay = overlayEl();
   if(!overlay) return;
+
   overlay.style.display = "none";
   overlay.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
@@ -996,6 +1097,7 @@ function closeGameOverlay(){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
   }
+
   gameMode = null;
 }
 
@@ -1025,10 +1127,31 @@ function gameUnlockStatus(game){
 function renderGamesCatalog(){
   const grid = $("#games-grid");
   if(!grid) return;
+
   grid.innerHTML = "";
+
+  // small helper buttons at top (Phase 3)
+  const tools = document.createElement("div");
+  tools.className = "row";
+  tools.style.marginTop = "0";
+  tools.innerHTML = `
+    <button class="btn small" type="button" id="btn-open-map">Open Story Map 🗺️</button>
+    <button class="btn small" type="button" id="btn-open-hq">Open Habit Quest 📖</button>
+  `;
+  grid.appendChild(tools);
+
+  tools.querySelector("#btn-open-map")?.addEventListener("click", () => showView("map"));
+  tools.querySelector("#btn-open-hq")?.addEventListener("click", () => {
+    const g = GAMES.find(x => x.id === "habitquest");
+    if(!g) return;
+    const { unlocked } = gameUnlockStatus(g);
+    if(!unlocked) return alert("Complete 1 lesson to unlock Habit Quest.");
+    startHabitQuest();
+  });
 
   GAMES.forEach(game => {
     const { unlocked, reason } = gameUnlockStatus(game);
+
     const card = document.createElement("div");
     card.className = "card gameCard";
 
@@ -1043,12 +1166,10 @@ function renderGamesCatalog(){
     p2.className = "muted";
     p2.textContent = `${reason} • ${game.status === "ready" ? "Playable" : "Coming soon"}`;
 
-    const btnRow = document.createElement("div");
-    btnRow.className = "actions";
-
     const btn = document.createElement("button");
     btn.className = "btn primary";
     btn.textContent = (game.status === "ready" && unlocked) ? "Play" : "Locked / Soon";
+
     if(!(game.status === "ready" && unlocked)){
       btn.disabled = true;
       btn.classList.add("disabled");
@@ -1056,19 +1177,7 @@ function renderGamesCatalog(){
       btn.addEventListener("click", () => launchGame(game.id));
     }
 
-    btnRow.appendChild(btn);
-
-    // Phase 2: add Story Map shortcut when Habit Quest is unlocked
-    if(game.id === "habitquest"){
-      const mapBtn = document.createElement("button");
-      mapBtn.className = "btn";
-      mapBtn.textContent = "Story Map";
-      mapBtn.disabled = !(game.status === "ready" && unlocked);
-      mapBtn.addEventListener("click", () => openStoryMap());
-      btnRow.appendChild(mapBtn);
-    }
-
-    card.append(h,p,p2,btnRow);
+    card.append(h,p,p2,btn);
     grid.appendChild(card);
   });
 }
@@ -1097,8 +1206,8 @@ function renderChoiceQuest(){
   if(!area) return;
 
   area.innerHTML = "";
-
   const scenario = GAME_SCENARIOS[gameIndex];
+
   if(!scenario){
     area.innerHTML = `
       <p class="big">🎉 Nice!</p>
@@ -1112,7 +1221,6 @@ function renderChoiceQuest(){
       state.highScore = gameScore;
       saveState();
     }
-
     addXP(25);
     renderProgress();
     return;
@@ -1128,6 +1236,7 @@ function renderChoiceQuest(){
     btn.type = "button";
     btn.className = "choiceBtn";
     btn.textContent = c.text;
+
     btn.addEventListener("click", () => {
       $$(".choiceBtn").forEach(x => x.disabled = true);
 
@@ -1158,6 +1267,7 @@ function renderChoiceQuest(){
       });
       area.appendChild(next);
     });
+
     area.appendChild(btn);
   });
 }
@@ -1239,7 +1349,6 @@ function startBreathing(){
 
 /* =========================================================
    HABIT QUEST — BRANCHING NODE GRAPH
-   (Phase 2 additions: Story Map + Save Slots)
 ========================================================= */
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
@@ -1252,6 +1361,7 @@ function hqCtx(){
   const avatarDataURL = getSelectedAvatarDataURL();
   const usingCustom = !!avatarDataURL;
   const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "🙂";
+
   return {
     avatarIsCustom: usingCustom,
     avatarImg: avatarDataURL,
@@ -1264,13 +1374,14 @@ function hqCtx(){
   };
 }
 
+// Helpers for branching state
 function hqMarkVisited(nodeId){
   state.habitQuest.visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
   state.habitQuest.visited[nodeId] = true;
 
   state.habitQuest.history = Array.isArray(state.habitQuest.history) ? state.habitQuest.history : [];
   state.habitQuest.history.push(nodeId);
-  state.habitQuest.history = state.habitQuest.history.slice(-50);
+  state.habitQuest.history = state.habitQuest.history.slice(-80);
 }
 
 function hqSetFlag(key, value){
@@ -1291,10 +1402,7 @@ function hqCan(choice){
   return true;
 }
 
-/* =========================
-   Node graph (your current nodes)
-   NOTE: Phase 2 does NOT add nodes; this stays as-is.
-========================= */
+// NODE GRAPH (same as your current demo; phase 3 adds save slots + map, not more nodes)
 const HQ_NODES = {
   hq_start: {
     chapter: "Chapter 1: The First Steps",
@@ -1420,7 +1528,6 @@ function hqApplyEffects(eff){
   if(e.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(e.hearts,0), 0, 5);
   if(e.wisdom) state.habitQuest.wisdom = Math.max(0, safeNum(state.habitQuest.wisdom,0) + safeNum(e.wisdom,0));
   if(e.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(e.tokens,0));
-
   if(e.flag && typeof e.flag === "object"){
     const key = safeStr(e.flag.key, "");
     if(key) hqSetFlag(key, e.flag.value);
@@ -1437,201 +1544,70 @@ function hqResetRun(){
   saveState();
 }
 
-/* =========================
-   Save Slots (Phase 2)
-========================= */
+/* =========================================================
+   HABIT QUEST SAVE SLOTS (PHASE 3)
+========================================================= */
 function hqSnapshot(){
   return {
     nodeId: safeStr(state.habitQuest.nodeId, "hq_start"),
-    hearts: clamp(safeNum(state.habitQuest.hearts,3), 0, 5),
-    wisdom: Math.max(0, safeNum(state.habitQuest.wisdom,0)),
-    tokens: Math.max(0, safeNum(state.habitQuest.tokens,0)),
-    lastLessonDay: Math.max(0, safeNum(state.habitQuest.lastLessonDay,0)),
-    flags: JSON.parse(JSON.stringify(state.habitQuest.flags || {})),
-    visited: JSON.parse(JSON.stringify(state.habitQuest.visited || {})),
-    history: Array.isArray(state.habitQuest.history) ? state.habitQuest.history.slice(-50) : [],
+    hearts: clamp(safeNum(state.habitQuest.hearts, 3), 0, 5),
+    wisdom: Math.max(0, safeNum(state.habitQuest.wisdom, 0)),
+    tokens: Math.max(0, safeNum(state.habitQuest.tokens, 0)),
+    lastLessonDay: Math.max(0, safeNum(state.habitQuest.lastLessonDay, 0)),
+    flags: (state.habitQuest.flags && typeof state.habitQuest.flags === "object") ? structuredClone(state.habitQuest.flags) : {},
+    visited: (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? structuredClone(state.habitQuest.visited) : {},
+    history: Array.isArray(state.habitQuest.history) ? [...state.habitQuest.history] : [],
   };
 }
 
-function hqLoadSnapshot(snap){
-  if(!snap || typeof snap !== "object") return false;
-  state.habitQuest.nodeId = safeStr(snap.nodeId, "hq_start");
-  state.habitQuest.hearts = clamp(safeNum(snap.hearts,3), 0, 5);
-  state.habitQuest.wisdom = Math.max(0, safeNum(snap.wisdom,0));
-  state.habitQuest.tokens = Math.max(0, safeNum(snap.tokens,0));
-  state.habitQuest.lastLessonDay = Math.max(0, safeNum(snap.lastLessonDay,0));
-  state.habitQuest.flags = (snap.flags && typeof snap.flags === "object") ? snap.flags : {};
-  state.habitQuest.visited = (snap.visited && typeof snap.visited === "object") ? snap.visited : {};
-  state.habitQuest.history = Array.isArray(snap.history) ? snap.history.slice(-50) : [];
+function hqRestore(snapshot){
+  if(!snapshot || typeof snapshot !== "object") return false;
+
+  state.habitQuest.nodeId = safeStr(snapshot.nodeId, "hq_start");
+  state.habitQuest.hearts = clamp(safeNum(snapshot.hearts, 3), 0, 5);
+  state.habitQuest.wisdom = Math.max(0, safeNum(snapshot.wisdom, 0));
+  state.habitQuest.tokens = Math.max(0, safeNum(snapshot.tokens, 0));
+  state.habitQuest.lastLessonDay = Math.max(0, safeNum(snapshot.lastLessonDay, 0));
+  state.habitQuest.flags = (snapshot.flags && typeof snapshot.flags === "object") ? snapshot.flags : {};
+  state.habitQuest.visited = (snapshot.visited && typeof snapshot.visited === "object") ? snapshot.visited : {};
+  state.habitQuest.history = Array.isArray(snapshot.history) ? snapshot.history.slice(-80) : [];
   saveState();
   return true;
 }
 
 function hqSaveToSlot(slotIndex){
-  const i = clamp(safeNum(slotIndex,0), 0, 2);
-  state.habitQuestSlots[i] = state.habitQuestSlots[i] || { name:`Slot ${i+1}`, savedISO:null, data:null };
-  state.habitQuestSlots[i].data = hqSnapshot();
-  state.habitQuestSlots[i].savedISO = isoDate(new Date());
-  saveState();
-}
-
-function hqClearSlot(slotIndex){
-  const i = clamp(safeNum(slotIndex,0), 0, 2);
-  state.habitQuestSlots[i] = state.habitQuestSlots[i] || { name:`Slot ${i+1}`, savedISO:null, data:null };
-  state.habitQuestSlots[i].data = null;
-  state.habitQuestSlots[i].savedISO = null;
+  const i = clamp(safeNum(slotIndex, 0), 0, 2);
+  const label = prompt(`Name this save slot (Slot ${i+1})?`, state.habitQuestSlots[i]?.label || "") ?? "";
+  state.habitQuestSlots[i] = {
+    savedISO: isoDate(new Date()),
+    label: safeStr(label, "").slice(0, 24),
+    data: hqSnapshot(),
+  };
   saveState();
 }
 
 function hqLoadFromSlot(slotIndex){
-  const i = clamp(safeNum(slotIndex,0), 0, 2);
+  const i = clamp(safeNum(slotIndex, 0), 0, 2);
   const slot = state.habitQuestSlots[i];
-  if(!slot || !slot.data) return false;
-  const ok = hqLoadSnapshot(slot.data);
-  if(ok) state.habitQuest.activeSlot = i;
+  if(!slot || !slot.data) return alert("That slot is empty.");
+  if(!confirm(`Load Slot ${i+1}? Your current run will be replaced.`)) return;
+  hqRestore(slot.data);
+}
+
+function hqClearSlot(slotIndex){
+  const i = clamp(safeNum(slotIndex, 0), 0, 2);
+  if(!confirm(`Clear Slot ${i+1}?`)) return;
+  state.habitQuestSlots[i] = blankSaveSlot();
   saveState();
-  return ok;
 }
 
-// auto-save into active slot after every choice (bookmark)
-function hqAutoSave(){
-  const i = clamp(safeNum(state.habitQuest.activeSlot,0), 0, 2);
-  hqSaveToSlot(i);
-}
-
-/* =========================
-   Story Map (Phase 2)
-========================= */
-function nodeOutgoing(nodeId){
-  const node = HQ_NODES[nodeId];
-  const out = [];
-  if(!node || !Array.isArray(node.choices)) return out;
-  for(const c of node.choices){
-    const nxt = safeStr(c.next, "");
-    if(nxt) out.push(nxt);
-  }
-  return Array.from(new Set(out));
-}
-
-function openStoryMap(){
-  gameMode = "map";
-  gameScore = 0;
-  openGameOverlay("Story Map", "See nodes, visited status, and jump to any node.");
-
-  const overlay = overlayEl();
-  overlay?.querySelector("#go-map") && (overlay.querySelector("#go-map").style.display = "none");
-  const restartBtn = overlay?.querySelector("#go-restart");
-  if(restartBtn) restartBtn.style.display = "inline-block";
-
-  renderStoryMap();
-}
-
-function renderStoryMap(){
-  const overlay = overlayEl();
-  const area = overlay?.querySelector("#go-content");
-  if(!area) return;
-
-  const visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
-  const nodeIds = Object.keys(HQ_NODES);
-
-  // build rows sorted by chapter then nodeId
-  const rows = nodeIds.map(id => {
-    const n = HQ_NODES[id];
-    return {
-      id,
-      chapter: safeStr(n?.chapter, "Habit Quest"),
-      isVisited: !!visited[id],
-      out: nodeOutgoing(id),
-    };
-  });
-
-  rows.sort((a,b) => {
-    if(a.chapter < b.chapter) return -1;
-    if(a.chapter > b.chapter) return 1;
-    return a.id.localeCompare(b.id);
-  });
-
-  const current = safeStr(state.habitQuest.nodeId, "hq_start");
-
-  area.innerHTML = `
-    <div class="card" style="background: rgba(255,255,255,0.06);">
-      <p class="muted" style="margin-top:0;">
-        Current node: <strong>${escapeHtml(current)}</strong>
-      </p>
-
-      <div class="mapTools">
-        <input id="map-jump" class="textInput" placeholder="Type nodeId (ex: hq_start)..." />
-        <button class="btn primary" id="btn-map-jump" type="button">Jump</button>
-        <button class="btn" id="btn-map-back" type="button">Back to Habit Quest</button>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="mapList" id="map-list"></div>
-    </div>
-  `;
-
-  const list = area.querySelector("#map-list");
-  const jumpInput = area.querySelector("#map-jump");
-  const jumpBtn = area.querySelector("#btn-map-jump");
-  const backBtn = area.querySelector("#btn-map-back");
-
-  const addRow = (r) => {
-    const div = document.createElement("div");
-    div.className = "mapRow";
-    const badge = r.isVisited ? "✅ Visited" : "⬜ Not yet";
-    const outs = r.out.length ? r.out.join(", ") : "—";
-    div.innerHTML = `
-      <div class="mapRowTop">
-        <span class="badge">${badge}</span>
-        <span class="mapNodeId">${escapeHtml(r.id)}</span>
-      </div>
-      <div class="muted mapMeta">
-        <span>${escapeHtml(r.chapter)}</span>
-        <span class="dot">•</span>
-        <span>Next: ${escapeHtml(outs)}</span>
-      </div>
-      <div class="mapRowActions">
-        <button class="btn small" data-jump="${escapeHtml(r.id)}" type="button">Jump</button>
-      </div>
-    `;
-    list.appendChild(div);
-  };
-
-  rows.forEach(addRow);
-
-  const doJump = (id) => {
-    const nodeId = safeStr(id, "");
-    if(!nodeId || !HQ_NODES[nodeId]){
-      alert("That nodeId does not exist.");
-      return;
-    }
-    state.habitQuest.nodeId = nodeId;
-    saveState();
-    startHabitQuest();
-  };
-
-  jumpBtn?.addEventListener("click", () => doJump(jumpInput?.value || ""));
-  jumpInput?.addEventListener("keydown", (e) => { if(e.key === "Enter") doJump(jumpInput?.value || ""); });
-
-  list?.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-jump]");
-    if(!btn) return;
-    doJump(btn.dataset.jump);
-  });
-
-  backBtn?.addEventListener("click", () => startHabitQuest());
-}
-
+/* =========================================================
+   HABIT QUEST GAME
+========================================================= */
 function startHabitQuest(){
   gameMode = "habitquest";
   gameScore = 0;
   openGameOverlay("Habit Quest", "Branching story: your choices change the path.");
-
-  const overlay = overlayEl();
-  const mapBtn = overlay?.querySelector("#go-map");
-  if(mapBtn) mapBtn.style.display = "inline-block";
-
   renderHabitQuest();
 }
 
@@ -1650,62 +1626,79 @@ function renderHabitQuest(){
       <p class="big">😵 Oops!</p>
       <p>You ran out of hearts.</p>
       <p class="muted">Good news: you can restart and practice better choices.</p>
-      <div class="actions">
-        <button class="btn primary" id="hq-restart" type="button">Restart Run</button>
-      </div>
     `;
-    area.querySelector("#hq-restart")?.addEventListener("click", () => {
-      hqResetRun();
-      startHabitQuest();
-    });
+    const restartBtn = overlay.querySelector("#go-restart");
+    if(restartBtn) restartBtn.style.display = "inline-block";
+    hqResetRun();
     return;
   }
 
   const nodeId = safeStr(state.habitQuest.nodeId, "hq_start");
   const node = hqGetNode(nodeId);
 
+  // mark visited
   hqMarkVisited(nodeId);
   saveState();
 
-  // top: slots UI
-  const slots = state.habitQuestSlots || [];
-  const activeSlot = clamp(safeNum(state.habitQuest.activeSlot,0), 0, 2);
-  const slotLabel = (i) => {
-    const s = slots[i];
-    const name = safeStr(s?.name, `Slot ${i+1}`);
-    const stamp = s?.savedISO ? ` • ${s.savedISO}` : " • empty";
-    return `${name}${stamp}`;
+  // Header + Save Slots controls (PHASE 3)
+  const slotSummary = (slot, idx) => {
+    if(!slot || !slot.data) return `Slot ${idx+1}: (empty)`;
+    const label = slot.label ? `“${escapeHtml(slot.label)}”` : "(no name)";
+    const when = slot.savedISO ? escapeHtml(slot.savedISO) : "—";
+    const nid = escapeHtml(slot.data.nodeId || "hq_start");
+    return `Slot ${idx+1}: ${label} • ${when} • @ ${nid}`;
   };
 
   area.innerHTML = `
     <div class="hqRow">
       <div class="hqChip">📖 ${escapeHtml(node.chapter || "Habit Quest")}</div>
+      <div class="hqChip">🧭 Node: <strong>${escapeHtml(nodeId)}</strong></div>
       <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
       <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
       <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
-      <div class="hqChip youChip">
+      <div class="hqChip">
         ${
           ctx.avatarIsCustom && ctx.avatarImg
             ? `<img class="hqAvatarImg" src="${ctx.avatarImg}" alt="You" />`
-            : `<span class="emojiAvatar">${escapeHtml(ctx.avatarEmoji || "🙂")}</span>`
+            : `<span style="font-size:18px; line-height:1;">${escapeHtml(ctx.avatarEmoji || "🙂")}</span>`
         }
         <span>You</span>
       </div>
     </div>
 
-    <div class="hqSlots">
-      <div class="muted">Save slots</div>
-      <div class="hqSlotsRow">
-        <select id="hq-slot-select" class="select">
-          <option value="0"${activeSlot===0?" selected":""}>${escapeHtml(slotLabel(0))}</option>
-          <option value="1"${activeSlot===1?" selected":""}>${escapeHtml(slotLabel(1))}</option>
-          <option value="2"${activeSlot===2?" selected":""}>${escapeHtml(slotLabel(2))}</option>
-        </select>
-        <button class="btn small" id="hq-slot-save" type="button">Save</button>
-        <button class="btn small" id="hq-slot-load" type="button">Load</button>
-        <button class="btn small danger" id="hq-slot-clear" type="button">Clear</button>
+    <div class="hqSlotRow">
+      <div class="hqSlotCard">
+        <div class="muted" style="font-weight:900;">Save Slots</div>
+        <div class="muted" style="margin-top:6px;">${slotSummary(state.habitQuestSlots[0],0)}</div>
+        <div class="actions" style="margin-top:8px;">
+          <button class="btn small" type="button" data-save="0">Save</button>
+          <button class="btn small" type="button" data-load="0">Load</button>
+          <button class="btn small danger" type="button" data-clear="0">Clear</button>
+        </div>
       </div>
-      <p class="muted" style="margin:8px 0 0;">Tip: Save before risky choices so you can explore branches.</p>
+      <div class="hqSlotCard">
+        <div class="muted" style="font-weight:900;">&nbsp;</div>
+        <div class="muted" style="margin-top:6px;">${slotSummary(state.habitQuestSlots[1],1)}</div>
+        <div class="actions" style="margin-top:8px;">
+          <button class="btn small" type="button" data-save="1">Save</button>
+          <button class="btn small" type="button" data-load="1">Load</button>
+          <button class="btn small danger" type="button" data-clear="1">Clear</button>
+        </div>
+      </div>
+      <div class="hqSlotCard">
+        <div class="muted" style="font-weight:900;">&nbsp;</div>
+        <div class="muted" style="margin-top:6px;">${slotSummary(state.habitQuestSlots[2],2)}</div>
+        <div class="actions" style="margin-top:8px;">
+          <button class="btn small" type="button" data-save="2">Save</button>
+          <button class="btn small" type="button" data-load="2">Load</button>
+          <button class="btn small danger" type="button" data-clear="2">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:10px;">
+      <button class="btn small" type="button" id="btn-hq-resetrun">New Run (reset) ↩️</button>
+      <button class="btn small" type="button" id="btn-hq-openmap">Story Map 🗺️</button>
     </div>
 
     <div class="divider"></div>
@@ -1715,40 +1708,38 @@ function renderHabitQuest(){
     <p class="muted" id="hq-why" style="margin-top:12px;"></p>
   `;
 
-  // bind slots
-  const sel = area.querySelector("#hq-slot-select");
-  const btnSave = area.querySelector("#hq-slot-save");
-  const btnLoad = area.querySelector("#hq-slot-load");
-  const btnClear = area.querySelector("#hq-slot-clear");
-
-  const readSlotIndex = () => clamp(safeNum(sel?.value, activeSlot), 0, 2);
-
-  sel?.addEventListener("change", () => {
-    state.habitQuest.activeSlot = readSlotIndex();
-    saveState();
+  // bind slot buttons
+  area.querySelectorAll("[data-save]")?.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-save"));
+      hqSaveToSlot(i);
+      renderHabitQuest();
+    });
   });
-  btnSave?.addEventListener("click", () => {
-    const i = readSlotIndex();
-    state.habitQuest.activeSlot = i;
-    hqSaveToSlot(i);
-    alert(`Saved to Slot ${i+1}.`);
+  area.querySelectorAll("[data-load]")?.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-load"));
+      hqLoadFromSlot(i);
+      renderHabitQuest();
+    });
+  });
+  area.querySelectorAll("[data-clear]")?.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-clear"));
+      hqClearSlot(i);
+      renderHabitQuest();
+    });
+  });
+
+  area.querySelector("#btn-hq-resetrun")?.addEventListener("click", () => {
+    if(!confirm("Start a fresh run? (Your tokens stay, but run stats reset.)")) return;
+    hqResetRun();
     renderHabitQuest();
   });
-  btnLoad?.addEventListener("click", () => {
-    const i = readSlotIndex();
-    const ok = hqLoadFromSlot(i);
-    if(!ok){
-      alert("That slot is empty.");
-      return;
-    }
-    alert(`Loaded Slot ${i+1}.`);
-    startHabitQuest();
-  });
-  btnClear?.addEventListener("click", () => {
-    const i = readSlotIndex();
-    if(!confirm(`Clear Slot ${i+1}?`)) return;
-    hqClearSlot(i);
-    renderHabitQuest();
+
+  area.querySelector("#btn-hq-openmap")?.addEventListener("click", () => {
+    closeGameOverlay();
+    showView("map");
   });
 
   const textEl = area.querySelector("#hq-node-text");
@@ -1776,18 +1767,14 @@ function renderHabitQuest(){
       wrap.querySelectorAll(".choiceBtn").forEach(x => x.disabled = true);
       if(whyEl) whyEl.textContent = choice.why ? choice.why : "";
 
-      // apply effects
       hqApplyEffects(choice.effects || {});
       saveState();
 
-      // XP
       if(choice.effects?.xp && safeNum(choice.effects.xp,0) > 0) addXP(choice.effects.xp);
 
-      // score
       if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
       overlay.querySelector("#go-score") && (overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`);
 
-      // move
       const nextBtn = document.createElement("button");
       nextBtn.type = "button";
       nextBtn.className = "btn primary";
@@ -1796,20 +1783,14 @@ function renderHabitQuest(){
 
       nextBtn.addEventListener("click", () => {
         if(choice.end){
-          // autosave before exit
-          hqAutoSave();
           closeGameOverlay();
           return;
         }
-
         const nextId = safeStr(choice.next, "");
         if(nextId){
           state.habitQuest.nodeId = nextId;
           saveState();
         }
-
-        // autosave after moving
-        hqAutoSave();
         renderHabitQuest();
       });
 
@@ -1821,6 +1802,106 @@ function renderHabitQuest(){
 
   const restartBtn = overlay.querySelector("#go-restart");
   if(restartBtn) restartBtn.style.display = "inline-block";
+}
+
+/* =========================================================
+   STORY MAP VIEW (PHASE 3)
+========================================================= */
+function nodeOutgoing(node){
+  const outs = new Set();
+  const choices = Array.isArray(node?.choices) ? node.choices : [];
+  for(const c of choices){
+    if(c && typeof c === "object" && typeof c.next === "string" && c.next.trim()){
+      outs.add(c.next.trim());
+    }
+  }
+  return Array.from(outs);
+}
+
+function renderStoryMap(){
+  const wrap = $("#map-wrap");
+  if(!wrap) return;
+
+  const visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
+  const nodes = Object.entries(HQ_NODES).map(([id, node]) => ({
+    id,
+    chapter: safeStr(node.chapter, ""),
+    visited: !!visited[id],
+    outs: nodeOutgoing(node),
+  }));
+
+  // sort: chapter then id
+  nodes.sort((a,b) => (a.chapter.localeCompare(b.chapter) || a.id.localeCompare(b.id)));
+
+  const visCount = nodes.filter(n => n.visited).length;
+
+  wrap.innerHTML = `
+    <div class="card">
+      <h2 style="margin-top:0;">Story Map 🗺️</h2>
+      <p class="muted">
+        Visited: <strong>${visCount}</strong> / <strong>${nodes.length}</strong>
+        • Current node: <strong>${escapeHtml(safeStr(state.habitQuest.nodeId,"hq_start"))}</strong>
+      </p>
+
+      <div class="actions">
+        <button class="btn small" id="btn-map-open-hq" type="button">Open Habit Quest</button>
+        <button class="btn small" id="btn-map-jump" type="button">Jump to nodeId</button>
+        <button class="btn small" id="btn-map-clear-visited" type="button">Clear visited marks</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <table class="mapTable">
+        <thead>
+          <tr>
+            <th style="width:160px;">nodeId</th>
+            <th style="width:220px;">chapter</th>
+            <th style="width:120px;">visited</th>
+            <th>outgoing next links</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            nodes.map(n => `
+              <tr>
+                <td><code style="color:rgba(255,255,255,0.9)">${escapeHtml(n.id)}</code></td>
+                <td>${escapeHtml(n.chapter || "—")}</td>
+                <td>
+                  ${n.visited ? `<span class="mapPill ok">✅ visited</span>` : `<span class="mapPill no">⬜ not yet</span>`}
+                </td>
+                <td>
+                  ${
+                    n.outs.length
+                      ? n.outs.map(o => `<span class="mapPill">${escapeHtml(o)}</span>`).join(" ")
+                      : `<span class="muted">—</span>`
+                  }
+                </td>
+              </tr>
+            `).join("")
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  wrap.querySelector("#btn-map-open-hq")?.addEventListener("click", () => startHabitQuest());
+
+  wrap.querySelector("#btn-map-jump")?.addEventListener("click", () => {
+    const id = prompt("Jump to which nodeId? (example: hq_start)")?.trim();
+    if(!id) return;
+    if(!HQ_NODES[id]) return alert("That nodeId does not exist in HQ_NODES.");
+    state.habitQuest.nodeId = id;
+    saveState();
+    startHabitQuest();
+  });
+
+  wrap.querySelector("#btn-map-clear-visited")?.addEventListener("click", () => {
+    if(!confirm("Clear visited marks + history? (Does not delete save slots.)")) return;
+    state.habitQuest.visited = {};
+    state.habitQuest.history = [];
+    saveState();
+    renderStoryMap();
+  });
 }
 
 /* =========================================================
@@ -1845,6 +1926,7 @@ function renderAvatars(){
     const chip = document.createElement("button");
     chip.className = "chip avatarChip";
     chip.type = "button";
+
     if(opts.kind === "img"){
       const img = document.createElement("img");
       img.src = opts.src;
@@ -1854,6 +1936,7 @@ function renderAvatars(){
     }else{
       chip.textContent = opts.label;
     }
+
     if(opts.active) chip.classList.add("activeAvatar");
     chip.addEventListener("click", opts.onClick);
     return chip;
@@ -1874,10 +1957,11 @@ function renderAvatars(){
     }));
   });
 
-  // custom avatars with delete ×
+  // custom avatars (many) with delete ×
   const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
   list.forEach((a) => {
     const ref = CUSTOM_AVATAR_PREFIX + a.id;
+
     const chip = makeChip({
       kind: "img",
       src: a.dataURL,
@@ -1895,13 +1979,17 @@ function renderAvatars(){
     del.className = "avatarDelete";
     del.textContent = "×";
     del.title = "Delete this uploaded avatar";
+
     del.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       if(!confirm("Delete this uploaded avatar from this device?")) return;
+
       state.customAvatars = (Array.isArray(state.customAvatars) ? state.customAvatars : [])
         .filter(x => x && x.id !== a.id);
+
       if(state.avatar === ref) state.avatar = AVATARS[0];
+
       saveState();
       renderAvatars();
       renderProfile();
@@ -1955,7 +2043,9 @@ function bindAvatarUpload(){
       state.customAvatars = Array.isArray(state.customAvatars) ? state.customAvatars : [];
       state.customAvatars.unshift(item);
 
+      // auto-select the new upload
       state.avatar = CUSTOM_AVATAR_PREFIX + item.id;
+
       saveState();
       renderAvatars();
       renderProfile();
@@ -1968,6 +2058,7 @@ function bindAvatarUpload(){
 function renderProfile(){
   const input = $("#profile-name-input");
   if(!input) return;
+
   input.value = safeStr(state.profileName, "Player").slice(0, 24);
 
   const selectedCustom = getSelectedCustomAvatar();
@@ -1975,6 +2066,7 @@ function renderProfile(){
 
   const headerEmojiEl = $("#profile-avatar-emoji");
   const headerImgEl   = $("#profile-avatar-img");
+
   if(headerImgEl && headerEmojiEl){
     if(usingCustom){
       headerImgEl.src = selectedCustom.dataURL;
@@ -2026,6 +2118,7 @@ function renderProfile(){
 function renderShop(){
   const grid = $("#shop-grid");
   if(!grid) return;
+
   grid.innerHTML = "";
   BADGES.forEach(b => {
     const unlocked = state.xp >= b.xpRequired;
@@ -2046,12 +2139,14 @@ function renderShop(){
 function bindRatingStarsOnce(){
   if(window.__starsBound) return;
   window.__starsBound = true;
+
   const wrap = $("#stars");
   if(!wrap) return;
 
   wrap.addEventListener("click", (e) => {
     const btn = e.target.closest(".star");
     if(!btn) return;
+
     const stars = Number(btn.dataset.star);
     if(!Number.isFinite(stars)) return;
 
@@ -2066,6 +2161,7 @@ function bindRatingStarsOnce(){
 
 function renderRate(){
   if(!$("#rating-average")) return;
+
   const total = safeNum(state.ratings?.total, 0);
   const count = safeNum(state.ratings?.count, 0);
   const avg = (count > 0) ? (total / count) : null;
@@ -2120,31 +2216,9 @@ function bindReset(){
     renderRate();
     renderGamesCatalog();
     renderTrackUI();
+    renderHomeRecommendation();
+    showView("home");
   });
-}
-
-/* =========================================================
-   HOME: recommended lesson area
-========================================================= */
-function ensureRecommendedHomeCard(){
-  const home = $("#view-home");
-  if(!home) return;
-  if($("#recommended-lesson")) return;
-
-  const grid = home.querySelector(".grid");
-  if(!grid) return;
-
-  const card = document.createElement("div");
-  card.className = "card";
-  card.innerHTML = `
-    <h3>Recommended Next Lesson</h3>
-    <p class="muted" id="recommended-lesson">Recommended next: —</p>
-    <button class="btn small" id="btn-go-recommended">Open recommended</button>
-    <p class="muted" style="margin-top:10px;">
-      Based on your track + what you’ve been working on.
-    </p>
-  `;
-  grid.appendChild(card);
 }
 
 /* =========================================================
@@ -2159,8 +2233,6 @@ function init(){
   saveState();
 
   ensureGameOverlay();
-  ensureRecommendedHomeCard();
-
   bindNav();
   bindTracks();
   bindLessonButtons();
@@ -2181,6 +2253,7 @@ function init(){
   renderRate();
   renderGamesCatalog();
   renderTrackUI();
+  renderHomeRecommendation();
 
   showView("home");
 }

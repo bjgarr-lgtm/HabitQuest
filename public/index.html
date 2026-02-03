@@ -22,6 +22,7 @@
       <button class="tab" data-view="lesson">Today’s Lesson</button>
       <button class="tab" data-view="tracks">Tracks</button>
       <button class="tab" data-view="games">Mini‑Games</button>
+      <button class="tab" data-view="map">Story Map</button>
       <button class="tab" data-view="progress">Progress</button>
       <button class="tab" data-view="profile">Profile</button>
       <button class="tab" data-view="shop">Badges</button>
@@ -66,14 +67,19 @@
           <p class="muted">Do one lesson a day to build your streak.</p>
         </div>
 
+        <!-- PHASE 3: Recommended lesson -->
+        <div class="card">
+          <h3 id="rec-title">Recommended next lesson</h3>
+          <p class="muted" id="rec-desc">Loading…</p>
+          <button class="btn small primary" id="btn-go-recommended" type="button">Go</button>
+        </div>
+
         <div class="card">
           <h3>Safety</h3>
           <p class="muted">
             If you ever feel unsafe, talk to a trusted adult (parent/guardian, teacher, coach).
           </p>
         </div>
-
-        <!-- Phase 2 adds “Recommended Next Lesson” card here via JS -->
       </div>
     </section>
 
@@ -139,9 +145,13 @@
         <p class="muted">
           These games practice real-life skills: saying no, handling stress, and choosing healthy options.
         </p>
-
         <div id="games-grid" class="grid"></div>
       </div>
+    </section>
+
+    <!-- STORY MAP (PHASE 3) -->
+    <section class="view hidden" id="view-map">
+      <div id="map-wrap"></div>
     </section>
 
     <!-- PROGRESS -->
