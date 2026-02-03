@@ -351,3 +351,15 @@ h1{ margin:0; font-size:18px; }
 .avatarDelete:hover{ background: rgba(255,85,119,0.35); }
 
 /* (Overlay styles injected by app.js too; this is fine.) */
+
+/* =========================
+   Mini-Games: force full-width grid (no sidebar)
+========================= */
+#view-games .grid{
+  width: 100%;
+}
+
+/* If you previously used a flex layout wrapper, this prevents shrinking */
+#view-games .card{
+  width: 100%;
+}
