@@ -317,6 +317,6 @@ h1{ margin:0; font-size:18px; }
 /* Keep primary buttons readable (they intentionally have dark text) */
 #game-area .btn.primary,
 #game-content .btn.primary {
-  color: #06101a !important;
-  -webkit-text-fill-color: #06101a !important;
+  color: #f40707 !important;
+  -webkit-text-fill-color: #057ff9 !important;
 }
