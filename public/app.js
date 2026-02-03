@@ -1,8 +1,9 @@
 /* How to Avoid Addiction — V2 (no frameworks)
    Runs as a static site. Saves progress in localStorage (on this device).
+   NOTE: app.js must contain ONLY JavaScript (no HTML at the bottom).
 */
 
-const $  = (sel) => document.querySelector(sel);
+const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const STORAGE_KEY = "htaa_v2_state";
@@ -19,6 +20,20 @@ function isoDate(d){
   return `${y}-${m}-${day}`;
 }
 
+function safeNum(x, fallback=0){
+  const n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
 /* =========================================================
    CONTENT
 ========================================================= */
@@ -29,17 +44,18 @@ const TIPS = [
   "Pick a trusted adult now—so you know who to talk to later.",
   "Sleep + food + water make your brain stronger.",
   "Real friends respect your ‘no’.",
-  "Stress is a signal, not a boss. You can handle it."
+  "Stress is a signal, not a boss. You can handle it.",
+  "If something feels risky, ask: “Will this help Future Me?”",
 ];
 
-// Choice Quest scenarios
+// Choice Quest scenarios (short)
 const GAME_SCENARIOS = [
   {
     prompt: "A friend says: “Try this, everyone’s doing it.” What’s the best response?",
     choices: [
       { text: "“No. I’m not into that. Let’s do something else.”", good: true,  why: "Clear no + switch." },
-      { text: "“Maybe later, don’t tell anyone.”",                 good: false, why: "That keeps risk open." },
-      { text: "“Okay, so you like me.”",                          good: false, why: "Pressure isn’t friendship." }
+      { text: "“Maybe later, don’t tell anyone.”",                  good: false, why: "That keeps risk open." },
+      { text: "“Okay, so you like me.”",                            good: false, why: "Pressure isn’t friendship." }
     ]
   },
   {
@@ -60,7 +76,7 @@ const GAME_SCENARIOS = [
   }
 ];
 
-// Badges unlock by XP (XP never decreases)
+// 25+ badges (XP based)
 const BADGES = [
   { id:"starter-star",    name:"Starter Star",    xpRequired: 50,   icon:"⭐" },
   { id:"calm-master",     name:"Calm Master",     xpRequired: 120,  icon:"🫧" },
@@ -92,72 +108,60 @@ const BADGES = [
   { id:"calm-pro",        name:"Calm Pro",        xpRequired: 6000, icon:"🧘" },
   { id:"level-10",        name:"Level 10",        xpRequired: 6800, icon:"🔟" },
   { id:"legend",          name:"Legend",          xpRequired: 8000, icon:"👑" },
+
+  // extra fun ones
+  { id:"gentle-giant",    name:"Gentle Giant",    xpRequired: 9000, icon:"🐘" },
+  { id:"super-helper",    name:"Super Helper",    xpRequired: 10000,icon:"🦸" },
+  { id:"wise-owl",        name:"Wise Owl",        xpRequired: 12000,icon:"🦉" },
 ];
 
-
-// Games catalog (tiles render in #games-grid)
-const GAMES = [
-  { id:"choicequest", title:"Choice Quest",   desc:"Pick the healthiest choice in quick scenarios.", status:"ready", unlock:{ type:"free" } },
-  { id:"breathing",   title:"Breathing Buddy",desc:"60-second calm timer that earns XP.",            status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest", title:"Habit Quest", desc:"Build a hero habit over many days (progress carries over).", status:"ready", unlock:{ type:"lessons", lessons:1 } },
-
-  // Coming soon placeholders
-  { id:"memory",         title:"Memory Match",        desc:"Match healthy coping tools.",                       status:"soon", unlock:{ type:"xp",     xp:120 } },
-  { id:"coping-sort",    title:"Coping Sort",         desc:"Sort coping tools into ‘healthy’ vs ‘not helpful’.",status:"soon", unlock:{ type:"lessons", lessons:3 } },
-  { id:"streak-run",     title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",    status:"soon", unlock:{ type:"level",  level:3 } },
-  { id:"focus-dodge",    title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                  status:"soon", unlock:{ type:"level",  level:4 } },
-  { id:"goal-builder",   title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",            status:"soon", unlock:{ type:"xp",     xp:350 } },
-  { id:"friendship-quiz",title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",       status:"soon", unlock:{ type:"lessons", lessons:7 } },
-  { id:"stress-lab",     title:"Stress Lab",          desc:"Try safe stress tools and see what works.",         status:"soon", unlock:{ type:"xp",     xp:600 } }
-];
-
+// Avatars
 const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
 
-
-// Tracks (for filtering lesson “focus”)
+// Tracks (for filtering lessons)
 const TRACKS = {
-  general:    { name: "General",                 desc: "Healthy choices, stress tools, confidence, asking for help." },
-  nicotine:   { name: "Nicotine / Vaping",       desc: "Cravings, pressure, coping skills, and refusing offers." },
-  alcohol:    { name: "Alcohol",                 desc: "Safer choices, boundaries, and handling social pressure." },
-  gaming:     { name: "Gaming / Screen habits",  desc: "Balance, routines, and stopping when you planned to stop." },
-  socialmedia:{ name: "Social media / Scrolling",desc: "Dopamine loops, focus, and healthier habits." },
-  caffeine:   { name: "Caffeine / Energy drinks",desc: "Sleep/energy basics and alternatives to overstimulation." },
+  general:    { name:"General",                 desc:"Healthy choices, stress tools, confidence, asking for help." },
+  nicotine:   { name:"Nicotine / Vaping",       desc:"Cravings, pressure, coping skills, and refusing offers." },
+  alcohol:    { name:"Alcohol",                 desc:"Safer choices, boundaries, and handling social pressure." },
+  gaming:     { name:"Gaming / Screen habits",  desc:"Balance, routines, and stopping when you planned to stop." },
+  socialmedia:{ name:"Social media / Scrolling",desc:"Dopamine loops, focus, and healthier habits." },
+  caffeine:   { name:"Caffeine / Energy drinks",desc:"Sleep/energy basics and alternatives to overstimulation." },
 };
 
-// 30 lesson curriculum (NOW includes track tags)
+// 30 lesson curriculum (includes track tags)
 const CURRICULUM = [
-  { title:"Choices & Your Future",                   goal:"Learn how small choices add up over time.",           track:"general" },
-  { title:"Handling Stress Safely",                  goal:"Build safe, healthy stress tools.",                   track:"general" },
-  { title:"Saying No With Confidence",               goal:"Practice refusing pressure calmly.",                  track:"general" },
-  { title:"Friend Pressure vs Real Friends",         goal:"Spot healthy friendships.",                           track:"general" },
-  { title:"Boredom Without Risk",                    goal:"Make a fun plan that’s safe.",                        track:"general" },
-  { title:"Feelings Are Signals",                    goal:"Name feelings and respond wisely.",                   track:"general" },
-  { title:"Big Emotions Plan",                       goal:"Use a 3-step plan when emotions spike.",             track:"general" },
-  { title:"Asking for Help",                         goal:"Know who to talk to and how to ask.",                track:"general" },
-  { title:"Online Influence",                        goal:"Handle trends, dares, and social pressure.",         track:"socialmedia" },
-  { title:"Confidence & Self-Respect",               goal:"Build self-respect so pressure loses power.",        track:"general" },
+  { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",               track:"general" },
+  { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                       track:"general" },
+  { title:"Saying No With Confidence",          goal:"Practice refusing pressure calmly.",                      track:"general" },
+  { title:"Friend Pressure vs Real Friends",    goal:"Spot healthy friendships.",                               track:"general" },
+  { title:"Boredom Without Risk",               goal:"Make a fun plan that’s safe.",                            track:"general" },
+  { title:"Feelings Are Signals",               goal:"Name feelings and respond wisely.",                       track:"general" },
+  { title:"Big Emotions Plan",                  goal:"Use a 3-step plan when emotions spike.",                  track:"general" },
+  { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                     track:"general" },
+  { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",              track:"socialmedia" },
+  { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",             track:"general" },
 
-  { title:"Healthy Coping Tools",                    goal:"Choose coping tools that help long-term.",           track:"general" },
-  { title:"Sleep, Food, Water = Brain Fuel",         goal:"Build habits that protect your brain.",              track:"caffeine" },
-  { title:"Stress + School",                         goal:"Use safe tools before stress stacks up.",            track:"general" },
-  { title:"Goals & Tiny Steps",                      goal:"Make goals and track small wins.",                   track:"general" },
-  { title:"Mistakes & Comebacks",                    goal:"Recover from mistakes without shame.",               track:"general" },
-  { title:"Problem Solving",                         goal:"Use a simple method to solve problems.",             track:"general" },
-  { title:"Positive Routines",                       goal:"Build routines that make life easier.",              track:"gaming" },
-  { title:"Boundaries",                              goal:"Protect your time, body, and mind.",                 track:"general" },
-  { title:"Handling Conflict",                       goal:"Stay calm and communicate respectfully.",            track:"general" },
-  { title:"Trusted Adults",                          goal:"Build your support team.",                           track:"general" },
+  { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                track:"general" },
+  { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                   track:"caffeine" },
+  { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                 track:"general" },
+  { title:"Goals & Tiny Steps",                 goal:"Make goals and track small wins.",                        track:"general" },
+  { title:"Mistakes & Comebacks",               goal:"Recover from mistakes without shame.",                    track:"general" },
+  { title:"Problem Solving",                    goal:"Use a simple method to solve problems.",                  track:"general" },
+  { title:"Positive Routines",                  goal:"Build routines that make life easier.",                   track:"gaming" },
+  { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                      track:"general" },
+  { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                 track:"general" },
+  { title:"Trusted Adults",                     goal:"Build your support team.",                                track:"general" },
 
-  { title:"Cravings & Urges Plan",                   goal:"Make a plan for urges so they pass safely.",         track:"nicotine" },
-  { title:"Refusing Offers (Practice)",              goal:"Use a confident script and exit plan.",              track:"nicotine" },
-  { title:"Parties & Social Pressure",               goal:"Make choices when others are pushing you.",          track:"alcohol" },
-  { title:"Helping a Friend",                        goal:"What to do if a friend is struggling.",              track:"general" },
-  { title:"Self-Talk",                               goal:"Use kinder thoughts to make better choices.",        track:"general" },
-  { title:"Dealing With Anger",                      goal:"Cool down without hurting anyone.",                  track:"general" },
-  { title:"Dealing With Anxiety",                    goal:"Use grounding + breathing tools.",                   track:"general" },
-  { title:"Building Confidence Skills",              goal:"Practice skills that grow confidence.",              track:"general" },
-  { title:"Being a Leader",                          goal:"Help others make safe choices too.",                 track:"general" },
-  { title:"Review & Next Steps",                     goal:"Lock in what you learned and keep going.",           track:"general" },
+  { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",              track:"nicotine" },
+  { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                   track:"nicotine" },
+  { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",               track:"alcohol" },
+  { title:"Helping a Friend",                   goal:"What to do if a friend is struggling.",                   track:"general" },
+  { title:"Self-Talk",                          goal:"Use kinder thoughts to make better choices.",             track:"general" },
+  { title:"Dealing With Anger",                 goal:"Cool down without hurting anyone.",                       track:"general" },
+  { title:"Dealing With Anxiety",               goal:"Use grounding + breathing tools.",                        track:"general" },
+  { title:"Building Confidence Skills",         goal:"Practice skills that grow confidence.",                   track:"general" },
+  { title:"Being a Leader",                     goal:"Help others make safe choices too.",                      track:"general" },
+  { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                track:"general" },
 ];
 
 function makeLessonContent(title, goal){
@@ -197,6 +201,24 @@ const LESSONS = CURRICULUM.map((c, i) => ({
   quiz: make12QuestionQuiz(c.title)
 }));
 
+// Games catalog (tiles render in #games-grid)
+const GAMES = [
+  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",              status:"ready", unlock:{ type:"free" } },
+  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                       status:"ready", unlock:{ type:"free" } },
+
+  // NEW: bigger, story-based game
+  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.",status:"ready", unlock:{ type:"lessons", lessons:1 } },
+
+  // Coming soon placeholders
+  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                        status:"soon", unlock:{ type:"xp",     xp:120 } },
+  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",     status:"soon", unlock:{ type:"lessons",lessons:3 } },
+  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",     status:"soon", unlock:{ type:"level",  level:3 } },
+  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                   status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",             status:"soon", unlock:{ type:"xp",     xp:350 } },
+  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",        status:"soon", unlock:{ type:"lessons",lessons:7 } },
+  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",          status:"soon", unlock:{ type:"xp",     xp:600 } },
+];
+
 /* =========================================================
    STATE
 ========================================================= */
@@ -206,17 +228,27 @@ const DEFAULT_STATE = {
   lastCompletedISO: null,
   streak: 0,
   highScore: 0,
-  avatar: "🦊",
-  habitQuest: { level: 1, progress: 0 },
-
 
   selectedTrack: "general",
 
   xp: 0,
   level: 1,
+
   profileName: "Odin Garrett",
+  avatar: AVATARS[0],
+
   ownedBadges: [],
-  ratings: { total: 0, count: 0 }
+  ratings: { total: 0, count: 0 },
+
+  // Habit Quest (story)
+  habitQuest: {
+    chapter: 0,
+    scene: 0,
+    hearts: 3,
+    wisdom: 0,
+    tokens: 0,      // earned by completing lessons
+    lastLessonDay: 0
+  }
 };
 
 function loadState(){
@@ -229,30 +261,6 @@ function loadState(){
   }
 }
 
-function renderAvatars(){
-  const grid = $("#avatar-grid");
-  if(!grid) return;
-  grid.innerHTML = "";
-
-  AVATARS.forEach(a => {
-    const chip = document.createElement("button");
-    chip.className = "chip";
-    chip.type = "button";
-    chip.textContent = a;
-
-    if(state.avatar === a) chip.style.outline = "2px solid rgba(255,255,255,0.6)";
-
-    chip.addEventListener("click", () => {
-      state.avatar = a;
-      saveState();
-      renderAvatars();
-      renderProfile();
-    });
-
-    grid.appendChild(chip);
-  });
-}
-
 function normalizeState(s){
   const safe = (s && typeof s === "object") ? s : {};
   const merged = {
@@ -263,26 +271,28 @@ function normalizeState(s){
     ratings: {
       ...DEFAULT_STATE.ratings,
       ...(safe.ratings && typeof safe.ratings === "object" ? safe.ratings : {})
+    },
+    habitQuest: {
+      ...DEFAULT_STATE.habitQuest,
+      ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
     }
   };
 
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
   merged.avatar = AVATARS.includes(merged.avatar) ? merged.avatar : AVATARS[0];
 
-  merged.xp = Number(merged.xp);            if(!Number.isFinite(merged.xp)) merged.xp = 0;
-  merged.level = Number(merged.level);      if(!Number.isFinite(merged.level)) merged.level = 1;
-  merged.highScore = Number(merged.highScore); if(!Number.isFinite(merged.highScore)) merged.highScore = 0;
-  merged.streak = Number(merged.streak);    if(!Number.isFinite(merged.streak)) merged.streak = 0;
-  if(!merged.habitQuest || typeof merged.habitQuest !== "object"){
-    merged.habitQuest = { level: 1, progress: 0 };
-  }
-  merged.habitQuest.level = Number(merged.habitQuest.level);
-  merged.habitQuest.progress = Number(merged.habitQuest.progress);
-  if(!Number.isFinite(merged.habitQuest.level) || merged.habitQuest.level < 1) merged.habitQuest.level = 1;
-  if(!Number.isFinite(merged.habitQuest.progress) || merged.habitQuest.progress < 0) merged.habitQuest.progress = 0;
+  merged.xp = safeNum(merged.xp, 0);
+  merged.level = safeNum(merged.level, 1);
+  merged.highScore = safeNum(merged.highScore, 0);
+  merged.streak = safeNum(merged.streak, 0);
+  merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  merged.currentLessonIndex = Number(merged.currentLessonIndex);
-  if(!Number.isFinite(merged.currentLessonIndex)) merged.currentLessonIndex = 0;
+  merged.habitQuest.chapter = safeNum(merged.habitQuest.chapter, 0);
+  merged.habitQuest.scene   = safeNum(merged.habitQuest.scene, 0);
+  merged.habitQuest.hearts  = clamp(safeNum(merged.habitQuest.hearts, 3), 0, 5);
+  merged.habitQuest.wisdom  = safeNum(merged.habitQuest.wisdom, 0);
+  merged.habitQuest.tokens  = safeNum(merged.habitQuest.tokens, 0);
+  merged.habitQuest.lastLessonDay = safeNum(merged.habitQuest.lastLessonDay, 0);
 
   return merged;
 }
@@ -301,7 +311,7 @@ function getActiveLessons(){
   const t = state.selectedTrack || "general";
   if(t === "general") return LESSONS;
 
-  // Show track lessons + also allow general lessons as “support”
+  // show track lessons + general support lessons
   const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
   return filtered.length ? filtered : LESSONS;
 }
@@ -334,10 +344,10 @@ function bindTracks(){
     showView("lesson");
   });
 
-  // Live preview when changing dropdown
   sel?.addEventListener("change", () => {
     const v = sel.value;
-    $("#track-preview") && ($("#track-preview").textContent = (TRACKS[v]?.desc || TRACKS.general.desc));
+    const p = $("#track-preview");
+    if(p) p.textContent = (TRACKS[v]?.desc || TRACKS.general.desc);
   });
 }
 
@@ -345,16 +355,15 @@ function bindTracks(){
    XP / LEVEL
 ========================================================= */
 function recalcLevel(){
-  const xp = Number(state.xp);
-  state.xp = Number.isFinite(xp) ? xp : 0;
+  state.xp = safeNum(state.xp, 0);
   state.level = 1 + Math.floor(state.xp / 200);
 }
 
 function addXP(amount){
-  const a = Number(amount);
-  if(!Number.isFinite(a) || a <= 0) return;
+  const a = safeNum(amount, 0);
+  if(a <= 0) return;
 
-  state.xp = Number(state.xp) + a;
+  state.xp = safeNum(state.xp, 0) + a;
   recalcLevel();
   saveState();
 
@@ -485,7 +494,7 @@ function quizScoreForCurrentLesson(){
     if(picked && Number(picked.value) === item.answer) correct++;
   });
 
-  return { correct, total: lesson.quiz.length, day: lesson.day };
+  return { correct, total: lesson.quiz.length, day: lesson.day, title: lesson.title };
 }
 
 function updateLessonStatus(day){
@@ -528,11 +537,12 @@ function bindLessonButtons(){
       state.completedDays.push(score.day);
       saveState();
       addXP(50);
+
+      // Habit Quest: earn 1 token for finishing a lesson (used in story)
+      state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+      state.habitQuest.lastLessonDay = score.day;
+      saveState();
     }
-
-    state.habitQuest.progress += 1; // free step for finishing lesson
-    saveState();
-
 
     // streak logic
     const todayISO = isoDate(new Date());
@@ -555,18 +565,130 @@ function bindLessonButtons(){
    HOME STATS
 ========================================================= */
 function updateHomeStats(){
-  $("#streak-text")  && ($("#streak-text").textContent  = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
-  $("#streak-text-2")&& ($("#streak-text-2").textContent= `${state.streak} day${state.streak === 1 ? "" : "s"}`);
+  $("#streak-text")   && ($("#streak-text").textContent   = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
+  $("#streak-text-2") && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
 }
 
 /* =========================================================
-   GAMES (catalog + playable)
+   GAMES: FULLSCREEN OVERLAY (NO SCROLL)
 ========================================================= */
 let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
 let breathingTimerId = null;
 
+function ensureGameOverlay(){
+  if($("#game-overlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "game-overlay";
+  overlay.className = "gameOverlay hidden";
+  overlay.innerHTML = `
+    <div class="gameOverlayInner">
+      <div class="gameOverlayTop">
+        <div class="gameOverlayTitle">
+          <div class="big" id="go-title">Game</div>
+          <div class="muted" id="go-sub">Make good choices. Earn XP.</div>
+        </div>
+        <div class="gameOverlayStats">
+          <span class="badge" id="go-score">Score: 0</span>
+          <button class="btn" id="go-exit" type="button">Exit</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="go-content"></div>
+
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn primary hidden" id="go-restart" type="button">Restart</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // minimal styling injected (so it works even if CSS is missing)
+  const style = document.createElement("style");
+  style.textContent = `
+    .gameOverlay.hidden{ display:none; }
+    .gameOverlay{
+      position:fixed; inset:0; z-index:9999;
+      background: rgba(0,0,0,0.70);
+      backdrop-filter: blur(8px);
+      padding: 14px;
+      overflow:auto;
+    }
+    .gameOverlayInner{
+      max-width: 900px;
+      margin: 0 auto;
+      background: rgba(20,20,30,0.92);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .gameOverlayTop{
+      display:flex; gap:14px; align-items:center; justify-content:space-between;
+      flex-wrap: wrap;
+    }
+    .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+    .choiceBtn{
+      display:block; width:100%;
+      text-align:left;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      cursor:pointer;
+      margin-top: 10px;
+    }
+    .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
+    .choiceGood{ border-color: rgba(80,220,140,0.6); }
+    .choiceBad{ border-color: rgba(255,120,120,0.6); }
+    .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+    .hqChip{
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+  `;
+  document.head.appendChild(style);
+
+  // bind overlay buttons once
+  $("#go-exit")?.addEventListener("click", closeGameOverlay);
+  $("#go-restart")?.addEventListener("click", () => {
+    if(gameMode === "choicequest") startChoiceQuest();
+    if(gameMode === "breathing") startBreathing();
+    if(gameMode === "habitquest") startHabitQuest();
+  });
+}
+
+function openGameOverlay(title, subtitle=""){
+  ensureGameOverlay();
+  $("#game-overlay")?.classList.remove("hidden");
+  $("#go-title") && ($("#go-title").textContent = title);
+  $("#go-sub") && ($("#go-sub").textContent = subtitle);
+  $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
+  $("#go-restart")?.classList.add("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeGameOverlay(){
+  $("#game-overlay")?.classList.add("hidden");
+  const c = $("#go-content");
+  if(c) c.innerHTML = "";
+  gameMode = null;
+
+  if(breathingTimerId){
+    clearInterval(breathingTimerId);
+    breathingTimerId = null;
+  }
+  document.body.style.overflow = "";
+}
+
+/* =========================================================
+   GAMES CATALOG
+========================================================= */
 function gameUnlockStatus(game){
   const u = game.unlock || { type:"free" };
   const completed = state.completedDays.length;
@@ -626,32 +748,6 @@ function renderGamesCatalog(){
   });
 }
 
-function openGameArea(title){
-  $("#game-area")?.classList.remove("hidden");
-  $("#game-title") && ($("#game-title").textContent = title);
-  $("#game-score") && ($("#game-score").textContent = `Score: ${gameScore}`);
-  $("#btn-restart-game")?.classList.add("hidden");
-}
-
-function closeGameArea(){
-  $("#game-area")?.classList.add("hidden");
-  $("#game-content") && ($("#game-content").innerHTML = "");
-  gameMode = null;
-  if(breathingTimerId){
-  clearInterval(breathingTimerId);
-  breathingTimerId = null;
-}
-}
-
-function bindGameShellButtons(){
-  $("#btn-exit-game")?.addEventListener("click", closeGameArea);
-  $("#btn-restart-game")?.addEventListener("click", () => {
-    if(gameMode === "choicequest") startChoiceQuest();
-    if(gameMode === "breathing") startBreathing();
-    if(gameMode === "habitquest") startHabitQuest();
-  });
-}
-
 function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
@@ -659,74 +755,20 @@ function launchGame(id){
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
 
-function startHabitQuest(){
-  gameMode = "habitquest";
-  gameScore = 0;
-  openGameArea("Habit Quest");
-
-  const area = $("#game-content");
-  if(!area) return;
-  area.innerHTML = "";
-
-  const hq = state.habitQuest || { level:1, progress:0 };
-  const need = 3 + (hq.level - 1); // steps needed grows slowly
-
-  area.innerHTML = `
-    <p class="big">🏰 Level ${hq.level}</p>
-    <p class="muted">Complete <strong>${need}</strong> steps to level up.</p>
-    <p>Progress: <strong>${hq.progress}/${need}</strong></p>
-    <div class="divider"></div>
-    <p>Pick a step to practice today:</p>
-  `;
-
-  const steps = [
-    { label:"Take 4 slow breaths", xp:10 },
-    { label:"Drink water", xp:8 },
-    { label:"Text a trusted adult (check-in)", xp:12 },
-    { label:"Do a 2‑minute tidy reset", xp:10 },
-    { label:"Write 1 helpful thought", xp:10 },
-  ];
-
-  steps.forEach(s => {
-    const btn = document.createElement("button");
-    btn.className = "btn";
-    btn.style.marginTop = "10px";
-    btn.textContent = `Do: ${s.label} (+${s.xp} XP)`;
-    btn.addEventListener("click", () => {
-      // advance persistent progress
-      state.habitQuest.progress += 1;
-      addXP(s.xp);
-      saveState();
-
-      // level up if reached requirement
-      const hq2 = state.habitQuest;
-      const need2 = 3 + (hq2.level - 1);
-      if(hq2.progress >= need2){
-        hq2.level += 1;
-        hq2.progress = 0;
-        addXP(30); // level-up bonus
-        saveState();
-      }
-
-      startHabitQuest(); // re-render
-    });
-    area.appendChild(btn);
-  });
-
-  $("#btn-restart-game")?.classList.remove("hidden");
-}
-
-
+/* =========================================================
+   GAME: CHOICE QUEST
+========================================================= */
 function startChoiceQuest(){
   gameMode = "choicequest";
   gameIndex = 0;
   gameScore = 0;
-  openGameArea("Choice Quest");
+
+  openGameOverlay("Choice Quest", "Pick the healthiest option.");
   renderChoiceQuest();
 }
 
 function renderChoiceQuest(){
-  const area = $("#game-content");
+  const area = $("#go-content");
   if(!area) return;
   area.innerHTML = "";
 
@@ -737,7 +779,7 @@ function renderChoiceQuest(){
       <p>You finished Choice Quest.</p>
       <p class="muted">Final score: <strong>${gameScore}</strong></p>
     `;
-    $("#btn-restart-game")?.classList.remove("hidden");
+    $("#go-restart")?.classList.remove("hidden");
 
     if(gameScore > state.highScore){
       state.highScore = gameScore;
@@ -755,22 +797,23 @@ function renderChoiceQuest(){
   area.appendChild(p);
 
   scenario.choices.forEach((c) => {
-    const btn = document.createElement("div");
-    btn.className = "choice";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choiceBtn";
     btn.textContent = c.text;
 
     btn.addEventListener("click", () => {
-      $$(".choice").forEach(x => x.style.pointerEvents = "none");
+      $$(".choiceBtn").forEach(x => x.disabled = true);
 
       if(c.good){
-        btn.classList.add("correct");
+        btn.classList.add("choiceGood");
         gameScore += 10;
       } else {
-        btn.classList.add("wrong");
+        btn.classList.add("choiceBad");
         gameScore = Math.max(0, gameScore - 3);
       }
 
-      $("#game-score") && ($("#game-score").textContent = `Score: ${gameScore}`);
+      $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
 
       const why = document.createElement("p");
       why.className = "muted";
@@ -779,6 +822,7 @@ function renderChoiceQuest(){
       area.appendChild(why);
 
       const next = document.createElement("button");
+      next.type = "button";
       next.className = "btn primary";
       next.style.marginTop = "12px";
       next.textContent = "Next";
@@ -793,11 +837,15 @@ function renderChoiceQuest(){
   });
 }
 
+/* =========================================================
+   GAME: BREATHING BUDDY
+========================================================= */
 function startBreathing(){
   gameMode = "breathing";
-  openGameArea("Breathing Buddy");
+  gameScore = 0;
 
-  const area = $("#game-content");
+  openGameOverlay("Breathing Buddy", "Calm your body for 60 seconds.");
+  const area = $("#go-content");
   if(!area) return;
   area.innerHTML = "";
 
@@ -845,23 +893,308 @@ function startBreathing(){
 
     t -= 1;
     if(t < 0){
-      clearInterval(id);
+      clearInterval(breathingTimerId);
+      breathingTimerId = null;
+
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
       if(!finished){
         finished = true;
         addXP(10);
       }
-      $("#btn-restart-game")?.classList.remove("hidden");
+      $("#go-restart")?.classList.remove("hidden");
     }
   }, 1000);
 }
 
 /* =========================================================
+   GAME: HABIT QUEST (STORY / TURN-BASED)
+========================================================= */
+
+// A kid-friendly story system:
+// - You have an avatar (emoji)
+// - Scenes have text + choices
+// - Choices can give wisdom, cost a heart, give XP, and can require a token (earned by lessons)
+// - "Lesson integration": uses last completed lesson title/day in a few lines
+const HQ = {
+  chapters: [
+    {
+      name: "Chapter 1: The First Steps",
+      scenes: [
+        {
+          text: (ctx) => `You (${ctx.avatar}) arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
+          choices: [
+            { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch." },
+            { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1, xp:+0 },  why:"Fitting in isn’t worth it." },
+            { text:"Walk away and find a trusted adult.",        good:true,  effects:{ wisdom:+1, xp:+10 }, why:"Asking for help is strong." },
+          ]
+        },
+        {
+          text: (ctx) => `A mentor character appears: “When you feel pressure, try: Pause → No → Switch.” They ask: “Want to practice?”`,
+          choices: [
+            { text:"Practice the 3‑step ‘No’ out loud.", good:true, effects:{ wisdom:+1, xp:+12 }, why:"Practice makes real life easier." },
+            { text:"Ignore them and scroll forever.",     good:false,effects:{ hearts:-1, xp:+0 },  why:"Escapes can become habits." },
+          ]
+        },
+        {
+          text: (ctx) => {
+            const last = ctx.lastLessonTitle ? `You remember your last lesson: “${ctx.lastLessonTitle}.”` : "You remember: small choices add up.";
+            return `${last} A kid nearby looks stressed. What do you do?`;
+          },
+          choices: [
+            { text:"Offer a simple calm tool: 4 slow breaths together.", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Calm tools help fast." },
+            { text:"Tell them to ‘just deal with it’ and leave.",         good:false,effects:{ hearts:-1, xp:+0 },  why:"Kindness matters." },
+            { text:"Help them find a trusted adult.",                     good:true, effects:{ wisdom:+1, xp:+10 }, why:"Support is powerful." },
+          ]
+        },
+        {
+          text: (ctx) => `Gatekeeper: “To enter the next area, you need a Lesson Token.” (You earn tokens by completing lessons.)`,
+          choices: [
+            { text:"Use 1 token to open the gate.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice! You used your lesson power." },
+            { text:"Come back later after finishing a lesson.",          good:true, effects:{ xp:+0 },             why:"Finish a lesson to earn a token." , end:true },
+          ]
+        }
+      ]
+    },
+    {
+      name: "Chapter 2: The Focus Forest",
+      scenes: [
+        {
+          text: (ctx) => `In Focus Forest, a character offers “instant fun” that could become a bad habit. What’s your move?`,
+          choices: [
+            { text:"Pause and ask: “Will this help Future Me?”", good:true, effects:{ wisdom:+1, xp:+15 }, why:"That question protects you." },
+            { text:"Do it without thinking.",                     good:false,effects:{ hearts:-1, xp:+0 },  why:"Pausing is your superpower." },
+          ]
+        },
+        {
+          text: (ctx) => `You find a “Routine Builder” sign: “Tiny steps beat giant promises.” Pick your tiny step.`,
+          choices: [
+            { text:"Drink water + snack (brain fuel).", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Brain fuel helps choices." },
+            { text:"2 minutes tidy reset.",             good:true, effects:{ wisdom:+1, xp:+10 }, why:"Small wins add up." },
+            { text:"1 helpful thought about yourself.", good:true, effects:{ wisdom:+1, xp:+10 }, why:"Kind self-talk matters." },
+          ]
+        },
+        {
+          text: (ctx) => `Boss moment: a crowd pressures you. Your avatar ${ctx.avatar} takes a deep breath…`,
+          choices: [
+            { text:"Say: “No thanks. I’m heading out.”", good:true, effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit." },
+            { text:"Say yes so nobody laughs.",          good:false,effects:{ hearts:-1, xp:+0 },  why:"A real friend won’t demand proof." },
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+function getLastLessonTitle(){
+  const day = safeNum(state.habitQuest.lastLessonDay, 0);
+  if(day <= 0) return "";
+  const l = LESSONS.find(x => x.day === day);
+  return l ? l.title : "";
+}
+
+function hqCtx(){
+  return {
+    avatar: state.avatar || "🙂",
+    name: state.profileName || "Player",
+    lastLessonTitle: getLastLessonTitle()
+  };
+}
+
+function startHabitQuest(){
+  gameMode = "habitquest";
+  gameScore = 0;
+
+  openGameOverlay("Habit Quest", "Story adventure: make choices, learn skills, earn XP.");
+  renderHabitQuest();
+}
+
+function renderHabitQuest(){
+  const area = $("#go-content");
+  if(!area) return;
+
+  const ch = clamp(safeNum(state.habitQuest.chapter,0), 0, HQ.chapters.length - 1);
+  const chapter = HQ.chapters[ch];
+  const sc = clamp(safeNum(state.habitQuest.scene,0), 0, chapter.scenes.length - 1);
+  const scene = chapter.scenes[sc];
+
+  // header stats
+  const hearts = clamp(safeNum(state.habitQuest.hearts,3), 0, 5);
+  const wisdom = safeNum(state.habitQuest.wisdom,0);
+  const tokens = safeNum(state.habitQuest.tokens,0);
+
+  const ctx = hqCtx();
+
+  area.innerHTML = `
+    <div class="hqRow">
+      <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
+      <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
+      <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
+      <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
+      <div class="hqChip">${escapeHtml(ctx.avatar)} You</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
+    <p>${escapeHtml(scene.text(ctx))}</p>
+    <div id="hq-choices"></div>
+    <p class="muted" id="hq-why" style="margin-top:12px;"></p>
+  `;
+
+  const wrap = $("#hq-choices");
+  const whyEl = $("#hq-why");
+  if(!wrap) return;
+
+  // if hearts are 0, game over screen
+  if(hearts <= 0){
+    area.innerHTML = `
+      <p class="big">😵 Oops!</p>
+      <p>You ran out of hearts.</p>
+      <p class="muted">Good news: you can restart and practice better choices.</p>
+    `;
+    $("#go-restart")?.classList.remove("hidden");
+
+    // reset for restart next time
+    state.habitQuest.hearts = 3;
+    state.habitQuest.wisdom = 0;
+    state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0); // keep tokens
+    state.habitQuest.chapter = 0;
+    state.habitQuest.scene = 0;
+    saveState();
+    return;
+  }
+
+  scene.choices.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choiceBtn";
+    btn.textContent = choice.text;
+
+    // require token?
+    const needTok = choice.require?.token ? safeNum(choice.require.token,0) : 0;
+    if(needTok > 0 && tokens < needTok){
+      btn.disabled = true;
+      btn.classList.add("disabled");
+      btn.textContent = `${choice.text} (needs ${needTok} token)`;
+    }
+
+    btn.addEventListener("click", () => {
+      // lock buttons
+      $$(".choiceBtn").forEach(x => x.disabled = true);
+
+      // show why
+      if(whyEl) whyEl.textContent = choice.why ? choice.why : "";
+
+      // apply effects
+      const eff = choice.effects || {};
+      if(eff.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(eff.hearts,0), 0, 5);
+      if(eff.wisdom) state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + safeNum(eff.wisdom,0);
+      if(eff.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(eff.tokens,0));
+      saveState();
+
+      // xp
+      if(eff.xp && safeNum(eff.xp,0) > 0) addXP(eff.xp);
+
+      // small score feedback
+      if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
+      $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
+
+      // next button
+      const next = document.createElement("button");
+      next.type = "button";
+      next.className = "btn primary";
+      next.style.marginTop = "12px";
+      next.textContent = choice.end ? "Exit" : "Continue";
+      next.addEventListener("click", () => {
+        if(choice.end){
+          closeGameOverlay();
+          return;
+        }
+
+        // advance scene/chapter
+        const newCh = safeNum(state.habitQuest.chapter,0);
+        const newSc = safeNum(state.habitQuest.scene,0) + 1;
+
+        if(newSc >= chapter.scenes.length){
+          // chapter completed
+          state.habitQuest.chapter = clamp(newCh + 1, 0, HQ.chapters.length - 1);
+          state.habitQuest.scene = 0;
+
+          // chapter reward
+          addXP(40);
+          state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + 1;
+          saveState();
+
+          // if finished final chapter
+          if(newCh + 1 >= HQ.chapters.length){
+            renderHabitQuestWin();
+            return;
+          }
+        } else {
+          state.habitQuest.scene = newSc;
+          saveState();
+        }
+
+        renderHabitQuest();
+      });
+      $("#go-content")?.appendChild(next);
+    });
+
+    wrap.appendChild(btn);
+  });
+
+  $("#go-restart")?.classList.remove("hidden");
+}
+
+function renderHabitQuestWin(){
+  const area = $("#go-content");
+  if(!area) return;
+
+  area.innerHTML = `
+    <p class="big">🏁 You finished Habit Quest (for now)!</p>
+    <p>You made lots of strong choices. Your avatar ${escapeHtml(state.avatar)} is getting wiser.</p>
+    <p class="muted">We can add more chapters next.</p>
+  `;
+  $("#go-restart")?.classList.remove("hidden");
+
+  // reset story position but keep rewards
+  state.habitQuest.chapter = 0;
+  state.habitQuest.scene = 0;
+  state.habitQuest.hearts = 3;
+  saveState();
+}
+
+/* =========================================================
    PROFILE / SHOP
 ========================================================= */
+function renderAvatars(){
+  const grid = $("#avatar-grid");
+  if(!grid) return;
+  grid.innerHTML = "";
+
+  AVATARS.forEach(a => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.type = "button";
+    chip.textContent = a;
+
+    if(state.avatar === a) chip.style.outline = "2px solid rgba(255,255,255,0.6)";
+
+    chip.addEventListener("click", () => {
+      state.avatar = a;
+      saveState();
+      renderAvatars();
+      renderProfile();
+    });
+
+    grid.appendChild(chip);
+  });
+}
+
 function renderProfile(){
   if(!$("#profile-name")) return;
+
   renderAvatars();
 
   $("#profile-name").textContent = `${state.avatar || "🙂"} ${state.profileName || "Player"}`;
@@ -905,7 +1238,7 @@ function renderShop(){
     card.className = "card shopCard" + (unlocked ? "" : " locked");
     card.innerHTML = `
       <div class="shopBadge">${b.icon}</div>
-      <h3>${b.name}</h3>
+      <h3>${escapeHtml(b.name)}</h3>
       <p class="muted">${unlocked ? "Unlocked ✅" : `Locked 🔒 (needs ${b.xpRequired} XP)`}</p>
     `;
     grid.appendChild(card);
@@ -929,8 +1262,8 @@ function bindRatingStarsOnce(){
     const stars = Number(btn.dataset.star);
     if(!Number.isFinite(stars)) return;
 
-    state.ratings.total += stars;
-    state.ratings.count += 1;
+    state.ratings.total = safeNum(state.ratings.total,0) + stars;
+    state.ratings.count = safeNum(state.ratings.count,0) + 1;
     saveState();
 
     $("#rating-thanks") && ($("#rating-thanks").textContent = "Thanks for rating! ⭐");
@@ -941,9 +1274,8 @@ function bindRatingStarsOnce(){
 function renderRate(){
   if(!$("#rating-average")) return;
 
-  const r = state.ratings || { total:0, count:0 };
-  const total = Number(r.total);
-  const count = Number(r.count);
+  const total = safeNum(state.ratings?.total, 0);
+  const count = safeNum(state.ratings?.count, 0);
   const avg = (count > 0) ? (total / count) : null;
 
   $("#rating-average").textContent = avg ? avg.toFixed(1) + " / 5" : "—";
@@ -1011,7 +1343,6 @@ function init(){
   bindNav();
   bindTracks();
   bindLessonButtons();
-  bindGameShellButtons();
   bindReset();
   bindRatingStarsOnce();
 
@@ -1027,6 +1358,9 @@ function init(){
   renderRate();
   renderGamesCatalog();
   renderTrackUI();
+
+  // Make sure overlay exists (so first game opens instantly)
+  ensureGameOverlay();
 }
 
 init();
