@@ -811,7 +811,7 @@ function updateLessonStatus(day){
   if(!el) return;
   const done = state.completedDays.includes(day);
   el.textContent = done
-    ? "✅ You already completed this lesson!"
+    ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
 
