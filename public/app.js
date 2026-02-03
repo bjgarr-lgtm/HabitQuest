@@ -540,40 +540,26 @@ function showView(name){
 }
 
 function bindProfileNameEditor(){
-  const input = document.getElementById("profile-name-input");
-  const btn = document.getElementById("btn-save-name");
+  const input = $("#profile-name-input");
+  const btn = $("#btn-save-name");
   if(!input || !btn) return;
 
   if(btn.__bound) return;
   btn.__bound = true;
 
-  const syncInputFromState = () => {
-    input.value = safeStr(state.profileName, "Player").slice(0, 24);
-  };
+  // initial value
+  input.value = safeStr(state.profileName, "Player").slice(0, 24);
 
   const commit = () => {
     state.profileName = safeStr(input.value, "Player").slice(0, 24);
+    input.value = state.profileName;
     saveState();
-    // Refresh profile UI without changing views
-    renderProfile();
+    renderProfile(); // refresh anywhere name is used
   };
 
-  // initial fill
-  syncInputFromState();
-
   btn.addEventListener("click", commit);
-
   input.addEventListener("keydown", (e) => {
-    if(e.key === "Enter"){
-      e.preventDefault();
-      commit();
-    }
-  });
-
-  // If user navigates away and back, keep input in sync
-  input.addEventListener("blur", () => {
-    // optional: normalize display on blur
-    syncInputFromState();
+    if(e.key === "Enter") commit();
   });
 }
 
@@ -1144,7 +1130,8 @@ function startBreathing(){
    HABIT QUEST (7 CHAPTERS)
 ========================================================= */
 function avatarForStory(){
-  if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🖼️";
+  // Don’t show 🖼️ in story text; use a normal emoji fallback.
+  if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🙂";
   return state.avatar || "🙂";
 }
 
@@ -1156,8 +1143,11 @@ function getLastLessonTitle(){
 }
 
 function hqCtx(){
+  const isCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
   return {
-    avatar: avatarForStory(),
+    avatarEmoji: avatarForStory(),
+    avatarIsCustom: isCustom,
+    avatarImg: isCustom ? state.customAvatar : null,
     name: state.profileName || "Player",
     completed: state.completedDays.length,
     lastLessonTitle: getLastLessonTitle(),
@@ -1439,22 +1429,32 @@ function renderHabitQuest(){
     return;
   }
 
-  area.innerHTML = `
-    <div class="hqRow">
-      <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
-      <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
-      <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
-      <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
-      <div class="hqChip">${escapeHtml(ctx.avatar)} You</div>
+area.innerHTML = `
+  <div class="hqRow">
+    <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
+    <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
+    <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
+    <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
+
+    <div class="hqChip hqYouChip">
+      ${
+        ctx.avatarIsCustom && ctx.avatarImg
+          ? `<img class="hqAvatarImg" src="${ctx.avatarImg}" alt="Your avatar" />`
+          : `<span class="hqAvatarEmoji">${escapeHtml(ctx.avatarEmoji)}</span>`
+      }
+      <span>You</span>
     </div>
+  </div>
 
-    <div class="divider"></div>
+  <div class="divider"></div>
 
-    <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
-    <p>${escapeHtml(scene.text(ctx))}</p>
-    <div id="hq-choices"></div>
-    <p class="muted" id="hq-why" style="margin-top:12px;"></p>
-  `;
+  <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
+  <p>${escapeHtml(scene.text({ avatar: ctx.avatarEmoji, name: ctx.name, lastLessonTitle: ctx.lastLessonTitle, tokens: ctx.tokens }))}</p>
+
+  <div id="hq-choices"></div>
+  <p class="muted" id="hq-why" style="margin-top:12px;"></p>
+`;
+
 
   const wrap = area.querySelector("#hq-choices");
   const whyEl = area.querySelector("#hq-why");
@@ -1618,6 +1618,32 @@ function renderAvatars(){
     }));
   }
 
+  if(state.customAvatar){
+  const del = document.createElement("button");
+  del.className = "chip avatarChip avatarDelete";
+  del.type = "button";
+  del.textContent = "🗑️";
+  del.title = "Delete uploaded avatar";
+
+  del.addEventListener("click", () => {
+    if(!confirm("Delete your uploaded avatar photo from this device?")) return;
+
+    state.customAvatar = null;
+
+    // If they were using it, fall back to an emoji
+    if(state.avatar === CUSTOM_AVATAR_ID){
+      state.avatar = AVATARS[0];
+    }
+
+    saveState();
+    renderAvatars();
+    renderProfile();
+  });
+
+  grid.appendChild(del);
+}
+
+
   const plus = document.createElement("button");
   plus.className = "chip avatarChip avatarPlus";
   plus.type = "button";
@@ -1668,53 +1694,53 @@ function bindAvatarUpload(){
 }
 
 function renderProfile(){
-  // New HTML uses these ids (not #profile-name)
-  const input = document.getElementById("profile-name-input");
-  const emojiEl = document.getElementById("profile-avatar-emoji");
-  const imgEl = document.getElementById("profile-avatar-img");
+  const input = $("#profile-name-input");
+  if(!input) return;
 
-  const xpEl = document.getElementById("profile-xp");
-  const levelEl = document.getElementById("profile-level");
-  const lessonsEl = document.getElementById("profile-lessons");
-
-  // If profile view isn’t in the DOM for some reason, bail safely
-  if(!input || !emojiEl || !imgEl || !xpEl || !levelEl || !lessonsEl) return;
-
-  // --- Name (keep input synced) ---
+  // keep input synced
   input.value = safeStr(state.profileName, "Player").slice(0, 24);
 
-  // --- Avatar preview (emoji OR uploaded image) ---
-  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && typeof state.customAvatar === "string" && state.customAvatar.startsWith("data:image/"));
+  // avatar preview in header card
+  const emojiEl = $("#profile-avatar-emoji");
+  const imgEl   = $("#profile-avatar-img");
+
+  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
 
   if(usingCustom){
-    imgEl.src = state.customAvatar;
-    imgEl.classList.remove("hidden");
-    emojiEl.classList.add("hidden");
+    if(imgEl){
+      imgEl.src = state.customAvatar;
+      imgEl.classList.remove("hidden");
+    }
+    if(emojiEl) emojiEl.classList.add("hidden");
   } else {
-    emojiEl.textContent = state.avatar || "🙂";
-    emojiEl.classList.remove("hidden");
-    imgEl.classList.add("hidden");
-    imgEl.removeAttribute("src");
+    if(emojiEl){
+      emojiEl.textContent = state.avatar || "🙂";
+      emojiEl.classList.remove("hidden");
+    }
+    if(imgEl){
+      imgEl.removeAttribute("src");
+      imgEl.classList.add("hidden");
+    }
   }
 
-  // --- Stats ---
-  xpEl.textContent = String(safeNum(state.xp, 0));
-  levelEl.textContent = String(safeNum(state.level, 1));
-  lessonsEl.textContent = String(Array.isArray(state.completedDays) ? state.completedDays.length : 0);
+  // stats
+  $("#profile-xp") && ($("#profile-xp").textContent = String(state.xp));
+  $("#profile-level") && ($("#profile-level").textContent = String(state.level));
+  $("#profile-lessons") && ($("#profile-lessons").textContent = String(state.completedDays.length));
 
-  // --- Avatar picker grid ---
+  // avatar grid + upload
   renderAvatars();
 
-  // --- Auto-unlock badges + render owned badges ---
-  const unlockedIds = BADGES.filter(b => safeNum(state.xp,0) >= b.xpRequired).map(b => b.id);
+  // auto-unlock badges
+  const unlockedIds = BADGES.filter(b => state.xp >= b.xpRequired).map(b => b.id);
   state.ownedBadges = Array.from(new Set([...(state.ownedBadges||[]), ...unlockedIds]));
   saveState();
 
-  const wrap = document.getElementById("owned-badges");
-  const empty = document.getElementById("owned-badges-empty");
+  const wrap = $("#owned-badges");
+  const empty = $("#owned-badges-empty");
   if(wrap && empty){
     wrap.innerHTML = "";
-    if(!state.ownedBadges.length){
+    if(state.ownedBadges.length === 0){
       empty.textContent = "No badges yet — earn XP to unlock some!";
     } else {
       empty.textContent = "";
@@ -1729,7 +1755,6 @@ function renderProfile(){
     }
   }
 
-  // Ensure the Save/Enter handler is wired
   bindProfileNameEditor();
 }
 

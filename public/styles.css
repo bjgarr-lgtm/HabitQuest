@@ -585,3 +585,50 @@ button, input, select, textarea {
   .profileTwoCol{ grid-template-columns: 1fr; }
   .profileStats{ justify-content:flex-start; }
 }
+
+/* Wider overlay card + avoid “inner scrollbar” look */
+.gameOverlay{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  overflow:auto;           /* scroll the overlay itself if needed */
+  padding: 18px;
+}
+
+.gameOverlayInner{
+  width: min(1180px, 100%);
+  max-height: none;        /* don’t force inner scrolling */
+  overflow: visible;
+  margin: 18px 0;
+}
+
+/* Habit Quest: show custom avatar image in the HUD chip */
+.hqYouChip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.hqAvatarImg{
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
+
+.hqAvatarEmoji{
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Avatar delete chip */
+.avatarDelete{
+  opacity: 0.9;
+}
+.avatarDelete:hover{
+  opacity: 1;
+  background: rgba(255,85,119,0.15);
+  border-color: rgba(255,85,119,0.35);
+}
