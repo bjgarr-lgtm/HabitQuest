@@ -733,7 +733,7 @@ function updateHomeStats(){
 }
 
 /* =========================================================
-   GAMES: FULLSCREEN OVERLAY (NO SCROLL)
+   GAMES: FULLSCREEN OVERLAY (NO SCROLL) — FIXED VISIBILITY
 ========================================================= */
 let gameMode = null;
 let gameIndex = 0;
@@ -741,13 +741,23 @@ let gameScore = 0;
 let breathingTimerId = null;
 
 function ensureGameOverlay(){
-  if($("#game-overlay")) return;
+  // If it already exists, force-hide it on boot.
+  const existing = document.getElementById("game-overlay");
+  if(existing){
+    existing.style.display = "none";
+    existing.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    return;
+  }
 
   const overlay = document.createElement("div");
   overlay.id = "game-overlay";
-  overlay.className = "gameOverlay hidden";
+  overlay.className = "gameOverlay"; // don't depend on .hidden
+  overlay.style.display = "none";    // ALWAYS start hidden
+  overlay.setAttribute("aria-hidden", "true");
+
   overlay.innerHTML = `
-    <div class="gameOverlayInner">
+    <div class="gameOverlayInner" role="dialog" aria-modal="true" aria-label="Game overlay">
       <div class="gameOverlayTop">
         <div class="gameOverlayTitle">
           <div class="big" id="go-title">Game</div>
@@ -764,40 +774,38 @@ function ensureGameOverlay(){
       <div id="go-content"></div>
 
       <div class="actions" style="margin-top:14px;">
-        <button class="btn primary hidden" id="go-restart" type="button">Restart</button>
+        <button class="btn primary" id="go-restart" type="button" style="display:none;">Restart</button>
       </div>
     </div>
   `;
+
   document.body.appendChild(overlay);
 
-  // Minimal styling injected (so it works even if CSS misses something).
-  // IMPORTANT: Explicit text color so buttons/choices never render black.
+  // Inject overlay CSS (safe)
   const style = document.createElement("style");
   style.textContent = `
-    .gameOverlay.hidden{ display:none; }
     .gameOverlay{
       position:fixed; inset:0; z-index:9999;
       background: rgba(0,0,0,0.70);
       backdrop-filter: blur(8px);
       padding: 14px;
       overflow:auto;
+      color: rgba(255,255,255,0.92);
     }
     .gameOverlayInner{
       max-width: 900px;
       margin: 0 auto;
-      background: rgba(20,20,30,0.94);
+      background: rgba(20,20,30,0.92);
       border: 1px solid rgba(255,255,255,0.14);
       border-radius: 16px;
       padding: 16px;
-      color: rgba(255,255,255,0.92);
     }
-    .gameOverlayInner *{ color: inherit; }
-    .gameOverlayInner .muted{ color: rgba(255,255,255,0.72) !important; }
     .gameOverlayTop{
       display:flex; gap:14px; align-items:center; justify-content:space-between;
       flex-wrap: wrap;
     }
     .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+
     .choiceBtn{
       display:block; width:100%;
       text-align:left;
@@ -805,59 +813,81 @@ function ensureGameOverlay(){
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.16);
       background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
       cursor:pointer;
       margin-top: 10px;
-      color: rgba(255,255,255,0.92) !important;
     }
     .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-    .choiceBtn.disabled, .choiceBtn:disabled{
-      opacity: .55;
-      cursor:not-allowed;
-    }
-    .choiceGood{ border-color: rgba(80,220,140,0.6) !important; }
-    .choiceBad{ border-color: rgba(255,120,120,0.6) !important; }
+    .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
+
+    .choiceGood{ border-color: rgba(80,220,140,0.6); }
+    .choiceBad{ border-color: rgba(255,120,120,0.6); }
+
     .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
     .hqChip{
       padding: 6px 10px;
       border-radius: 999px;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.14);
-      color: rgba(255,255,255,0.92);
     }
   `;
   document.head.appendChild(style);
 
-  // Bind overlay buttons once
-  $("#go-exit")?.addEventListener("click", closeGameOverlay);
-  $("#go-restart")?.addEventListener("click", () => {
+  // Bind buttons (RELIABLE)
+  overlay.querySelector("#go-exit")?.addEventListener("click", closeGameOverlay);
+  overlay.querySelector("#go-restart")?.addEventListener("click", () => {
     if(gameMode === "choicequest") startChoiceQuest();
     if(gameMode === "breathing") startBreathing();
     if(gameMode === "habitquest") startHabitQuest();
+  });
+
+  // Optional: click outside the card closes (kid-friendly)
+  overlay.addEventListener("click", (e) => {
+    if(e.target === overlay) closeGameOverlay();
   });
 }
 
 function openGameOverlay(title, subtitle=""){
   ensureGameOverlay();
-  $("#game-overlay")?.classList.remove("hidden");
-  $("#go-title") && ($("#go-title").textContent = title);
-  $("#go-sub") && ($("#go-sub").textContent = subtitle);
-  $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
-  $("#go-restart")?.classList.add("hidden");
+  const overlay = document.getElementById("game-overlay");
+  if(!overlay) return;
+
+  overlay.style.display = "block";
+  overlay.setAttribute("aria-hidden", "false");
+
+  const titleEl = document.getElementById("go-title");
+  const subEl = document.getElementById("go-sub");
+  const scoreEl = document.getElementById("go-score");
+  const restartBtn = document.getElementById("go-restart");
+
+  if(titleEl) titleEl.textContent = title;
+  if(subEl) subEl.textContent = subtitle;
+  if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
+  if(restartBtn) restartBtn.style.display = "none";
+
   document.body.style.overflow = "hidden";
 }
 
 function closeGameOverlay(){
-  $("#game-overlay")?.classList.add("hidden");
-  const c = $("#go-content");
+  const overlay = document.getElementById("game-overlay");
+  if(!overlay) return;
+
+  overlay.style.display = "none";
+  overlay.setAttribute("aria-hidden", "true");
+
+  const c = document.getElementById("go-content");
   if(c) c.innerHTML = "";
+
   gameMode = null;
 
   if(breathingTimerId){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
   }
+
   document.body.style.overflow = "";
 }
+
 
 /* =========================================================
    GAMES CATALOG
