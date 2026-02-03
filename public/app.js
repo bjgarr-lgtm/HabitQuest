@@ -50,6 +50,74 @@ function mulberry32(seed){
   };
 }
 
+function safeStr(x, fallback=""){
+  if(typeof x !== "string") return fallback;
+  const s = x.trim();
+  return s.length ? s : fallback;
+}
+
+// Inject small profile UI polish + name editor (no index.html edits needed)
+function ensureProfileNameUI(){
+  // Add tiny CSS once
+  if(!document.getElementById("profile-name-ui-css")){
+    const style = document.createElement("style");
+    style.id = "profile-name-ui-css";
+    style.textContent = `
+      .profileNameRow{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        flex-wrap:wrap;
+      }
+      #profile-avatar-img{
+        width:44px;
+        height:44px;
+        border-radius:12px;
+        object-fit:cover;
+        border:1px solid rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.06);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+      }
+      .profileNameInputRow{
+        margin-top:12px;
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+      #profile-name-input{
+        flex: 1 1 220px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.92);
+        outline: none;
+      }
+      #profile-name-input::placeholder{ color: rgba(255,255,255,0.55); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Upgrade the big name element to hold img + text
+  const nameEl = document.getElementById("profile-name");
+  if(nameEl && !nameEl.dataset.upgraded){
+    nameEl.dataset.upgraded = "1";
+    nameEl.innerHTML = `
+      <div class="profileNameRow">
+        <img id="profile-avatar-img" alt="Avatar" style="display:none;" />
+        <span id="profile-name-text"></span>
+      </div>
+      <div class="profileNameInputRow">
+        <input id="profile-name-input" type="text" maxlength="30" placeholder="Enter your name" />
+        <button class="btn small" id="profile-name-save" type="button">Save</button>
+      </div>
+      <p class="muted" id="profile-name-hint" style="margin:10px 0 0;">This is shown on your profile.</p>
+    `;
+  }
+}
+
+
 /* =========================================================
    CONTENT
 ========================================================= */
@@ -359,7 +427,7 @@ const DEFAULT_STATE = {
   xp: 0,
   level: 1,
 
-  profileName: "Odin Garrett",
+  profileName: "Player",
 
   avatar: AVATARS[0],        // emoji or CUSTOM_AVATAR_ID
   customAvatar: null,        // dataURL string (local only)
@@ -405,6 +473,7 @@ function normalizeState(s){
       ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
     }
   };
+  merged.profileName = safeStr(merged.profileName, "Player").slice(0, 30);
 
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
 
@@ -483,6 +552,33 @@ function bindTracks(){
     if(p) p.textContent = (TRACKS[v]?.desc || TRACKS.general.desc);
   });
 }
+
+function bindProfileNameEditor(){
+  // Must exist (we inject it)
+  ensureProfileNameUI();
+
+  const input = document.getElementById("profile-name-input");
+  const btn = document.getElementById("profile-name-save");
+  if(!input || !btn) return;
+
+  if(btn.__bound) return;
+  btn.__bound = true;
+
+  // set initial value
+  input.value = safeStr(state.profileName, "Player");
+
+  const commit = () => {
+    state.profileName = safeStr(input.value, "Player").slice(0, 30);
+    saveState();
+    renderProfile(); // refresh name display
+  };
+
+  btn.addEventListener("click", commit);
+  input.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") commit();
+  });
+}
+
 
 /* =========================================================
    XP / LEVEL
@@ -1620,22 +1716,45 @@ function bindAvatarUpload(){
 }
 
 function renderProfile(){
-  if(!$("#profile-name")) return;
+  if(!document.getElementById("profile-name")) return;
 
+  ensureProfileNameUI();
   renderAvatars();
 
-  const avatarLabel = (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) ? "🖼️" : (state.avatar || "🙂");
-  $("#profile-name").textContent = `${avatarLabel} ${state.profileName || "Player"}`.trim();
+  const nameTextEl = document.getElementById("profile-name-text");
+  const imgEl = document.getElementById("profile-avatar-img");
 
-  $("#profile-xp").textContent = String(state.xp);
-  $("#profile-level").textContent = String(state.level);
+  const displayName = safeStr(state.profileName, "Player");
 
+  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
+
+  if(imgEl){
+    if(usingCustom){
+      imgEl.src = state.customAvatar;
+      imgEl.style.display = "inline-block";
+    }else{
+      imgEl.removeAttribute("src");
+      imgEl.style.display = "none";
+    }
+  }
+
+  // If custom avatar, show image + name; otherwise emoji + name
+  const emoji = (!usingCustom ? (state.avatar || "🙂") : "");
+  if(nameTextEl){
+    nameTextEl.textContent = `${emoji} ${displayName}`.trim();
+  }
+
+  // Keep stats
+  document.getElementById("profile-xp").textContent = String(state.xp);
+  document.getElementById("profile-level").textContent = String(state.level);
+
+  // auto-unlock badges
   const unlockedIds = BADGES.filter(b => state.xp >= b.xpRequired).map(b => b.id);
   state.ownedBadges = Array.from(new Set([...(state.ownedBadges||[]), ...unlockedIds]));
   saveState();
 
-  const wrap = $("#owned-badges");
-  const empty = $("#owned-badges-empty");
+  const wrap = document.getElementById("owned-badges");
+  const empty = document.getElementById("owned-badges-empty");
   if(!wrap || !empty) return;
 
   wrap.innerHTML = "";
@@ -1653,7 +1772,11 @@ function renderProfile(){
     chip.textContent = `${b.icon} ${b.name}`;
     wrap.appendChild(chip);
   });
+
+  // Ensure editor stays in sync
+  bindProfileNameEditor();
 }
+
 
 function renderShop(){
   const grid = $("#shop-grid");
@@ -1782,6 +1905,7 @@ function init(){
   bindReset();
   bindRatingStarsOnce();
   bindAvatarUpload();
+  bindProfileNameEditor();
 
   $("#btn-new-tip")?.addEventListener("click", randomTip);
   randomTip();
