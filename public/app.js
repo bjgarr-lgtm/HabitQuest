@@ -565,6 +565,7 @@ function updateHomeStats(){
 let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
+let breathingTimerId = null;
 
 function gameUnlockStatus(game){
   const u = game.unlock || { type:"free" };
@@ -636,6 +637,10 @@ function closeGameArea(){
   $("#game-area")?.classList.add("hidden");
   $("#game-content") && ($("#game-content").innerHTML = "");
   gameMode = null;
+  if(breathingTimerId){
+  clearInterval(breathingTimerId);
+  breathingTimerId = null;
+}
 }
 
 function bindGameShellButtons(){
@@ -643,6 +648,7 @@ function bindGameShellButtons(){
   $("#btn-restart-game")?.addEventListener("click", () => {
     if(gameMode === "choicequest") startChoiceQuest();
     if(gameMode === "breathing") startBreathing();
+    if(gameMode === "habitquest") startHabitQuest();
   });
 }
 
@@ -822,7 +828,8 @@ function startBreathing(){
   let phaseT = 0;
   let finished = false;
 
-  const id = setInterval(() => {
+  if(breathingTimerId) clearInterval(breathingTimerId);
+  breathingTimerId = setInterval(() => {
     timerText.textContent = `Time left: ${t}s`;
     ring.textContent = phase;
 
