@@ -292,3 +292,31 @@ h1{ margin:0; font-size:18px; }
 #view-profile .card h3 {
   margin-bottom: 8px;
 }
+
+/* =========================================================
+   HARD FIX: Game portal buttons/text turning black
+   Put this at the VERY END of styles.css
+========================================================= */
+
+#game-area,
+#game-area * ,
+#game-content,
+#game-content * {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important; /* helps Safari/WebKit */
+}
+
+#game-area button,
+#game-content button,
+#game-area .choice,
+#game-content .choice {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
+/* Keep primary buttons readable (they intentionally have dark text) */
+#game-area .btn.primary,
+#game-content .btn.primary {
+  color: #06101a !important;
+  -webkit-text-fill-color: #06101a !important;
+}
