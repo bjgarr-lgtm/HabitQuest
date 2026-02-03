@@ -62,17 +62,44 @@ const GAME_SCENARIOS = [
 
 // Badges unlock by XP (XP never decreases)
 const BADGES = [
-  { id: "starter-star", name: "Starter Star", xpRequired: 50,  icon: "⭐" },
-  { id: "calm-master",  name: "Calm Master",  xpRequired: 120, icon: "🫧" },
-  { id: "quiz-whiz",    name: "Quiz Whiz",    xpRequired: 200, icon: "🧠" },
-  { id: "streak-hero",  name: "Streak Hero",  xpRequired: 350, icon: "🔥" },
-  { id: "game-champ",   name: "Game Champ",   xpRequired: 500, icon: "🏆" },
+  { id:"starter-star",    name:"Starter Star",    xpRequired: 50,   icon:"⭐" },
+  { id:"calm-master",     name:"Calm Master",     xpRequired: 120,  icon:"🫧" },
+  { id:"quiz-whiz",       name:"Quiz Whiz",       xpRequired: 200,  icon:"🧠" },
+  { id:"streak-hero",     name:"Streak Hero",     xpRequired: 350,  icon:"🔥" },
+  { id:"game-champ",      name:"Game Champ",      xpRequired: 500,  icon:"🏆" },
+
+  { id:"daily-doer",      name:"Daily Doer",      xpRequired: 650,  icon:"📅" },
+  { id:"focus-falcon",    name:"Focus Falcon",    xpRequired: 800,  icon:"🦅" },
+  { id:"kind-mind",       name:"Kind Mind",       xpRequired: 950,  icon:"💛" },
+  { id:"stress-tamer",    name:"Stress Tamer",    xpRequired: 1100, icon:"🧯" },
+  { id:"brave-voice",     name:"Brave Voice",     xpRequired: 1250, icon:"🗣️" },
+
+  { id:"steady-steps",    name:"Steady Steps",    xpRequired: 1400, icon:"👟" },
+  { id:"boundary-boss",   name:"Boundary Boss",   xpRequired: 1600, icon:"🛡️" },
+  { id:"help-seeker",     name:"Help Seeker",     xpRequired: 1800, icon:"🤝" },
+  { id:"sleep-guardian",  name:"Sleep Guardian",  xpRequired: 2000, icon:"🌙" },
+  { id:"hydration-hero",  name:"Hydration Hero",  xpRequired: 2200, icon:"💧" },
+
+  { id:"streak-7",        name:"7‑Day Streak",    xpRequired: 2400, icon:"7️⃣" },
+  { id:"streak-14",       name:"14‑Day Streak",   xpRequired: 2700, icon:"1️⃣4️⃣" },
+  { id:"streak-30",       name:"30‑Day Streak",   xpRequired: 3200, icon:"3️⃣0️⃣" },
+
+  { id:"lesson-10",       name:"10 Lessons",      xpRequired: 3500, icon:"📘" },
+  { id:"lesson-20",       name:"20 Lessons",      xpRequired: 4000, icon:"📗" },
+  { id:"lesson-30",       name:"30 Lessons",      xpRequired: 4600, icon:"📙" },
+
+  { id:"game-grinder",    name:"Game Grinder",    xpRequired: 5200, icon:"🎮" },
+  { id:"calm-pro",        name:"Calm Pro",        xpRequired: 6000, icon:"🧘" },
+  { id:"level-10",        name:"Level 10",        xpRequired: 6800, icon:"🔟" },
+  { id:"legend",          name:"Legend",          xpRequired: 8000, icon:"👑" },
 ];
+
 
 // Games catalog (tiles render in #games-grid)
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",   desc:"Pick the healthiest choice in quick scenarios.", status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy",desc:"60-second calm timer that earns XP.",            status:"ready", unlock:{ type:"free" } },
+  { id:"habitquest", title:"Habit Quest", desc:"Build a hero habit over many days (progress carries over).", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
   // Coming soon placeholders
   { id:"memory",         title:"Memory Match",        desc:"Match healthy coping tools.",                       status:"soon", unlock:{ type:"xp",     xp:120 } },
@@ -83,6 +110,9 @@ const GAMES = [
   { id:"friendship-quiz",title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",       status:"soon", unlock:{ type:"lessons", lessons:7 } },
   { id:"stress-lab",     title:"Stress Lab",          desc:"Try safe stress tools and see what works.",         status:"soon", unlock:{ type:"xp",     xp:600 } }
 ];
+
+const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
+
 
 // Tracks (for filtering lesson “focus”)
 const TRACKS = {
@@ -176,6 +206,9 @@ const DEFAULT_STATE = {
   lastCompletedISO: null,
   streak: 0,
   highScore: 0,
+  avatar: "🦊",
+  habitQuest: { level: 1, progress: 0 },
+
 
   selectedTrack: "general",
 
@@ -196,6 +229,30 @@ function loadState(){
   }
 }
 
+function renderAvatars(){
+  const grid = $("#avatar-grid");
+  if(!grid) return;
+  grid.innerHTML = "";
+
+  AVATARS.forEach(a => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.type = "button";
+    chip.textContent = a;
+
+    if(state.avatar === a) chip.style.outline = "2px solid rgba(255,255,255,0.6)";
+
+    chip.addEventListener("click", () => {
+      state.avatar = a;
+      saveState();
+      renderAvatars();
+      renderProfile();
+    });
+
+    grid.appendChild(chip);
+  });
+}
+
 function normalizeState(s){
   const safe = (s && typeof s === "object") ? s : {};
   const merged = {
@@ -210,11 +267,19 @@ function normalizeState(s){
   };
 
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
+  merged.avatar = AVATARS.includes(merged.avatar) ? merged.avatar : AVATARS[0];
 
   merged.xp = Number(merged.xp);            if(!Number.isFinite(merged.xp)) merged.xp = 0;
   merged.level = Number(merged.level);      if(!Number.isFinite(merged.level)) merged.level = 1;
   merged.highScore = Number(merged.highScore); if(!Number.isFinite(merged.highScore)) merged.highScore = 0;
   merged.streak = Number(merged.streak);    if(!Number.isFinite(merged.streak)) merged.streak = 0;
+  if(!merged.habitQuest || typeof merged.habitQuest !== "object"){
+    merged.habitQuest = { level: 1, progress: 0 };
+  }
+  merged.habitQuest.level = Number(merged.habitQuest.level);
+  merged.habitQuest.progress = Number(merged.habitQuest.progress);
+  if(!Number.isFinite(merged.habitQuest.level) || merged.habitQuest.level < 1) merged.habitQuest.level = 1;
+  if(!Number.isFinite(merged.habitQuest.progress) || merged.habitQuest.progress < 0) merged.habitQuest.progress = 0;
 
   merged.currentLessonIndex = Number(merged.currentLessonIndex);
   if(!Number.isFinite(merged.currentLessonIndex)) merged.currentLessonIndex = 0;
@@ -465,6 +530,10 @@ function bindLessonButtons(){
       addXP(50);
     }
 
+    state.habitQuest.progress += 1; // free step for finishing lesson
+    saveState();
+
+
     // streak logic
     const todayISO = isoDate(new Date());
     if(state.lastCompletedISO !== todayISO){
@@ -580,8 +649,67 @@ function bindGameShellButtons(){
 function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
+  if(id === "habitquest") return startHabitQuest();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
+
+function startHabitQuest(){
+  gameMode = "habitquest";
+  gameScore = 0;
+  openGameArea("Habit Quest");
+
+  const area = $("#game-content");
+  if(!area) return;
+  area.innerHTML = "";
+
+  const hq = state.habitQuest || { level:1, progress:0 };
+  const need = 3 + (hq.level - 1); // steps needed grows slowly
+
+  area.innerHTML = `
+    <p class="big">🏰 Level ${hq.level}</p>
+    <p class="muted">Complete <strong>${need}</strong> steps to level up.</p>
+    <p>Progress: <strong>${hq.progress}/${need}</strong></p>
+    <div class="divider"></div>
+    <p>Pick a step to practice today:</p>
+  `;
+
+  const steps = [
+    { label:"Take 4 slow breaths", xp:10 },
+    { label:"Drink water", xp:8 },
+    { label:"Text a trusted adult (check-in)", xp:12 },
+    { label:"Do a 2‑minute tidy reset", xp:10 },
+    { label:"Write 1 helpful thought", xp:10 },
+  ];
+
+  steps.forEach(s => {
+    const btn = document.createElement("button");
+    btn.className = "btn";
+    btn.style.marginTop = "10px";
+    btn.textContent = `Do: ${s.label} (+${s.xp} XP)`;
+    btn.addEventListener("click", () => {
+      // advance persistent progress
+      state.habitQuest.progress += 1;
+      addXP(s.xp);
+      saveState();
+
+      // level up if reached requirement
+      const hq2 = state.habitQuest;
+      const need2 = 3 + (hq2.level - 1);
+      if(hq2.progress >= need2){
+        hq2.level += 1;
+        hq2.progress = 0;
+        addXP(30); // level-up bonus
+        saveState();
+      }
+
+      startHabitQuest(); // re-render
+    });
+    area.appendChild(btn);
+  });
+
+  $("#btn-restart-game")?.classList.remove("hidden");
+}
+
 
 function startChoiceQuest(){
   gameMode = "choicequest";
@@ -727,8 +855,9 @@ function startBreathing(){
 ========================================================= */
 function renderProfile(){
   if(!$("#profile-name")) return;
+  renderAvatars();
 
-  $("#profile-name").textContent = state.profileName || "Player";
+  $("#profile-name").textContent = `${state.avatar || "🙂"} ${state.profileName || "Player"}`;
   $("#profile-xp").textContent = String(state.xp);
   $("#profile-level").textContent = String(state.level);
 
