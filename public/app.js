@@ -56,67 +56,6 @@ function safeStr(x, fallback=""){
   return s.length ? s : fallback;
 }
 
-// Inject small profile UI polish + name editor (no index.html edits needed)
-function ensureProfileNameUI(){
-  // Add tiny CSS once
-  if(!document.getElementById("profile-name-ui-css")){
-    const style = document.createElement("style");
-    style.id = "profile-name-ui-css";
-    style.textContent = `
-      .profileNameRow{
-        display:flex;
-        align-items:center;
-        gap:12px;
-        flex-wrap:wrap;
-      }
-      #profile-avatar-img{
-        width:44px;
-        height:44px;
-        border-radius:12px;
-        object-fit:cover;
-        border:1px solid rgba(255,255,255,0.18);
-        background: rgba(255,255,255,0.06);
-        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
-      }
-      .profileNameInputRow{
-        margin-top:12px;
-        display:flex;
-        gap:10px;
-        flex-wrap:wrap;
-        align-items:center;
-      }
-      #profile-name-input{
-        flex: 1 1 220px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.16);
-        background: rgba(255,255,255,0.06);
-        color: rgba(255,255,255,0.92);
-        outline: none;
-      }
-      #profile-name-input::placeholder{ color: rgba(255,255,255,0.55); }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Upgrade the big name element to hold img + text
-  const nameEl = document.getElementById("profile-name");
-  if(nameEl && !nameEl.dataset.upgraded){
-    nameEl.dataset.upgraded = "1";
-    nameEl.innerHTML = `
-      <div class="profileNameRow">
-        <img id="profile-avatar-img" alt="Avatar" style="display:none;" />
-        <span id="profile-name-text"></span>
-      </div>
-      <div class="profileNameInputRow">
-        <input id="profile-name-input" type="text" maxlength="30" placeholder="Enter your name" />
-        <button class="btn small" id="profile-name-save" type="button">Save</button>
-      </div>
-      <p class="muted" id="profile-name-hint" style="margin:10px 0 0;">This is shown on your profile.</p>
-    `;
-  }
-}
-
 
 /* =========================================================
    CONTENT
@@ -553,32 +492,6 @@ function bindTracks(){
   });
 }
 
-function bindProfileNameEditor(){
-  // Must exist (we inject it)
-  ensureProfileNameUI();
-
-  const input = document.getElementById("profile-name-input");
-  const btn = document.getElementById("profile-name-save");
-  if(!input || !btn) return;
-
-  if(btn.__bound) return;
-  btn.__bound = true;
-
-  // set initial value
-  input.value = safeStr(state.profileName, "Player");
-
-  const commit = () => {
-    state.profileName = safeStr(input.value, "Player").slice(0, 30);
-    saveState();
-    renderProfile(); // refresh name display
-  };
-
-  btn.addEventListener("click", commit);
-  input.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") commit();
-  });
-}
-
 
 /* =========================================================
    XP / LEVEL
@@ -625,6 +538,45 @@ function showView(name){
   if(name === "rate")     renderRate();
   if(name === "tracks")   renderTrackUI();
 }
+
+function bindProfileNameEditor(){
+  const input = document.getElementById("profile-name-input");
+  const btn = document.getElementById("btn-save-name");
+  if(!input || !btn) return;
+
+  if(btn.__bound) return;
+  btn.__bound = true;
+
+  const syncInputFromState = () => {
+    input.value = safeStr(state.profileName, "Player").slice(0, 24);
+  };
+
+  const commit = () => {
+    state.profileName = safeStr(input.value, "Player").slice(0, 24);
+    saveState();
+    // Refresh profile UI without changing views
+    renderProfile();
+  };
+
+  // initial fill
+  syncInputFromState();
+
+  btn.addEventListener("click", commit);
+
+  input.addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){
+      e.preventDefault();
+      commit();
+    }
+  });
+
+  // If user navigates away and back, keep input in sync
+  input.addEventListener("blur", () => {
+    // optional: normalize display on blur
+    syncInputFromState();
+  });
+}
+
 
 function bindNav(){
   $$(".tab").forEach(btn => btn.addEventListener("click", () => showView(btn.dataset.view)));
@@ -1716,66 +1668,71 @@ function bindAvatarUpload(){
 }
 
 function renderProfile(){
-  if(!document.getElementById("profile-name")) return;
-
-  ensureProfileNameUI();
-  renderAvatars();
-
-  const nameTextEl = document.getElementById("profile-name-text");
+  // New HTML uses these ids (not #profile-name)
+  const input = document.getElementById("profile-name-input");
+  const emojiEl = document.getElementById("profile-avatar-emoji");
   const imgEl = document.getElementById("profile-avatar-img");
 
-  const displayName = safeStr(state.profileName, "Player");
+  const xpEl = document.getElementById("profile-xp");
+  const levelEl = document.getElementById("profile-level");
+  const lessonsEl = document.getElementById("profile-lessons");
 
-  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
+  // If profile view isn’t in the DOM for some reason, bail safely
+  if(!input || !emojiEl || !imgEl || !xpEl || !levelEl || !lessonsEl) return;
 
-  if(imgEl){
-    if(usingCustom){
-      imgEl.src = state.customAvatar;
-      imgEl.style.display = "inline-block";
-    }else{
-      imgEl.removeAttribute("src");
-      imgEl.style.display = "none";
-    }
+  // --- Name (keep input synced) ---
+  input.value = safeStr(state.profileName, "Player").slice(0, 24);
+
+  // --- Avatar preview (emoji OR uploaded image) ---
+  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && typeof state.customAvatar === "string" && state.customAvatar.startsWith("data:image/"));
+
+  if(usingCustom){
+    imgEl.src = state.customAvatar;
+    imgEl.classList.remove("hidden");
+    emojiEl.classList.add("hidden");
+  } else {
+    emojiEl.textContent = state.avatar || "🙂";
+    emojiEl.classList.remove("hidden");
+    imgEl.classList.add("hidden");
+    imgEl.removeAttribute("src");
   }
 
-  // If custom avatar, show image + name; otherwise emoji + name
-  const emoji = (!usingCustom ? (state.avatar || "🙂") : "");
-  if(nameTextEl){
-    nameTextEl.textContent = `${emoji} ${displayName}`.trim();
-  }
+  // --- Stats ---
+  xpEl.textContent = String(safeNum(state.xp, 0));
+  levelEl.textContent = String(safeNum(state.level, 1));
+  lessonsEl.textContent = String(Array.isArray(state.completedDays) ? state.completedDays.length : 0);
 
-  // Keep stats
-  document.getElementById("profile-xp").textContent = String(state.xp);
-  document.getElementById("profile-level").textContent = String(state.level);
+  // --- Avatar picker grid ---
+  renderAvatars();
 
-  // auto-unlock badges
-  const unlockedIds = BADGES.filter(b => state.xp >= b.xpRequired).map(b => b.id);
+  // --- Auto-unlock badges + render owned badges ---
+  const unlockedIds = BADGES.filter(b => safeNum(state.xp,0) >= b.xpRequired).map(b => b.id);
   state.ownedBadges = Array.from(new Set([...(state.ownedBadges||[]), ...unlockedIds]));
   saveState();
 
   const wrap = document.getElementById("owned-badges");
   const empty = document.getElementById("owned-badges-empty");
-  if(!wrap || !empty) return;
-
-  wrap.innerHTML = "";
-  if(state.ownedBadges.length === 0){
-    empty.textContent = "No badges yet — earn XP to unlock some!";
-    return;
+  if(wrap && empty){
+    wrap.innerHTML = "";
+    if(!state.ownedBadges.length){
+      empty.textContent = "No badges yet — earn XP to unlock some!";
+    } else {
+      empty.textContent = "";
+      state.ownedBadges.forEach(id => {
+        const b = BADGES.find(x => x.id === id);
+        if(!b) return;
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = `${b.icon} ${b.name}`;
+        wrap.appendChild(chip);
+      });
+    }
   }
-  empty.textContent = "";
 
-  state.ownedBadges.forEach(id => {
-    const b = BADGES.find(x => x.id === id);
-    if(!b) return;
-    const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.textContent = `${b.icon} ${b.name}`;
-    wrap.appendChild(chip);
-  });
-
-  // Ensure editor stays in sync
+  // Ensure the Save/Enter handler is wired
   bindProfileNameEditor();
 }
+
 
 
 function renderShop(){
