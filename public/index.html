@@ -66,6 +66,13 @@
           <p class="muted">Do one lesson a day to build your streak.</p>
         </div>
 
+        <div class="card recommendedCard hidden" id="recommended-box">
+          <h3>Recommended Next</h3>
+          <p class="recommendedTitle" id="recommended-title">Recommended: …</p>
+          <p class="muted" id="recommended-reason">…</p>
+          <button class="btn primary small" id="btn-go-recommended">Go to recommended lesson</button>
+        </div>
+
         <div class="card">
           <h3>Safety</h3>
           <p class="muted">
@@ -102,35 +109,33 @@
       </div>
     </section>
 
-        <!-- TRACKS -->
-
+    <!-- TRACKS -->
     <section class="view hidden" id="view-tracks">
-  <div class="card">
-    <h2>Choose a Focus Track</h2>
-    <p class="muted">Optional: pick a topic to focus your lessons. You can switch anytime.</p>
+      <div class="card">
+        <h2>Choose a Focus Track</h2>
+        <p class="muted">Optional: pick a topic to focus your lessons. You can switch anytime.</p>
 
-    <label class="muted" for="track-select">Focus track</label>
-    <select id="track-select" class="select">
-      <option value="general">General (recommended)</option>
-      <option value="nicotine">Nicotine / Vaping</option>
-      <option value="alcohol">Alcohol</option>
-      <option value="gaming">Gaming / Screen habits</option>
-      <option value="socialmedia">Social media / Scrolling</option>
-      <option value="caffeine">Caffeine / Energy drinks</option>
-    </select>
+        <label class="muted" for="track-select">Focus track</label>
+        <select id="track-select" class="select">
+          <option value="general">General (recommended)</option>
+          <option value="nicotine">Nicotine / Vaping</option>
+          <option value="alcohol">Alcohol</option>
+          <option value="gaming">Gaming / Screen habits</option>
+          <option value="socialmedia">Social media / Scrolling</option>
+          <option value="caffeine">Caffeine / Energy drinks</option>
+        </select>
 
-    <div class="divider"></div>
+        <div class="divider"></div>
 
-    <h3>What you’ll see</h3>
-    <p class="muted" id="track-preview"></p>
+        <h3>What you’ll see</h3>
+        <p class="muted" id="track-preview"></p>
 
-    <div class="actions">
-      <button class="btn primary" id="btn-apply-track">Use this track</button>
-      <button class="btn" id="btn-clear-track">Back to General</button>
-    </div>
-  </div>
-</section>
-
+        <div class="actions">
+          <button class="btn primary" id="btn-apply-track">Use this track</button>
+          <button class="btn" id="btn-clear-track">Back to General</button>
+        </div>
+      </div>
+    </section>
 
     <!-- GAMES -->
     <section class="view hidden" id="view-games">
@@ -140,24 +145,7 @@
           These games practice real-life skills: saying no, handling stress, and choosing healthy options.
         </p>
 
-        <!-- V2: dynamic tiles rendered by app.js -->
         <div id="games-grid" class="grid"></div>
-
-        <div class="divider"></div>
-
-        <div class="card hidden" id="game-area">
-          <div class="gameTop">
-            <h3 id="game-title">Game</h3>
-            <span class="badge" id="game-score">Score: 0</span>
-          </div>
-
-          <div id="game-content"></div>
-
-          <div class="actions">
-            <button class="btn" id="btn-exit-game">Exit</button>
-            <button class="btn primary hidden" id="btn-restart-game">Restart</button>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -194,67 +182,65 @@
       </div>
     </section>
 
-<!-- PROFILE -->
-<section class="view hidden" id="view-profile">
-  <div class="card">
-    <div class="profileHeader">
-      <div class="profileIdentity">
-        <!-- avatar preview (emoji or uploaded image) -->
-        <div class="profileAvatar" aria-hidden="true">
-          <span id="profile-avatar-emoji">🙂</span>
-          <img id="profile-avatar-img" class="hidden" alt="Your avatar" />
-        </div>
+    <!-- PROFILE -->
+    <section class="view hidden" id="view-profile">
+      <div class="card">
+        <div class="profileHeader">
+          <div class="profileIdentity">
+            <div class="profileAvatar" aria-hidden="true">
+              <span id="profile-avatar-emoji">🙂</span>
+              <img id="profile-avatar-img" class="hidden" alt="Your avatar" />
+            </div>
 
-        <div class="profileNameBlock">
-          <h2 style="margin:0;">Profile 👤</h2>
+            <div class="profileNameBlock">
+              <h2 style="margin:0;">Profile 👤</h2>
 
-          <label class="muted" for="profile-name-input" style="display:block; margin-top:8px;">
-            Name
-          </label>
+              <label class="muted" for="profile-name-input" style="display:block; margin-top:8px;">
+                Name
+              </label>
 
-          <div class="profileNameRow">
-            <input id="profile-name-input" class="textInput" type="text" maxlength="24" placeholder="Your name" />
-            <button class="btn small" id="btn-save-name" type="button">Save</button>
+              <div class="profileNameRow">
+                <input id="profile-name-input" class="textInput" type="text" maxlength="24" placeholder="Your name" />
+                <button class="btn small" id="btn-save-name" type="button">Save</button>
+              </div>
+
+              <p class="muted" style="margin:8px 0 0;">This is shown on your profile.</p>
+            </div>
           </div>
 
-          <p class="muted" style="margin:8px 0 0;">This is shown on your profile.</p>
+          <div class="profileStats">
+            <div class="statPill">
+              <div class="muted">Total XP</div>
+              <div class="statValue" id="profile-xp">0</div>
+            </div>
+            <div class="statPill">
+              <div class="muted">Level</div>
+              <div class="statValue" id="profile-level">1</div>
+            </div>
+            <div class="statPill">
+              <div class="muted">Lessons</div>
+              <div class="statValue" id="profile-lessons">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="profileTwoCol">
+          <div class="card" style="margin:0;">
+            <h3 style="margin-top:0;">Choose an Avatar</h3>
+            <p class="muted">Pick an emoji or upload your own photo.</p>
+            <div id="avatar-grid" class="chips"></div>
+          </div>
+
+          <div class="card" style="margin:0;">
+            <h3 style="margin-top:0;">Your Badges</h3>
+            <div id="owned-badges" class="chips"></div>
+            <p class="muted" id="owned-badges-empty"></p>
+          </div>
         </div>
       </div>
-
-      <div class="profileStats">
-        <div class="statPill">
-          <div class="muted">Total XP</div>
-          <div class="statValue" id="profile-xp">0</div>
-        </div>
-        <div class="statPill">
-          <div class="muted">Level</div>
-          <div class="statValue" id="profile-level">1</div>
-        </div>
-        <div class="statPill">
-          <div class="muted">Lessons</div>
-          <div class="statValue" id="profile-lessons">0</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="profileTwoCol">
-      <div class="card" style="margin:0;">
-        <h3 style="margin-top:0;">Choose an Avatar</h3>
-        <p class="muted">Pick an emoji or upload your own photo.</p>
-        <div id="avatar-grid" class="chips"></div>
-      </div>
-
-      <div class="card" style="margin:0;">
-        <h3 style="margin-top:0;">Your Badges</h3>
-        <div id="owned-badges" class="chips"></div>
-        <p class="muted" id="owned-badges-empty"></p>
-      </div>
-    </div>
-  </div>
-</section>
-
+    </section>
 
     <!-- SHOP -->
     <section class="view hidden" id="view-shop">
@@ -317,33 +303,6 @@
     <span class="dot">•</span>
     <button class="link" id="btn-open-rate">Rate this app</button>
   </footer>
-<!-- FULLSCREEN GAME OVERLAY (no scrolling needed) -->
-<div class="gameOverlay hidden" id="game-overlay" role="dialog" aria-modal="true">
-  <div class="gameOverlayInner">
-    <div class="gameOverlayTop">
-      <div>
-        <h2 class="gameOverlayTitle" id="go-title">Game</h2>
-        <p class="gameOverlaySubtitle" id="go-subtitle">…</p>
-      </div>
-
-      <div class="gameOverlayActions">
-        <span class="badge" id="go-score">Score: 0</span>
-        <button class="btn" id="go-exit">Exit</button>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div id="go-content"></div>
-
-    <div class="actions">
-      <button class="btn primary hidden" id="go-restart">Restart</button>
-    </div>
-  </div>
-</div>
-
-<!-- Hidden file input for custom avatar upload -->
-<input id="avatar-upload" type="file" accept="image/*" class="hidden" />
 
   <script src="app.js"></script>
 </body>
