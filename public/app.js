@@ -48,8 +48,6 @@ function mulberry32(seed){
 /* =========================================================
    CONTENT
 ========================================================= */
-
-// Tips
 const TIPS = [
   "When you’re unsure, pause and ask: “Is this safe for my brain and body?”",
   "Pick a trusted adult now—so you know who to talk to later.",
@@ -59,7 +57,6 @@ const TIPS = [
   "If something feels risky, ask: “Will this help Future Me?”",
 ];
 
-// Choice Quest scenarios (short)
 const GAME_SCENARIOS = [
   {
     prompt: "A friend says: “Try this, everyone’s doing it.” What’s the best response?",
@@ -87,7 +84,6 @@ const GAME_SCENARIOS = [
   }
 ];
 
-// 25+ badges (XP based)
 const BADGES = [
   { id:"starter-star",    name:"Starter Star",    xpRequired: 50,    icon:"⭐" },
   { id:"calm-master",     name:"Calm Master",     xpRequired: 120,   icon:"🫧" },
@@ -120,17 +116,14 @@ const BADGES = [
   { id:"level-10",        name:"Level 10",        xpRequired: 6800,  icon:"🔟" },
   { id:"legend",          name:"Legend",          xpRequired: 8000,  icon:"👑" },
 
-  // extra fun ones
   { id:"gentle-giant",    name:"Gentle Giant",    xpRequired: 9000,  icon:"🐘" },
   { id:"super-helper",    name:"Super Helper",    xpRequired: 10000, icon:"🦸" },
   { id:"wise-owl",        name:"Wise Owl",        xpRequired: 12000, icon:"🦉" },
 ];
 
-// Avatars
 const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
 const CUSTOM_AVATAR_ID = "__custom__";
 
-// Tracks (for filtering lessons)
 const TRACKS = {
   general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
   nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, coping skills, and refusing offers." },
@@ -140,7 +133,6 @@ const TRACKS = {
   caffeine:    { name:"Caffeine / Energy drinks", desc:"Sleep/energy basics and alternatives to overstimulation." },
 };
 
-// 30 lesson curriculum (includes track tags)
 const CURRICULUM = [
   { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",                track:"general" },
   { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                        track:"general" },
@@ -187,11 +179,8 @@ function makeLessonContent(title, goal){
 }
 
 /* =========================================================
-   QUIZZES — SPECIFIC PER LESSON + DIFFICULTY RAMP
-   (Deterministic: each Day has its own quiz, and later days are harder.)
+   QUIZZES — SPECIFIC PER LESSON + DIFFICULTY RAMP (DETERMINISTIC)
 ========================================================= */
-
-// Lesson “focus words” so questions feel like THAT lesson (not the same 12 every day).
 const LESSON_FOCUS = {
   1:  { words:["future","choices","tiny steps","practice"], skill:"Future Me thinking" },
   2:  { words:["stress","calm","breathing","body"], skill:"Healthy stress tools" },
@@ -240,7 +229,6 @@ function makeQuizForLesson(day, title, goal, track){
 
   const q = (question, options, answer) => ({ q: question, options, answer });
 
-  // A few “lesson-specific” anchors (always included)
   const anchors = [
     q(`Today’s lesson (“${title}”) is mostly about…`,
       [`${focus.skill}`, "Hiding problems", "Taking bigger risks"], 0),
@@ -250,7 +238,6 @@ function makeQuizForLesson(day, title, goal, track){
       ["Safe and helpful long‑term", "Risky but exciting", "Something you must hide"], 0),
   ];
 
-  // Build difficulty ramp
   const poolEasy = [
     q(`When you feel ${w[1] || "pressure"}, the best first step is…`, ["Pause and think", "Say yes fast", "Do it secretly"], 0),
     q(`A trusted adult could be…`, ["Parent/guardian/teacher/coach", "Only strangers online", "Nobody"], 0),
@@ -281,13 +268,12 @@ function makeQuizForLesson(day, title, goal, track){
       ["Urges rise and fall like waves", "Urges never change", "You must obey urges"], 0),
   ];
 
-  // Choose pools based on difficulty
   let pool = [...poolEasy];
   if(diff >= 2) pool = pool.concat(poolMed);
   if(diff >= 3) pool = pool.concat(poolHard);
   if(diff >= 4) pool = pool.concat(poolBoss);
 
-  // Add a little track flavor (still kid-safe)
+  // track flavor
   if(track === "socialmedia"){
     pool.push(
       q("Online dares are safest when you…", ["Skip them and choose your own plan", "Do them for likes", "Hide them from adults"], 0),
@@ -319,8 +305,7 @@ function makeQuizForLesson(day, title, goal, track){
     );
   }
 
-  // Deterministically pick to 12 total: anchors + 9 from pool
-  // Shuffle-ish
+  // shuffle deterministically
   for(let i = pool.length - 1; i > 0; i--){
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -329,15 +314,11 @@ function makeQuizForLesson(day, title, goal, track){
   const picked = [...anchors];
   for(const item of pool){
     if(picked.length >= 12) break;
-    // Avoid duplicate question strings
     if(!picked.some(x => x.q === item.q)) picked.push(item);
   }
-
-  // If still short, repeat safe ones (rare)
   while(picked.length < 12){
     picked.push(poolEasy[Math.floor(rng() * poolEasy.length)]);
   }
-
   return picked;
 }
 
@@ -350,20 +331,18 @@ const LESSONS = CURRICULUM.map((c, i) => ({
   quiz: makeQuizForLesson(i + 1, c.title, c.goal, c.track || "general"),
 }));
 
-// Games catalog (tiles render in #games-grid)
 const GAMES = [
-  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",               status:"ready", unlock:{ type:"free" } },
-  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                       status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.",status:"ready", unlock:{ type:"lessons", lessons:1 } },
+  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                status:"ready", unlock:{ type:"free" } },
+  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                        status:"ready", unlock:{ type:"free" } },
+  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
 
-  // Coming soon placeholders
-  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                         status:"soon", unlock:{ type:"xp",     xp:120 } },
-  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",      status:"soon", unlock:{ type:"lessons",lessons:3 } },
-  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",      status:"soon", unlock:{ type:"level",  level:3 } },
-  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",                    status:"soon", unlock:{ type:"level",  level:4 } },
-  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",              status:"soon", unlock:{ type:"xp",     xp:350 } },
-  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",         status:"soon", unlock:{ type:"lessons",lessons:7 } },
-  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",           status:"soon", unlock:{ type:"xp",     xp:600 } },
+  { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                    status:"soon", unlock:{ type:"xp",     xp:120 } },
+  { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.", status:"soon", unlock:{ type:"lessons",lessons:3 } },
+  { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.", status:"soon", unlock:{ type:"level",  level:3 } },
+  { id:"focus-dodge",     title:"Focus Dodge",         desc:"Avoid distractions; build focus.",               status:"soon", unlock:{ type:"level",  level:4 } },
+  { id:"goal-builder",    title:"Goal Builder",        desc:"Pick goals + tiny steps to reach them.",         status:"soon", unlock:{ type:"xp",     xp:350 } },
+  { id:"friendship-quiz", title:"Friendship Signals",  desc:"Spot healthy vs unhealthy friend behaviors.",    status:"soon", unlock:{ type:"lessons",lessons:7 } },
+  { id:"stress-lab",      title:"Stress Lab",          desc:"Try safe stress tools and see what works.",      status:"soon", unlock:{ type:"xp",     xp:600 } },
 ];
 
 /* =========================================================
@@ -382,20 +361,20 @@ const DEFAULT_STATE = {
   profileName: "Odin Garrett",
 
   // Avatar
-  avatar: AVATARS[0],           // emoji or CUSTOM_AVATAR_ID
-  customAvatar: null,           // dataURL string (local only)
+  avatar: AVATARS[0],     // emoji or CUSTOM_AVATAR_ID
+  customAvatar: null,     // dataURL (local only)
 
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
 
-  // Habit Quest (story)
+  // Habit Quest
   habitQuest: {
-    chapter: 0,          // 0..6 (7 chapters)
-    scene: 0,            // within chapter
-    hearts: 3,           // 0..5
-    wisdom: 0,           // grows
-    tokens: 0,           // earned by completing lessons (first-time)
-    lastLessonDay: 0,    // used for story flavor
+    chapter: 0,       // 0..6 (7 chapters)
+    scene: 0,
+    hearts: 3,
+    wisdom: 0,
+    tokens: 0,        // earned by first-time lesson completes
+    lastLessonDay: 0,
   },
 
   selectedTrack: "general",
@@ -436,16 +415,12 @@ function normalizeState(s){
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  // Avatar
   merged.avatar = (merged.avatar === CUSTOM_AVATAR_ID || AVATARS.includes(merged.avatar)) ? merged.avatar : AVATARS[0];
   merged.customAvatar = (typeof merged.customAvatar === "string" && merged.customAvatar.startsWith("data:image/"))
     ? merged.customAvatar
     : null;
-  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar){
-    merged.avatar = AVATARS[0];
-  }
+  if(merged.avatar === CUSTOM_AVATAR_ID && !merged.customAvatar) merged.avatar = AVATARS[0];
 
-  // Habit Quest bounds
   merged.habitQuest.chapter = clamp(safeNum(merged.habitQuest.chapter,0), 0, 6);
   merged.habitQuest.scene   = clamp(safeNum(merged.habitQuest.scene,0), 0, 99);
   merged.habitQuest.hearts  = clamp(safeNum(merged.habitQuest.hearts,3), 0, 5);
@@ -464,13 +439,11 @@ function saveState(){
 }
 
 /* =========================================================
-   TRACKS (FILTERED LESSONS)
+   TRACKS
 ========================================================= */
 function getActiveLessons(){
   const t = state.selectedTrack || "general";
   if(t === "general") return LESSONS;
-
-  // show track lessons + general support lessons
   const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
   return filtered.length ? filtered : LESSONS;
 }
@@ -521,7 +494,6 @@ function recalcLevel(){
 function addXP(amount){
   const a = safeNum(amount, 0);
   if(a <= 0) return;
-
   state.xp = safeNum(state.xp, 0) + a;
   recalcLevel();
   saveState();
@@ -535,7 +507,7 @@ function addXP(amount){
 }
 
 /* =========================================================
-   NAVIGATION
+   NAV
 ========================================================= */
 function showView(name){
   $$(".view").forEach(v => v.classList.add("hidden"));
@@ -690,22 +662,19 @@ function bindLessonButtons(){
     }
 
     const firstTime = !state.completedDays.includes(score.day);
+
     if(firstTime){
-      // XP: quiz + lesson
       addXP(score.total * 5); // 5 XP per question
       state.completedDays.push(score.day);
       saveState();
       addXP(50);
 
-      // Habit Quest: +1 token per first-time completed lesson
+      // Habit Quest: +1 token per FIRST-TIME completed lesson
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
-      state.habitQuest.lastLessonDay = score.day;
-      saveState();
-    } else {
-      // Update last lesson day for story flavor (no token)
-      state.habitQuest.lastLessonDay = score.day;
-      saveState();
     }
+
+    // Always update last lesson day for story flavor
+    state.habitQuest.lastLessonDay = score.day;
 
     // streak logic
     const todayISO = isoDate(new Date());
@@ -713,7 +682,6 @@ function bindLessonButtons(){
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayISO = isoDate(yesterday);
-
       state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
     }
@@ -733,28 +701,33 @@ function updateHomeStats(){
 }
 
 /* =========================================================
-   GAMES: FULLSCREEN OVERLAY (NO SCROLL) — FIXED VISIBILITY
+   GAME OVERLAY — ROCK SOLID OPEN/CLOSE
 ========================================================= */
 let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
 let breathingTimerId = null;
 
+function setRestartVisible(visible){
+  const b = document.getElementById("go-restart");
+  if(!b) return;
+  b.style.display = visible ? "inline-flex" : "none";
+}
+
 function ensureGameOverlay(){
-  // If it already exists, force-hide it on boot.
-  const existing = document.getElementById("game-overlay");
-  if(existing){
-    existing.style.display = "none";
-    existing.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
+  let overlay = document.getElementById("game-overlay");
+  if(overlay){
+    // Always force hidden on boot / reload
+    overlay.style.display = "none";
+    overlay.setAttribute("aria-hidden", "true");
     return;
   }
 
-  const overlay = document.createElement("div");
+  overlay = document.createElement("div");
   overlay.id = "game-overlay";
-  overlay.className = "gameOverlay"; // don't depend on .hidden
-  overlay.style.display = "none";    // ALWAYS start hidden
+  overlay.style.display = "none";
   overlay.setAttribute("aria-hidden", "true");
+  overlay.className = "gameOverlay";
 
   overlay.innerHTML = `
     <div class="gameOverlayInner" role="dialog" aria-modal="true" aria-label="Game overlay">
@@ -778,10 +751,9 @@ function ensureGameOverlay(){
       </div>
     </div>
   `;
-
   document.body.appendChild(overlay);
 
-  // Inject overlay CSS (safe)
+  // CSS for overlay (self-contained)
   const style = document.createElement("style");
   style.textContent = `
     .gameOverlay{
@@ -819,7 +791,6 @@ function ensureGameOverlay(){
     }
     .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
     .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
-
     .choiceGood{ border-color: rgba(80,220,140,0.6); }
     .choiceBad{ border-color: rgba(255,120,120,0.6); }
 
@@ -833,29 +804,28 @@ function ensureGameOverlay(){
   `;
   document.head.appendChild(style);
 
-    // bind overlay buttons once (event delegation = cannot "miss" the button)
+  // One click handler = never “miss” the button
   overlay.addEventListener("click", (e) => {
     const exitBtn = e.target.closest("#go-exit");
-    if (exitBtn) {
+    if(exitBtn){
       e.preventDefault();
       closeGameOverlay();
       return;
     }
 
     const restartBtn = e.target.closest("#go-restart");
-    if (restartBtn) {
+    if(restartBtn){
       e.preventDefault();
-      if (gameMode === "choicequest") startChoiceQuest();
-      if (gameMode === "breathing") startBreathing();
-      if (gameMode === "habitquest") startHabitQuest();
+      if(gameMode === "choicequest") startChoiceQuest();
+      if(gameMode === "breathing") startBreathing();
+      if(gameMode === "habitquest") startHabitQuest();
       return;
     }
-  });
 
-
-  // Optional: click outside the card closes (kid-friendly)
-  overlay.addEventListener("click", (e) => {
-    if(e.target === overlay) closeGameOverlay();
+    // click outside card closes (optional)
+    if(e.target === overlay){
+      closeGameOverlay();
+    }
   });
 }
 
@@ -868,14 +838,17 @@ function openGameOverlay(title, subtitle=""){
   overlay.setAttribute("aria-hidden", "false");
 
   const titleEl = document.getElementById("go-title");
-  const subEl = document.getElementById("go-sub");
+  const subEl   = document.getElementById("go-sub");
   const scoreEl = document.getElementById("go-score");
-  const restartBtn = document.getElementById("go-restart");
-
   if(titleEl) titleEl.textContent = title;
-  if(subEl) subEl.textContent = subtitle;
+  if(subEl)   subEl.textContent   = subtitle;
   if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
-  if(restartBtn) restartBtn.style.display = "none";
+
+  setRestartVisible(false);
+
+  // clear old content
+  const c = document.getElementById("go-content");
+  if(c) c.innerHTML = "";
 
   document.body.style.overflow = "hidden";
 }
@@ -896,17 +869,9 @@ function closeGameOverlay(){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
   }
-  const ov = $("#game-overlay");
-  if (ov){
-    ov.classList.add("hidden");
-    ov.style.display = "none"; // hard stop
-    // allow it to reopen normally later
-    setTimeout(() => { ov.style.display = ""; }, 0);
-  }
 
   document.body.style.overflow = "";
 }
-
 
 /* =========================================================
    GAMES CATALOG
@@ -972,8 +937,8 @@ function renderGamesCatalog(){
 
 function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
-  if(id === "breathing") return startBreathing();
-  if(id === "habitquest") return startHabitQuest();
+  if(id === "breathing")   return startBreathing();
+  if(id === "habitquest")  return startHabitQuest();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
 
@@ -990,8 +955,9 @@ function startChoiceQuest(){
 }
 
 function renderChoiceQuest(){
-  const area = $("#go-content");
+  const area = document.getElementById("go-content");
   if(!area) return;
+
   area.innerHTML = "";
 
   const scenario = GAME_SCENARIOS[gameIndex];
@@ -1001,7 +967,7 @@ function renderChoiceQuest(){
       <p>You finished Choice Quest.</p>
       <p class="muted">Final score: <strong>${gameScore}</strong></p>
     `;
-    $("#go-restart")?.classList.remove("hidden");
+    setRestartVisible(true);
 
     if(gameScore > state.highScore){
       state.highScore = gameScore;
@@ -1035,7 +1001,8 @@ function renderChoiceQuest(){
         gameScore = Math.max(0, gameScore - 3);
       }
 
-      $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
+      const scoreEl = document.getElementById("go-score");
+      if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
 
       const why = document.createElement("p");
       why.className = "muted";
@@ -1067,8 +1034,9 @@ function startBreathing(){
   gameScore = 0;
 
   openGameOverlay("Breathing Buddy", "Calm your body for 60 seconds.");
-  const area = $("#go-content");
+  const area = document.getElementById("go-content");
   if(!area) return;
+
   area.innerHTML = "";
 
   const info = document.createElement("p");
@@ -1096,7 +1064,7 @@ function startBreathing(){
   let t = 60;
   let phase = "In";
   let phaseT = 0;
-  let finished = false;
+  let rewarded = false;
 
   if(breathingTimerId) clearInterval(breathingTimerId);
   breathingTimerId = setInterval(() => {
@@ -1120,21 +1088,20 @@ function startBreathing(){
 
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
-      if(!finished){
-        finished = true;
+
+      if(!rewarded){
+        rewarded = true;
         addXP(10);
       }
-      $("#go-restart")?.classList.remove("hidden");
+      setRestartVisible(true);
     }
   }, 1000);
 }
 
 /* =========================================================
-   GAME: HABIT QUEST (STORY / TURN-BASED) — 7 CHAPTERS
+   GAME: HABIT QUEST (7 CHAPTERS)
 ========================================================= */
-
 function avatarForStory(){
-  // If user uses photo, we can’t display it inside plain text; use a friendly symbol.
   if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🖼️";
   return state.avatar || "🙂";
 }
@@ -1156,8 +1123,6 @@ function hqCtx(){
   };
 }
 
-// 7 chapters, kid-safe, choices include “risky stuff / screens / addictive products”
-// without being graphic; always points back to skills + trusted adults.
 const HQ = {
   chapters: [
     {
@@ -1212,8 +1177,8 @@ const HQ = {
         {
           text: () => `You find a sign: “Tiny steps beat giant promises.” Pick your tiny step.`,
           choices: [
-            { text:"Drink water + snack (brain fuel).",     good:true, effects:{ wisdom:+1, xp:+10 }, why:"Brain fuel helps choices." },
-            { text:"2‑minute tidy reset.",                  good:true, effects:{ wisdom:+1, xp:+10 }, why:"Small wins add up." },
+            { text:"Drink water + snack (brain fuel).",      good:true, effects:{ wisdom:+1, xp:+10 }, why:"Brain fuel helps choices." },
+            { text:"2‑minute tidy reset.",                   good:true, effects:{ wisdom:+1, xp:+10 }, why:"Small wins add up." },
             { text:"Write 1 helpful thought about yourself.",good:true, effects:{ wisdom:+1, xp:+10 }, why:"Kind self-talk matters." },
           ]
         },
@@ -1401,13 +1366,12 @@ const HQ = {
 function startHabitQuest(){
   gameMode = "habitquest";
   gameScore = 0;
-
   openGameOverlay("Habit Quest", "Story adventure: make choices, learn skills, earn XP.");
   renderHabitQuest();
 }
 
 function renderHabitQuest(){
-  const area = $("#go-content");
+  const area = document.getElementById("go-content");
   if(!area) return;
 
   const ch = clamp(safeNum(state.habitQuest.chapter,0), 0, HQ.chapters.length - 1);
@@ -1415,23 +1379,20 @@ function renderHabitQuest(){
   const sc = clamp(safeNum(state.habitQuest.scene,0), 0, chapter.scenes.length - 1);
   const scene = chapter.scenes[sc];
 
-  // header stats
   const hearts = clamp(safeNum(state.habitQuest.hearts,3), 0, 5);
   const wisdom = safeNum(state.habitQuest.wisdom,0);
   const tokens = safeNum(state.habitQuest.tokens,0);
 
   const ctx = hqCtx();
 
-  // game over
   if(hearts <= 0){
     area.innerHTML = `
       <p class="big">😵 Oops!</p>
       <p>You ran out of hearts.</p>
       <p class="muted">Good news: you can restart and practice better choices.</p>
     `;
-    $("#go-restart")?.classList.remove("hidden");
+    setRestartVisible(true);
 
-    // reset run, keep tokens + progress rewards
     state.habitQuest.hearts = 3;
     state.habitQuest.wisdom = 0;
     state.habitQuest.chapter = 0;
@@ -1457,9 +1418,11 @@ function renderHabitQuest(){
     <p class="muted" id="hq-why" style="margin-top:12px;"></p>
   `;
 
-  const wrap = $("#hq-choices");
-  const whyEl = $("#hq-why");
+  const wrap = document.getElementById("hq-choices");
+  const whyEl = document.getElementById("hq-why");
   if(!wrap) return;
+
+  wrap.innerHTML = "";
 
   scene.choices.forEach((choice) => {
     const btn = document.createElement("button");
@@ -1467,7 +1430,6 @@ function renderHabitQuest(){
     btn.className = "choiceBtn";
     btn.textContent = choice.text;
 
-    // require token?
     const needTok = choice.require?.token ? safeNum(choice.require.token,0) : 0;
     if(needTok > 0 && tokens < needTok){
       btn.disabled = true;
@@ -1476,27 +1438,21 @@ function renderHabitQuest(){
     }
 
     btn.addEventListener("click", () => {
-      // lock buttons
       $$(".choiceBtn").forEach(x => x.disabled = true);
-
-      // show why
       if(whyEl) whyEl.textContent = choice.why ? choice.why : "";
 
-      // apply effects
       const eff = choice.effects || {};
       if(eff.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(eff.hearts,0), 0, 5);
       if(eff.wisdom) state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + safeNum(eff.wisdom,0);
       if(eff.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(eff.tokens,0));
       saveState();
 
-      // xp
       if(eff.xp && safeNum(eff.xp,0) > 0) addXP(eff.xp);
 
-      // score
       if(choice.good) gameScore += 10; else gameScore = Math.max(0, gameScore - 3);
-      $("#go-score") && ($("#go-score").textContent = `Score: ${gameScore}`);
+      const scoreEl = document.getElementById("go-score");
+      if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
 
-      // next button
       const next = document.createElement("button");
       next.type = "button";
       next.className = "btn primary";
@@ -1508,16 +1464,13 @@ function renderHabitQuest(){
           return;
         }
 
-        // advance scene/chapter
         const newCh = safeNum(state.habitQuest.chapter,0);
         const newSc = safeNum(state.habitQuest.scene,0) + 1;
 
         if(newSc >= chapter.scenes.length){
-          // chapter completed
           state.habitQuest.chapter = clamp(newCh + 1, 0, HQ.chapters.length - 1);
           state.habitQuest.scene = 0;
 
-          // chapter reward
           addXP(40);
           state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + 1;
           saveState();
@@ -1533,17 +1486,18 @@ function renderHabitQuest(){
 
         renderHabitQuest();
       });
-      $("#go-content")?.appendChild(next);
+
+      area.appendChild(next);
     });
 
     wrap.appendChild(btn);
   });
 
-  $("#go-restart")?.classList.remove("hidden");
+  setRestartVisible(true);
 }
 
 function renderHabitQuestWin(){
-  const area = $("#go-content");
+  const area = document.getElementById("go-content");
   if(!area) return;
 
   area.innerHTML = `
@@ -1551,9 +1505,8 @@ function renderHabitQuestWin(){
     <p>You made lots of strong choices. Your avatar ${escapeHtml(avatarForStory())} is getting wiser.</p>
     <p class="muted">We can add more chapters/branches anytime.</p>
   `;
-  $("#go-restart")?.classList.remove("hidden");
+  setRestartVisible(true);
 
-  // reset story position but keep tokens + wisdom + XP earned
   state.habitQuest.chapter = 0;
   state.habitQuest.scene = 0;
   state.habitQuest.hearts = 3;
@@ -1564,7 +1517,6 @@ function renderHabitQuestWin(){
    PROFILE (AVATARS + UPLOAD)
 ========================================================= */
 function ensureAvatarUploadInput(){
-  // If index.html doesn’t include it, we create it.
   if($("#avatar-upload")) return;
   const input = document.createElement("input");
   input.type = "file";
@@ -1599,7 +1551,6 @@ function renderAvatars(){
     return chip;
   };
 
-  // emoji avatars
   AVATARS.forEach(a => {
     grid.appendChild(makeChip({
       kind: "emoji",
@@ -1614,7 +1565,6 @@ function renderAvatars(){
     }));
   });
 
-  // custom avatar (if exists)
   if(state.customAvatar){
     grid.appendChild(makeChip({
       kind: "img",
@@ -1629,7 +1579,6 @@ function renderAvatars(){
     }));
   }
 
-  // plus button (opens system file dialog)
   const plus = document.createElement("button");
   plus.className = "chip avatarChip avatarPlus";
   plus.type = "button";
@@ -1690,7 +1639,6 @@ function renderProfile(){
   $("#profile-xp").textContent = String(state.xp);
   $("#profile-level").textContent = String(state.level);
 
-  // auto-unlock badges
   const unlockedIds = BADGES.filter(b => state.xp >= b.xpRequired).map(b => b.id);
   state.ownedBadges = Array.from(new Set([...(state.ownedBadges||[]), ...unlockedIds]));
   saveState();
@@ -1735,7 +1683,7 @@ function renderShop(){
 }
 
 /* =========================================================
-   RATE (clickable stars)
+   RATE
 ========================================================= */
 function bindRatingStarsOnce(){
   if(window.__starsBound) return;
@@ -1818,6 +1766,7 @@ function bindReset(){
     renderGamesCatalog();
     renderTrackUI();
 
+    closeGameOverlay();
     ensureGameOverlay();
   });
 }
@@ -1830,6 +1779,10 @@ function init(){
 
   recalcLevel();
   saveState();
+
+  // Overlay exists but MUST NOT show on load
+  ensureGameOverlay();
+  closeGameOverlay();
 
   bindNav();
   bindTracks();
@@ -1851,8 +1804,8 @@ function init(){
   renderGamesCatalog();
   renderTrackUI();
 
-  // Make sure overlay exists (so first game opens instantly)
-  ensureGameOverlay();
+  // Start on Home
+  showView("home");
 }
 
 init();
