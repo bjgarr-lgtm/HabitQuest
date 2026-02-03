@@ -1135,6 +1135,20 @@ function avatarForStory(){
   return state.avatar || "🙂";
 }
 
+function hqYouChipHTML(){
+  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
+
+  if(usingCustom){
+    // data URLs are safe here; just protect quotes for HTML attributes
+    const src = String(state.customAvatar).replaceAll('"', "&quot;");
+    return `<span class="hqAvatarWrap"><img class="hqAvatarImg" src="${src}" alt="You" /></span> You`;
+  }
+
+  const emoji = escapeHtml(state.avatar || "🙂");
+  return `${emoji} You`;
+}
+
+
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
   if(day <= 0) return "";
@@ -1440,7 +1454,7 @@ area.innerHTML = `
       ${
         ctx.avatarIsCustom && ctx.avatarImg
           ? `<img class="hqAvatarImg" src="${ctx.avatarImg}" alt="Your avatar" />`
-          : `<span class="hqAvatarEmoji">${escapeHtml(ctx.avatarEmoji)}</span>`
+          : `<span fclass="hqAvatarEmoji">${hqYouChipHTML()}</span>`
       }
       <span>You</span>
     </div>

@@ -632,3 +632,18 @@ button, input, select, textarea {
   background: rgba(255,85,119,0.15);
   border-color: rgba(255,85,119,0.35);
 }
+
+.hqAvatarWrap{
+  display:inline-flex;
+  align-items:center;
+  margin-right:6px;
+}
+
+.hqAvatarImg{
+  width:18px;
+  height:18px;
+  border-radius:6px;
+  object-fit:cover;
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
