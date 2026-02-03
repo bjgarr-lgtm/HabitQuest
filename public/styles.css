@@ -161,19 +161,6 @@ h1{ margin:0; font-size:18px; }
 }
 
 .gameCard{ background: var(--card2); }
-.gameTop{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
-
-.choice{
-  border:1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  border-radius:14px;
-  padding:12px;
-  cursor:pointer;
-  margin-top:10px;
-}
-.choice:hover{ background: rgba(255,255,255,0.09); }
-.choice.correct{ border-color: rgba(68,215,182,0.6); }
-.choice.wrong{ border-color: rgba(255,85,119,0.6); }
 
 .footer{
   position:fixed;
@@ -196,14 +183,13 @@ h1{ margin:0; font-size:18px; }
   cursor:pointer;
 }
 
-/* V2: stars + shop */
+/* stars + shop */
 .stars{
   display:flex;
   gap:10px;
   margin:12px 0 6px;
   justify-content:center;
 }
-
 .star{
   font-size:34px;
   border:none;
@@ -215,275 +201,28 @@ h1{ margin:0; font-size:18px; }
 .star:hover{ transform: translateY(-1px) scale(1.06); }
 .star.active{ color: rgba(255,220,90,0.95); }
 
-.shopCard{
-  background: rgba(255,255,255,0.08);
-}
-.shopBadge{
-  font-size:36px;
-}
-.locked{
-  opacity:0.6;
-}
+.shopCard{ background: rgba(255,255,255,0.08); }
+.shopBadge{ font-size:36px; }
+.locked{ opacity:0.6; }
 
-
-
-/* =========================
-   Profile layout polish
-========================= */
-.profileGrid {
-  align-items: stretch;
-}
-
-#avatar-grid .chip {
-  min-width: 44px;
-  min-height: 44px;
-  font-size: 22px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-}
-
-#avatar-grid .chip:hover {
-  background: rgba(255,255,255,0.10);
-}
-
-#view-profile .card h3 {
-  margin-bottom: 8px;
-}
-
-/* =========================
-   FIX: Game portal unreadable (black) text
-   Works even for disabled <button> + nested spans
-========================= */
-
-#game-area,
-#game-area * {
-  color: var(--text) !important;
-}
-
-/* Force button text color on Chromium/Safari */
-#game-area button,
-#game-area button * {
-  color: var(--text) !important;
-  -webkit-text-fill-color: var(--text) !important;
-}
-
-/* Disabled buttons often override color — force it back */
-#game-area button:disabled,
-#game-area button:disabled * {
-  color: var(--text) !important;
-  -webkit-text-fill-color: var(--text) !important;
-  opacity: 1 !important; /* prevents that greyed-out “dead” look */
-}
-
-/* If your choices are buttons with class="choice" */
-#game-area .choice,
-#game-area .choice * {
-  color: var(--text) !important;
-  -webkit-text-fill-color: var(--text) !important;
-}
-
-/* If the choices are inputs/textarea instead */
-#game-area input,
-#game-area textarea,
-#game-area select {
-  color: var(--text) !important;
-  -webkit-text-fill-color: var(--text) !important;
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid var(--border) !important;
-}
-
-/* =========================================================
-   HARD FIX: buttons inheriting black text in game portal
-   Put this at the VERY END of styles.css
-========================================================= */
-
-/* Make all form controls inherit the theme text color */
-button, input, select, textarea {
-  color: inherit;
-  font: inherit;
-}
-
-/* Force game portal to always use light text */
-#view-games,
-#view-games * {
-  color: var(--text);
-}
-
-/* Specifically force “choice” buttons/rows to be readable */
-#view-games .choice,
-#view-games button.choice,
-#view-games .choice *,
-#view-games button.choice * {
-  color: var(--text) !important;
-}
-
-/* If Habit Quest is rendering buttons that DON’T have .choice (common) */
-#view-games #game-content button {
-  color: var(--text) !important;
-}
-
-.avatarChip{
-  min-width: 46px;
-  min-height: 46px;
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-}
-
-.activeAvatar{
-  outline: 2px solid rgba(68,215,182,0.85);
-  box-shadow: 0 0 0 3px rgba(68,215,182,0.15);
-}
-
-.avatarPlus{
-  font-size: 22px;
-  font-weight: 900;
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.08);
-}
-
-.avatarImg{
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 1px solid rgba(255,255,255,0.18);
-}
-
-.profileAvatarImg{
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 1px solid rgba(255,255,255,0.18);
-  vertical-align: middle;
-  margin-right: 8px;
-}
-
-
-/* =========================
-   FULLSCREEN GAME OVERLAY
-========================= */
-.gameOverlay{
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(4, 6, 10, 0.72);
-  backdrop-filter: blur(14px);
-  display: grid;
-  place-items: center;
-  padding: 18px;
-}
-
-.gameOverlayInner{
-  width: min(980px, 100%);
-  max-height: 92vh;
-  overflow: auto;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.06));
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 22px;
-  padding: 18px;
-  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-  color: rgba(255,255,255,0.92);
-}
-
-.gameOverlayTop{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap: 12px;
-}
-
-.gameOverlayTitle{ margin: 0; font-size: 34px; letter-spacing: -0.5px; }
-.gameOverlaySubtitle{ margin: 6px 0 0; color: rgba(255,255,255,0.7); }
-
-.gameOverlayActions{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-}
-
-/* =========================
-   HABIT QUEST UI
-========================= */
-.hqRow{
-  display:flex;
-  flex-wrap:wrap;
-  gap: 8px;
-  align-items:center;
-}
-
-.hqChip{
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.choiceBtn{
+/* form inputs */
+.textInput{
   width: 100%;
-  text-align: left;
-  border: 1px solid rgba(255,255,255,0.14);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
   background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92); /* ✅ THIS is the “black text” fix */
-  padding: 12px 12px;
-  border-radius: 14px;
-  cursor: pointer;
-  margin-top: 10px;
-  font-weight: 700;
+  color: var(--text);
+  outline: none;
 }
-
-.choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-
-.choiceBtn.disabled,
-.choiceBtn:disabled{
-  opacity: 0.75;
-  color: rgba(255,255,255,0.85) !important; /* ✅ keep readable when disabled */
-  cursor: not-allowed;
+.textInput:focus{
+  border-color: rgba(124,92,255,0.65);
+  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
 }
 
 /* =========================
-   PROFILE: avatar grid polish + photo avatar
+   Profile polish
 ========================= */
-#avatar-grid{
-  display:flex;
-  flex-wrap:wrap;
-  gap: 10px;
-}
-
-.avatarChip{
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  display:grid;
-  place-items:center;
-  font-size: 22px;
-  cursor:pointer;
-}
-
-.avatarChip:hover{ background: rgba(255,255,255,0.10); }
-.avatarChip.active{ outline: 2px solid rgba(68,215,182,0.85); }
-
-.avatarChipPhoto{
-  background-size: cover;
-  background-position: center;
-}
-
-.avatarChipPlus{
-  font-size: 22px;
-  font-weight: 900;
-}
-
-/* =========================
-   PROFILE: compact + clean
-========================= */
-
 .profileHeader{
   display:flex;
   gap:16px;
@@ -491,7 +230,6 @@ button, input, select, textarea {
   justify-content:space-between;
   flex-wrap:wrap;
 }
-
 .profileIdentity{
   display:flex;
   gap:14px;
@@ -499,7 +237,6 @@ button, input, select, textarea {
   min-width: 280px;
   flex: 1 1 360px;
 }
-
 .profileAvatar{
   width:56px;
   height:56px;
@@ -511,48 +248,9 @@ button, input, select, textarea {
   overflow:hidden;
   flex: 0 0 auto;
 }
-
-.profileAvatar span{
-  font-size:28px;
-  line-height:1;
-}
-
-.profileAvatar img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-}
-
-.profileNameBlock{
-  min-width: 220px;
-  flex: 1 1 auto;
-}
-
-.profileNameRow{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  margin-top:6px;
-}
-
-.textInput{
-  flex: 1 1 auto;
-  min-width: 0;             /* KEY: prevents overflow in flex rows */
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  color: var(--text);
-  outline: none;
-}
-
-.textInput:focus{
-  border-color: rgba(124,92,255,0.65);
-  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
-}
-
+.profileAvatar span{ font-size:28px; line-height:1; }
+.profileAvatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+.profileNameRow{ display:flex; gap:10px; align-items:center; margin-top:6px; }
 .profileStats{
   display:flex;
   gap:10px;
@@ -560,7 +258,6 @@ button, input, select, textarea {
   justify-content:flex-end;
   flex: 0 1 auto;
 }
-
 .statPill{
   border:1px solid var(--border);
   background: rgba(255,255,255,0.06);
@@ -568,120 +265,53 @@ button, input, select, textarea {
   padding: 10px 12px;
   min-width: 140px;
 }
-
 .statValue{
   font-weight: 900;
   font-size: 22px;
   margin-top: 2px;
 }
-
 .profileTwoCol{
   display:grid;
   grid-template-columns: 1.2fr 0.8fr;
   gap:12px;
 }
-
 @media (max-width: 860px){
   .profileTwoCol{ grid-template-columns: 1fr; }
   .profileStats{ justify-content:flex-start; }
 }
 
-/* Wider overlay card + avoid “inner scrollbar” look */
-.gameOverlay{
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-  overflow:auto;           /* scroll the overlay itself if needed */
-  padding: 18px;
+/* avatar grid */
+#avatar-grid{ display:flex; flex-wrap:wrap; gap:10px; }
+.avatarChip{
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  display:grid;
+  place-items:center;
+  font-size: 22px;
+  cursor:pointer;
+  position: relative;
 }
-
-.gameOverlayInner{
-  width: min(1180px, 100%);
-  max-height: none;        /* don’t force inner scrolling */
-  overflow: visible;
-  margin: 18px 0;
+.avatarChip:hover{ background: rgba(255,255,255,0.10); }
+.activeAvatar{
+  outline: 2px solid rgba(68,215,182,0.85);
+  box-shadow: 0 0 0 3px rgba(68,215,182,0.15);
 }
-
-/* Habit Quest: show custom avatar image in the HUD chip */
-.hqYouChip{
-  display:flex;
-  align-items:center;
-  gap:8px;
+.avatarPlus{
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.08);
 }
-
-.hqAvatarImg{
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+.avatarImg{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
   object-fit: cover;
   border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
 }
-
-.hqAvatarEmoji{
-  font-size: 16px;
-  line-height: 1;
-}
-
-/* Avatar delete chip */
-.avatarDelete{
-  opacity: 0.9;
-}
-.avatarDelete:hover{
-  opacity: 1;
-  background: rgba(255,85,119,0.15);
-  border-color: rgba(255,85,119,0.35);
-}
-
-.hqAvatarWrap{
-  display:inline-flex;
-  align-items:center;
-  margin-right:6px;
-}
-
-.hqAvatarImg{
-  width:18px;
-  height:18px;
-  border-radius:6px;
-  object-fit:cover;
-  border:1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
-}
-
-/* Habit Quest – emphasize player identity */
-.hqChip.youChip{
-  padding: 6px 12px;
-  gap: 8px;
-  font-weight: 800;
-}
-
-.hqChip.youChip img{
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid rgba(255,255,255,0.25);
-}
-
-.hqChip.youChip .emojiAvatar{
-  font-size: 28px;
-  line-height: 1;
-}
-
-/* FIX: Tracks dropdown readability */
-#view-tracks select {
-  color: #111;               /* dark text */
-  background: #fff;          /* native white background */
-}
-
-#view-tracks select option {
-  color: #111;
-  background: #fff;
-}
-
-/* Custom avatar delete button inside avatar chips */
-.avatarChip{ position: relative; }
-
 .avatarDelete{
   position:absolute;
   top:-6px;
@@ -701,10 +331,128 @@ button, input, select, textarea {
 }
 .avatarDelete:hover{ background: rgba(255,85,119,0.35); }
 
-/* Inline avatar image used inside Habit Quest sentence */
-.avatarInlineImg{
-  border-radius: 6px;
+/* =========================
+   FULLSCREEN GAME OVERLAY
+========================= */
+.gameOverlay{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background: rgba(0,0,0,0.70);
+  backdrop-filter: blur(8px);
+  padding: 14px;
+  overflow:auto;
+  color: rgba(255,255,255,0.92);
+}
+.gameOverlayInner{
+  max-width: 1180px;
+  margin: 18px auto;
+  background: rgba(20,20,30,0.92);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+.gameOverlayTop{
+  display:flex; gap:14px; align-items:center; justify-content:space-between;
+  flex-wrap: wrap;
+}
+.gameOverlayStats{ display:flex; gap:10px; align-items:center; }
+
+/* Choice buttons (overlay games) */
+.choiceBtn{
+  display:block; width:100%;
+  text-align:left;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+  cursor:pointer;
+  margin-top: 10px;
+  font-weight: 700;
+}
+.choiceBtn:hover{ background: rgba(255,255,255,0.10); }
+.choiceBtn:disabled{ opacity:0.75; cursor:not-allowed; }
+.choiceGood{ border-color: rgba(80,220,140,0.6); }
+.choiceBad{ border-color: rgba(255,120,120,0.6); }
+
+/* Habit Quest HUD */
+.hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+.hqChip{
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  display:flex; align-items:center; gap:8px;
+}
+.hqChip.youChip{ font-weight: 800; }
+.hqAvatarImg{
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
   object-fit: cover;
   border: 1px solid rgba(255,255,255,0.18);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+}
+.emojiAvatar{ font-size: 20px; line-height: 1; }
+
+/* Habit Quest Save Slots (Phase 2) */
+.hqSlots{
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+}
+.hqSlotsRow{
+  margin-top: 8px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.select{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  outline: none;
+}
+
+/* Story Map (Phase 2) */
+.mapTools{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.mapList{
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mapRow{
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 12px;
+}
+.mapRowTop{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.mapNodeId{
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+.mapMeta{
+  margin-top: 6px;
+  font-size: 12px;
+}
+.mapRowActions{
+  margin-top: 10px;
 }
