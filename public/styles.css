@@ -293,3 +293,33 @@ h1{ margin:0; font-size:18px; }
   background: rgba(255,255,255,0.06) !important;
   border: 1px solid var(--border) !important;
 }
+
+/* =========================================================
+   HARD FIX: buttons inheriting black text in game portal
+   Put this at the VERY END of styles.css
+========================================================= */
+
+/* Make all form controls inherit the theme text color */
+button, input, select, textarea {
+  color: inherit;
+  font: inherit;
+}
+
+/* Force game portal to always use light text */
+#view-games,
+#view-games * {
+  color: var(--text);
+}
+
+/* Specifically force “choice” buttons/rows to be readable */
+#view-games .choice,
+#view-games button.choice,
+#view-games .choice *,
+#view-games button.choice * {
+  color: var(--text) !important;
+}
+
+/* If Habit Quest is rendering buttons that DON’T have .choice (common) */
+#view-games #game-content button {
+  color: var(--text) !important;
+}
