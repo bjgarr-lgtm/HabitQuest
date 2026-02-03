@@ -1,8 +1,7 @@
 /* How to Avoid Addiction — V2 (no frameworks)
    Runs as a static site. Saves progress in localStorage (on this device).
-   NOTE: app.js must contain ONLY JavaScript (no HTML at the bottom).
+   NOTE: app.js must contain ONLY JavaScript.
 */
-
 "use strict";
 
 /* =========================================================
@@ -30,6 +29,12 @@ function safeNum(x, fallback=0){
   return Number.isFinite(n) ? n : fallback;
 }
 
+function safeStr(x, fallback=""){
+  if(typeof x !== "string") return fallback;
+  const s = x.trim();
+  return s.length ? s : fallback;
+}
+
 function escapeHtml(s){
   return String(s ?? "")
     .replaceAll("&","&amp;")
@@ -49,13 +54,6 @@ function mulberry32(seed){
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-function safeStr(x, fallback=""){
-  if(typeof x !== "string") return fallback;
-  const s = x.trim();
-  return s.length ? s : fallback;
-}
-
 
 /* =========================================================
    CONTENT
@@ -102,86 +100,44 @@ const BADGES = [
   { id:"quiz-whiz",       name:"Quiz Whiz",       xpRequired: 200,   icon:"🧠" },
   { id:"streak-hero",     name:"Streak Hero",     xpRequired: 350,   icon:"🔥" },
   { id:"game-champ",      name:"Game Champ",      xpRequired: 500,   icon:"🏆" },
-
   { id:"daily-doer",      name:"Daily Doer",      xpRequired: 650,   icon:"📅" },
   { id:"focus-falcon",    name:"Focus Falcon",    xpRequired: 800,   icon:"🦅" },
   { id:"kind-mind",       name:"Kind Mind",       xpRequired: 950,   icon:"💛" },
   { id:"stress-tamer",    name:"Stress Tamer",    xpRequired: 1100,  icon:"🧯" },
   { id:"brave-voice",     name:"Brave Voice",     xpRequired: 1250,  icon:"🗣️" },
-
   { id:"steady-steps",    name:"Steady Steps",    xpRequired: 1400,  icon:"👟" },
   { id:"boundary-boss",   name:"Boundary Boss",   xpRequired: 1600,  icon:"🛡️" },
   { id:"help-seeker",     name:"Help Seeker",     xpRequired: 1800,  icon:"🤝" },
   { id:"sleep-guardian",  name:"Sleep Guardian",  xpRequired: 2000,  icon:"🌙" },
   { id:"hydration-hero",  name:"Hydration Hero",  xpRequired: 2200,  icon:"💧" },
-
   { id:"streak-7",        name:"7‑Day Streak",    xpRequired: 2400,  icon:"7️⃣" },
   { id:"streak-14",       name:"14‑Day Streak",   xpRequired: 2700,  icon:"1️⃣4️⃣" },
   { id:"streak-30",       name:"30‑Day Streak",   xpRequired: 3200,  icon:"3️⃣0️⃣" },
-
   { id:"lesson-10",       name:"10 Lessons",      xpRequired: 3500,  icon:"📘" },
   { id:"lesson-20",       name:"20 Lessons",      xpRequired: 4000,  icon:"📗" },
   { id:"lesson-30",       name:"30 Lessons",      xpRequired: 4600,  icon:"📙" },
-
   { id:"game-grinder",    name:"Game Grinder",    xpRequired: 5200,  icon:"🎮" },
   { id:"calm-pro",        name:"Calm Pro",        xpRequired: 6000,  icon:"🧘" },
   { id:"level-10",        name:"Level 10",        xpRequired: 6800,  icon:"🔟" },
   { id:"legend",          name:"Legend",          xpRequired: 8000,  icon:"👑" },
-
   { id:"gentle-giant",    name:"Gentle Giant",    xpRequired: 9000,  icon:"🐘" },
   { id:"super-helper",    name:"Super Helper",    xpRequired: 10000, icon:"🦸" },
   { id:"wise-owl",        name:"Wise Owl",        xpRequired: 12000, icon:"🦉" },
 ];
 
 const AVATARS = ["🦊","🐼","🐸","🦁","🐨","🐯","🐧","🐙","🦄","🐲"];
-const CUSTOM_AVATAR_ID = "__custom__";
 const CUSTOM_AVATAR_PREFIX = "custom:";
 
 function uid(){
   return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 }
-
 function isCustomAvatarRef(v){
   return typeof v === "string" && v.startsWith(CUSTOM_AVATAR_PREFIX);
 }
 
-function getCustomAvatarById(id){
-  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
-  return list.find(a => a && a.id === id) || null;
-}
-
-function getSelectedCustomAvatar(){
-  if(!isCustomAvatarRef(state.avatar)) return null;
-  const id = state.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
-  return getCustomAvatarById(id);
-}
-
-// For UI that needs an element, not a string:
-function makeAvatarNode({ size=20, alt="You" } = {}){
-  const wrap = document.createElement("span");
-  wrap.className = "avatarNode";
-  wrap.style.display = "inline-grid";
-  wrap.style.placeItems = "center";
-  wrap.style.width = size + "px";
-  wrap.style.height = size + "px";
-
-  const custom = getSelectedCustomAvatar();
-  if(custom && custom.dataURL){
-    const img = document.createElement("img");
-    img.src = custom.dataURL;
-    img.alt = alt;
-    img.className = "avatarInlineImg";
-    img.style.width = size + "px";
-    img.style.height = size + "px";
-    wrap.appendChild(img);
-    return wrap;
-  }
-
-  wrap.textContent = (state.avatar && !isCustomAvatarRef(state.avatar)) ? state.avatar : "🙂";
-  wrap.style.fontSize = Math.max(14, Math.floor(size * 0.9)) + "px";
-  return wrap;
-}
-
+/* =========================================================
+   TRACKS + LESSONS
+========================================================= */
 const TRACKS = {
   general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
   nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, coping skills, and refusing offers." },
@@ -202,7 +158,6 @@ const CURRICULUM = [
   { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                      track:"general" },
   { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",               track:"socialmedia" },
   { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",              track:"general" },
-
   { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                 track:"general" },
   { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                    track:"caffeine" },
   { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                  track:"general" },
@@ -213,7 +168,6 @@ const CURRICULUM = [
   { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                       track:"general" },
   { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                  track:"general" },
   { title:"Trusted Adults",                     goal:"Build your support team.",                                 track:"general" },
-
   { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",               track:"nicotine" },
   { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                    track:"nicotine" },
   { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",                track:"alcohol" },
@@ -237,7 +191,7 @@ function makeLessonContent(title, goal){
 }
 
 /* =========================================================
-   QUIZZES — SPECIFIC PER LESSON + DIFFICULTY RAMP (DETERMINISTIC)
+   QUIZZES — DETERMINISTIC
 ========================================================= */
 const LESSON_FOCUS = {
   1:  { words:["future","choices","tiny steps","practice"], skill:"Future Me thinking" },
@@ -284,7 +238,6 @@ function makeQuizForLesson(day, title, goal, track){
   const rng = mulberry32(1000 + day * 97);
   const focus = LESSON_FOCUS[day] || { words:["choices","safe","plan","help"], skill:"Healthy choices" };
   const w = focus.words;
-
   const q = (question, options, answer) => ({ q: question, options, answer });
 
   const anchors = [
@@ -298,20 +251,17 @@ function makeQuizForLesson(day, title, goal, track){
     q(`A trusted adult could be…`, ["Parent/guardian/teacher/coach", "Only strangers online", "Nobody"], 0),
     q(`Good friends will…`, ["Respect your boundaries", "Force you to prove yourself", "Laugh when you’re uncomfortable"], 0),
   ];
-
   const poolMed = [
     q(`Pick the best “switch” after saying no:`, ["Let’s do something else.", "You’re annoying.", "Fine, I’ll do it."], 0),
     q(`If stress is high, a smart tool is…`, ["Slow breathing + water", "Start a fight", "Do something risky"], 0),
     q(`A “tiny step” is…`, ["Small and doable today", "Huge and impossible", "Only for adults"], 0),
   ];
-
   const poolHard = [
     q(`Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
       ["Delay + distract + talk to someone", "Keep it secret", "Say yes to fit in"], 0),
     q(`A good boundary sounds like…`, ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
     q(`If you make a mistake, the best comeback is…`, ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
   ];
-
   const poolBoss = [
     q(`Boss moment: Your friend laughs at your “no.” Best move is…`,
       ["Repeat no calmly and step away", "Prove yourself by saying yes", "Start a fight"], 0),
@@ -326,7 +276,6 @@ function makeQuizForLesson(day, title, goal, track){
   if(diff >= 3) pool = pool.concat(poolHard);
   if(diff >= 4) pool = pool.concat(poolBoss);
 
-  // Track flavor
   if(track === "socialmedia"){
     pool.push(
       q("Online dares are safest when you…", ["Skip them and choose your own plan", "Do them for likes", "Hide them from adults"], 0),
@@ -358,7 +307,6 @@ function makeQuizForLesson(day, title, goal, track){
     );
   }
 
-  // Shuffle deterministically
   for(let i = pool.length - 1; i > 0; i--){
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -372,7 +320,6 @@ function makeQuizForLesson(day, title, goal, track){
   while(picked.length < 12){
     picked.push(poolEasy[Math.floor(rng() * poolEasy.length)]);
   }
-
   return picked;
 }
 
@@ -386,10 +333,9 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 }));
 
 const GAMES = [
-  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                status:"ready", unlock:{ type:"free" } },
-  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                        status:"ready", unlock:{ type:"free" } },
-  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.",status:"ready", unlock:{ type:"lessons", lessons:1 } },
-
+  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
+  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
+  { id:"habitquest",  title:"Habit Quest",     desc:"Story adventure: your avatar makes choices + learns skills.", status:"ready", unlock:{ type:"lessons", lessons:1 } },
   { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                          status:"soon", unlock:{ type:"xp",     xp:120 } },
   { id:"coping-sort",     title:"Coping Sort",         desc:"Sort coping tools into helpful vs not helpful.",       status:"soon", unlock:{ type:"lessons",lessons:3 } },
   { id:"streak-run",      title:"Streak Run",          desc:"Quick reaction game to keep your streak alive.",       status:"soon", unlock:{ type:"level",  level:3 } },
@@ -408,27 +354,21 @@ const DEFAULT_STATE = {
   lastCompletedISO: null,
   streak: 0,
   highScore: 0,
-
   xp: 0,
   level: 1,
-
   profileName: "Player",
-
   avatar: AVATARS[0],          // emoji OR "custom:<id>"
   customAvatars: [],           // [{ id, dataURL, createdISO }]
-
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
-
   habitQuest: {
-    chapter: 0,        // 0..6
+    chapter: 0,
     scene: 0,
     hearts: 3,
     wisdom: 0,
-    tokens: 0,         // +1 token per FIRST-TIME lesson completion
+    tokens: 0,
     lastLessonDay: 0,
   },
-
   selectedTrack: "general",
 };
 
@@ -444,6 +384,7 @@ function loadState(){
 
 function normalizeState(s){
   const safe = (s && typeof s === "object") ? s : {};
+
   const merged = {
     ...DEFAULT_STATE,
     ...safe,
@@ -458,23 +399,22 @@ function normalizeState(s){
       ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
     }
   };
-  merged.profileName = safeStr(merged.profileName, "Player").slice(0, 30);
 
+  merged.profileName = safeStr(merged.profileName, "Player").slice(0, 24);
   merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
-
   merged.xp = safeNum(merged.xp, 0);
   merged.level = safeNum(merged.level, 1);
   merged.highScore = safeNum(merged.highScore, 0);
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
 
-  // normalize custom avatar list
+  // Normalize custom avatar list
   merged.customAvatars = Array.isArray(safe.customAvatars) ? safe.customAvatars : [];
   merged.customAvatars = merged.customAvatars
     .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
     .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
 
-  // Back-compat: if older save had customAvatar + CUSTOM_AVATAR_ID, convert into customAvatars[0]
+  // Back-compat: older builds used `customAvatar` (single)
   if(typeof safe.customAvatar === "string" && safe.customAvatar.startsWith("data:image/")){
     const exists = merged.customAvatars.some(a => a.dataURL === safe.customAvatar);
     if(!exists){
@@ -482,27 +422,26 @@ function normalizeState(s){
     }
   }
 
-  // normalize avatar selection
+  // Normalize avatar selection
   const isEmoji = AVATARS.includes(merged.avatar);
   const isCustomRef = isCustomAvatarRef(merged.avatar);
 
   if(!isEmoji && !isCustomRef){
-    // Older build used "__custom__"
-    if(merged.avatar === CUSTOM_AVATAR_ID && merged.customAvatars.length){
+    // Older build used "__custom__" id
+    if(merged.avatar === "__custom__" && merged.customAvatars.length){
       merged.avatar = CUSTOM_AVATAR_PREFIX + merged.customAvatars[0].id;
-    } else {
+    }else{
       merged.avatar = AVATARS[0];
     }
   }
 
-// If selected custom ref points to missing avatar, fallback
-if(isCustomAvatarRef(merged.avatar)){
-  const id = merged.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
-  if(!getCustomAvatarById(id)){
-    merged.avatar = AVATARS[0];
+  if(isCustomAvatarRef(merged.avatar)){
+    const id = merged.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+    const found = merged.customAvatars.some(a => a.id === id);
+    if(!found){
+      merged.avatar = AVATARS[0];
+    }
   }
-}
-
 
   merged.habitQuest.chapter = clamp(safeNum(merged.habitQuest.chapter,0), 0, 6);
   merged.habitQuest.scene   = clamp(safeNum(merged.habitQuest.scene,0), 0, 99);
@@ -519,6 +458,25 @@ saveState();
 
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* =========================================================
+   AVATAR HELPERS (SAFE — NO GLOBAL LOOKUPS DURING NORMALIZE)
+========================================================= */
+function getCustomAvatarById(id){
+  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+  return list.find(a => a && a.id === id) || null;
+}
+
+function getSelectedCustomAvatar(){
+  if(!isCustomAvatarRef(state.avatar)) return null;
+  const id = state.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+  return getCustomAvatarById(id);
+}
+
+function getSelectedAvatarDataURL(){
+  const c = getSelectedCustomAvatar();
+  return c && c.dataURL ? c.dataURL : null;
 }
 
 /* =========================================================
@@ -541,7 +499,6 @@ function renderTrackUI(){
 
 function bindTracks(){
   const sel = $("#track-select");
-
   $("#btn-apply-track")?.addEventListener("click", () => {
     const v = sel?.value || "general";
     state.selectedTrack = TRACKS[v] ? v : "general";
@@ -566,6 +523,28 @@ function bindTracks(){
   });
 }
 
+/* =========================================================
+   PROFILE NAME
+========================================================= */
+function bindProfileNameEditor(){
+  const input = $("#profile-name-input");
+  const btn = $("#btn-save-name");
+  if(!input || !btn) return;
+  if(btn.__bound) return;
+  btn.__bound = true;
+
+  input.value = safeStr(state.profileName, "Player").slice(0, 24);
+
+  const commit = () => {
+    state.profileName = safeStr(input.value, "Player").slice(0, 24);
+    input.value = state.profileName;
+    saveState();
+    renderProfile();
+  };
+
+  btn.addEventListener("click", commit);
+  input.addEventListener("keydown", (e) => { if(e.key === "Enter") commit(); });
+}
 
 /* =========================================================
    XP / LEVEL
@@ -578,11 +557,9 @@ function recalcLevel(){
 function addXP(amount){
   const a = safeNum(amount, 0);
   if(a <= 0) return;
-
   state.xp = safeNum(state.xp, 0) + a;
   recalcLevel();
   saveState();
-
   updateHomeStats();
   renderProgress();
   renderProfile();
@@ -595,9 +572,7 @@ function addXP(amount){
    NAVIGATION
 ========================================================= */
 function showView(name){
-  // Always restore scroll when switching views (prevents “stuck no scroll” bugs)
-  document.body.style.overflow = "";
-
+  document.body.style.overflow = ""; // safety reset
   $$(".view").forEach(v => v.classList.add("hidden"));
   $(`#view-${name}`)?.classList.remove("hidden");
 
@@ -613,34 +588,13 @@ function showView(name){
   if(name === "tracks")   renderTrackUI();
 }
 
-function bindProfileNameEditor(){
-  const input = $("#profile-name-input");
-  const btn = $("#btn-save-name");
-  if(!input || !btn) return;
-
-  if(btn.__bound) return;
-  btn.__bound = true;
-
-  // initial value
-  input.value = safeStr(state.profileName, "Player").slice(0, 24);
-
-  const commit = () => {
-    state.profileName = safeStr(input.value, "Player").slice(0, 24);
-    input.value = state.profileName;
-    saveState();
-    renderProfile(); // refresh anywhere name is used
-  };
-
-  btn.addEventListener("click", commit);
-  input.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") commit();
-  });
-}
-
-
 function bindNav(){
-  $$(".tab").forEach(btn => btn.addEventListener("click", () => showView(btn.dataset.view)));
-
+  $$(".tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const v = btn.dataset.view;
+      if(v) showView(v);
+    });
+  });
   $("#btn-open-lesson")?.addEventListener("click", () => showView("lesson"));
   $("#btn-open-rate")?.addEventListener("click", () => showView("rate"));
   $("#btn-start-lesson")?.addEventListener("click", () => showView("lesson"));
@@ -653,7 +607,7 @@ function bindNav(){
 function randomTip(){
   const el = $("#tip-text");
   if(!el) return;
-  el.textContent = TIPS[Math.floor(Math.random()*TIPS.length)];
+  el.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
 }
 
 /* =========================================================
@@ -767,7 +721,6 @@ function bindLessonButtons(){
 
   $("#btn-complete-lesson")?.addEventListener("click", () => {
     const score = quizScoreForCurrentLesson();
-
     if(score.correct < score.total){
       $("#lesson-status") && ($("#lesson-status").textContent =
         `Almost! Quiz score: ${score.correct}/${score.total}. Answer all correctly to complete.`);
@@ -776,23 +729,19 @@ function bindLessonButtons(){
 
     const firstTime = !state.completedDays.includes(score.day);
     if(firstTime){
-      addXP(score.total * 5); // 5 XP per question
+      addXP(score.total * 5);
       state.completedDays.push(score.day);
       addXP(50);
-
-      // +1 token per FIRST-TIME lesson completion
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
-    // always update story flavor
+
     state.habitQuest.lastLessonDay = score.day;
 
-    // streak
     const todayISO = isoDate(new Date());
     if(state.lastCompletedISO !== todayISO){
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayISO = isoDate(yesterday);
-
       state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
     }
@@ -814,7 +763,7 @@ function updateHomeStats(){
 }
 
 /* =========================================================
-   GAME OVERLAY — HARD FIX (NO STUCK SCROLL, ALWAYS OPENS/CLOSES)
+   GAME OVERLAY (RELIABLE)
 ========================================================= */
 let gameMode = null;
 let gameIndex = 0;
@@ -824,7 +773,6 @@ let breathingTimerId = null;
 function overlayEl(){ return document.getElementById("game-overlay"); }
 
 function ensureGameOverlay(){
-  // If an old overlay exists from previous broken code, remove it cleanly.
   const old = overlayEl();
   if(old) old.remove();
 
@@ -832,7 +780,7 @@ function ensureGameOverlay(){
   overlay.id = "game-overlay";
   overlay.className = "gameOverlay";
   overlay.setAttribute("aria-hidden", "true");
-  overlay.style.display = "none"; // start hidden ALWAYS
+  overlay.style.display = "none";
   overlay.innerHTML = `
     <div class="gameOverlayInner" role="dialog" aria-modal="true" aria-label="Game overlay">
       <div class="gameOverlayTop">
@@ -845,11 +793,8 @@ function ensureGameOverlay(){
           <button class="btn" id="go-exit" type="button">Exit</button>
         </div>
       </div>
-
       <div class="divider"></div>
-
       <div id="go-content"></div>
-
       <div class="actions" style="margin-top:14px;">
         <button class="btn primary" id="go-restart" type="button" style="display:none;">Restart</button>
       </div>
@@ -857,59 +802,6 @@ function ensureGameOverlay(){
   `;
   document.body.appendChild(overlay);
 
-  // Inject overlay CSS once
-  if(!document.getElementById("__overlay_css")){
-    const style = document.createElement("style");
-    style.id = "__overlay_css";
-    style.textContent = `
-      .gameOverlay{
-        position:fixed; inset:0; z-index:9999;
-        background: rgba(0,0,0,0.70);
-        backdrop-filter: blur(8px);
-        padding: 14px;
-        overflow:auto;
-        color: rgba(255,255,255,0.92);
-      }
-      .gameOverlayInner{
-        max-width: 900px;
-        margin: 0 auto;
-        background: rgba(20,20,30,0.92);
-        border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 16px;
-        padding: 16px;
-      }
-      .gameOverlayTop{
-        display:flex; gap:14px; align-items:center; justify-content:space-between;
-        flex-wrap: wrap;
-      }
-      .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
-      .choiceBtn{
-        display:block; width:100%;
-        text-align:left;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.16);
-        background: rgba(255,255,255,0.06);
-        color: rgba(255,255,255,0.92);
-        cursor:pointer;
-        margin-top: 10px;
-      }
-      .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
-      .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
-      .choiceGood{ border-color: rgba(80,220,140,0.6); }
-      .choiceBad{ border-color: rgba(255,120,120,0.6); }
-      .hqRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
-      .hqChip{
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.14);
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Buttons (reliable because we bind AFTER creation)
   overlay.querySelector("#go-exit")?.addEventListener("click", (e) => {
     e.preventDefault();
     closeGameOverlay();
@@ -922,12 +814,10 @@ function ensureGameOverlay(){
     if(gameMode === "habitquest") startHabitQuest();
   });
 
-  // Click backdrop closes (optional)
   overlay.addEventListener("click", (e) => {
     if(e.target === overlay) closeGameOverlay();
   });
 
-  // Escape closes
   window.addEventListener("keydown", (e) => {
     if(e.key === "Escape" && overlayEl() && overlayEl().style.display === "block"){
       closeGameOverlay();
@@ -938,16 +828,15 @@ function ensureGameOverlay(){
 function openGameOverlay(title, subtitle=""){
   const overlay = overlayEl();
   if(!overlay) return;
-
   overlay.style.display = "block";
   overlay.setAttribute("aria-hidden", "false");
-
-  document.body.style.overflow = "hidden"; // lock scroll ONLY while open
+  document.body.style.overflow = "hidden";
 
   const titleEl = overlay.querySelector("#go-title");
   const subEl = overlay.querySelector("#go-sub");
   const scoreEl = overlay.querySelector("#go-score");
   const restartBtn = overlay.querySelector("#go-restart");
+
   if(titleEl) titleEl.textContent = title;
   if(subEl) subEl.textContent = subtitle;
   if(scoreEl) scoreEl.textContent = `Score: ${gameScore}`;
@@ -957,11 +846,8 @@ function openGameOverlay(title, subtitle=""){
 function closeGameOverlay(){
   const overlay = overlayEl();
   if(!overlay) return;
-
   overlay.style.display = "none";
   overlay.setAttribute("aria-hidden", "true");
-
-  // ALWAYS restore scroll (this is the “can’t scroll” fix)
   document.body.style.overflow = "";
 
   const c = overlay.querySelector("#go-content");
@@ -971,6 +857,7 @@ function closeGameOverlay(){
     clearInterval(breathingTimerId);
     breathingTimerId = null;
   }
+
   gameMode = null;
 }
 
@@ -1000,7 +887,6 @@ function gameUnlockStatus(game){
 function renderGamesCatalog(){
   const grid = $("#games-grid");
   if(!grid) return;
-
   grid.innerHTML = "";
 
   GAMES.forEach(game => {
@@ -1027,7 +913,7 @@ function renderGamesCatalog(){
     if(!(game.status === "ready" && unlocked)){
       btn.disabled = true;
       btn.classList.add("disabled");
-    } else {
+    }else{
       btn.addEventListener("click", () => launchGame(game.id));
     }
 
@@ -1050,7 +936,6 @@ function startChoiceQuest(){
   gameMode = "choicequest";
   gameIndex = 0;
   gameScore = 0;
-
   openGameOverlay("Choice Quest", "Pick the healthiest option.");
   renderChoiceQuest();
 }
@@ -1059,16 +944,16 @@ function renderChoiceQuest(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
-  area.innerHTML = "";
 
+  area.innerHTML = "";
   const scenario = GAME_SCENARIOS[gameIndex];
+
   if(!scenario){
     area.innerHTML = `
       <p class="big">🎉 Nice!</p>
       <p>You finished Choice Quest.</p>
       <p class="muted">Final score: <strong>${gameScore}</strong></p>
     `;
-
     const restartBtn = overlay.querySelector("#go-restart");
     if(restartBtn) restartBtn.style.display = "inline-block";
 
@@ -1098,7 +983,7 @@ function renderChoiceQuest(){
       if(c.good){
         btn.classList.add("choiceGood");
         gameScore += 10;
-      } else {
+      }else{
         btn.classList.add("choiceBad");
         gameScore = Math.max(0, gameScore - 3);
       }
@@ -1133,14 +1018,13 @@ function renderChoiceQuest(){
 function startBreathing(){
   gameMode = "breathing";
   gameScore = 0;
-
   openGameOverlay("Breathing Buddy", "Calm your body for 60 seconds.");
 
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
-  area.innerHTML = "";
 
+  area.innerHTML = "";
   const info = document.createElement("p");
   info.innerHTML = `Try this for <strong>60 seconds</strong>: breathe in… and out… slowly.`;
   area.appendChild(info);
@@ -1169,6 +1053,7 @@ function startBreathing(){
   let finished = false;
 
   if(breathingTimerId) clearInterval(breathingTimerId);
+
   breathingTimerId = setInterval(() => {
     timerText.textContent = `Time left: ${t}s`;
     ring.textContent = phase;
@@ -1187,7 +1072,6 @@ function startBreathing(){
     if(t < 0){
       clearInterval(breathingTimerId);
       breathingTimerId = null;
-
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
       if(!finished){
@@ -1201,42 +1085,8 @@ function startBreathing(){
 }
 
 /* =========================================================
-   HABIT QUEST (7 CHAPTERS)
+   HABIT QUEST
 ========================================================= */
-function avatarForStory(){
-  if (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) {
-    return ""; // ← no emoji in story text for photo avatars
-  }
-  return state.avatar || "🙂";
-}
-
-
-function hqYouChipEl(){
-  const youChip = document.createElement("div");
-  youChip.className = "hqChip youChip";
-
-  if (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) {
-    const img = document.createElement("img");
-    img.src = state.customAvatar;
-    img.alt = "You";
-    img.className = "youChipAvatar";
-    youChip.appendChild(img);
-  } else {
-    const span = document.createElement("span");
-    span.className = "emojiAvatar";
-    span.textContent = state.avatar || "🙂";
-    youChip.appendChild(span);
-  }
-
-  const label = document.createElement("span");
-  label.textContent = "You";
-  youChip.appendChild(label);
-
-  return youChip;
-}
-
-
-
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
   if(day <= 0) return "";
@@ -1245,11 +1095,14 @@ function getLastLessonTitle(){
 }
 
 function hqCtx(){
-  const isCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
+  const avatarDataURL = getSelectedAvatarDataURL();
+  const usingCustom = !!avatarDataURL;
+  const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "🙂";
+
   return {
-    avatarEmoji: avatarForStory(),
-    avatarIsCustom: isCustom,
-    avatarImg: isCustom ? state.customAvatar : null,
+    avatarIsCustom: usingCustom,
+    avatarImg: avatarDataURL,
+    avatarEmoji: emoji,
     name: state.profileName || "Player",
     completed: state.completedDays.length,
     lastLessonTitle: getLastLessonTitle(),
@@ -1494,7 +1347,6 @@ const HQ = {
 function startHabitQuest(){
   gameMode = "habitquest";
   gameScore = 0;
-
   openGameOverlay("Habit Quest", "Story adventure: make choices, learn skills, earn XP.");
   renderHabitQuest();
 }
@@ -1531,62 +1383,41 @@ function renderHabitQuest(){
     return;
   }
 
-area.innerHTML = `
-  <div class="hqRow">
-    <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
-    <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
-    <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
-    <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
-
-    <div class="hqChip hqYouChip">
-      ${
-        ctx.avatarIsCustom && ctx.avatarImg
-          ? `<img class="hqAvatarImg" src="${ctx.avatarImg}" alt="Your avatar" />`
-          : `<span fclass="hqAvatarEmoji">${hqYouChipHTML()}</span>`
-      }
-      <span>You</span>
+  // Header chips (includes image when custom)
+  area.innerHTML = `
+    <div class="hqRow">
+      <div class="hqChip">📖 ${escapeHtml(chapter.name)}</div>
+      <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
+      <div class="hqChip">🧠 Wisdom: <strong>${wisdom}</strong></div>
+      <div class="hqChip">🪙 Tokens: <strong>${tokens}</strong></div>
+      <div class="hqChip" style="display:flex; align-items:center; gap:8px;">
+        ${
+          ctx.avatarIsCustom && ctx.avatarImg
+            ? `<img src="${ctx.avatarImg}" alt="You" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid rgba(255,255,255,0.18);" />`
+            : `<span style="font-size:18px; line-height:1;">${escapeHtml(ctx.avatarEmoji || "🙂")}</span>`
+        }
+        <span>You</span>
+      </div>
     </div>
-  </div>
 
-  <div class="divider"></div>
+    <div class="divider"></div>
 
-  <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
-  <p id="hq-scene-text"></p>
+    <p style="font-weight:900; font-size:18px; margin-top:10px;">Scene ${sc+1}</p>
+    <p id="hq-scene-text"></p>
 
-  <div id="hq-choices"></div>
-  <p class="muted" id="hq-why" style="margin-top:12px;"></p>
-`;
+    <div id="hq-choices"></div>
+    <p class="muted" id="hq-why" style="margin-top:12px;"></p>
+  `;
 
+  // Scene text: DO NOT inject any emoji face for custom avatars.
+  const sceneP = area.querySelector("#hq-scene-text");
+  if(sceneP){
+    sceneP.textContent = String(scene.text(ctx));
+  }
 
   const wrap = area.querySelector("#hq-choices");
   const whyEl = area.querySelector("#hq-why");
   if(!wrap) return;
-
-  // Render scene text with inline avatar node (supports uploaded images)
-  const sceneP = area.querySelector("#hq-scene-text");
-  if(sceneP){
-    sceneP.textContent = ""; // clear
-    const raw = String(scene.text(ctx));
-
-    // Replace the first occurrence of "You (" + something + ")" with a real avatar node.
-    // Your story format starts like: "You (<avatar>) arrive..."
-    // We'll keep it flexible and just replace "You (" ... ")"
-    const m = raw.match(/^You\s*\((.*?)\)\s*/);
-    if(m){
-      // prefix "You ("
-      sceneP.appendChild(document.createTextNode("You ("));
-      sceneP.appendChild(makeAvatarNode({ size: 18, alt: "You" }));
-      sceneP.appendChild(document.createTextNode(") "));
-
-      // rest of the sentence after the match
-      const rest = raw.slice(m[0].length);
-      sceneP.appendChild(document.createTextNode(rest));
-    } else {
-      // fallback
-      sceneP.textContent = raw;
-    }
-  }
-
 
   scene.choices.forEach((choice) => {
     const btn = document.createElement("button");
@@ -1602,7 +1433,6 @@ area.innerHTML = `
 
     btn.addEventListener("click", () => {
       wrap.querySelectorAll(".choiceBtn").forEach(x => x.disabled = true);
-
       if(whyEl) whyEl.textContent = choice.why ? choice.why : "";
 
       const eff = choice.effects || {};
@@ -1621,6 +1451,7 @@ area.innerHTML = `
       next.className = "btn primary";
       next.style.marginTop = "12px";
       next.textContent = choice.end ? "Exit" : "Continue";
+
       next.addEventListener("click", () => {
         if(choice.end){
           closeGameOverlay();
@@ -1633,7 +1464,6 @@ area.innerHTML = `
         if(newSc >= chapter.scenes.length){
           state.habitQuest.chapter = clamp(newCh + 1, 0, HQ.chapters.length - 1);
           state.habitQuest.scene = 0;
-
           addXP(40);
           state.habitQuest.wisdom = safeNum(state.habitQuest.wisdom,0) + 1;
           saveState();
@@ -1642,7 +1472,7 @@ area.innerHTML = `
             renderHabitQuestWin();
             return;
           }
-        } else {
+        }else{
           state.habitQuest.scene = newSc;
           saveState();
         }
@@ -1667,7 +1497,6 @@ function renderHabitQuestWin(){
 
   area.innerHTML = `
     <p class="big">🏁 You finished Habit Quest (for now)!</p>
-    <p>You made lots of strong choices. Your avatar ${escapeHtml(avatarForStory())} is getting wiser.</p>
     <p class="muted">We can add more chapters/branches anytime.</p>
   `;
 
@@ -1681,7 +1510,7 @@ function renderHabitQuestWin(){
 }
 
 /* =========================================================
-   PROFILE (AVATARS + UPLOAD)
+   PROFILE (AVATARS + UPLOAD + DELETE)
 ========================================================= */
 function ensureAvatarUploadInput(){
   if($("#avatar-upload")) return;
@@ -1709,7 +1538,7 @@ function renderAvatars(){
       img.alt = "Custom avatar";
       img.className = "avatarImg";
       chip.appendChild(img);
-    } else {
+    }else{
       chip.textContent = opts.label;
     }
 
@@ -1718,6 +1547,7 @@ function renderAvatars(){
     return chip;
   };
 
+  // emojis
   AVATARS.forEach(a => {
     grid.appendChild(makeChip({
       kind: "emoji",
@@ -1732,7 +1562,7 @@ function renderAvatars(){
     }));
   });
 
-  // custom avatars (many)
+  // custom avatars (many) with delete ×
   const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
   list.forEach((a) => {
     const ref = CUSTOM_AVATAR_PREFIX + a.id;
@@ -1749,23 +1579,18 @@ function renderAvatars(){
       }
     });
 
-    // add delete "×" button inside chip
     const del = document.createElement("button");
     del.type = "button";
     del.className = "avatarDelete";
     del.textContent = "×";
     del.title = "Delete this uploaded avatar";
-
     del.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-
       if(!confirm("Delete this uploaded avatar from this device?")) return;
 
-      state.customAvatars = (Array.isArray(state.customAvatars) ? state.customAvatars : [])
-        .filter(x => x && x.id !== a.id);
+      state.customAvatars = (Array.isArray(state.customAvatars) ? state.customAvatars : []).filter(x => x && x.id !== a.id);
 
-      // if it was selected, fallback
       if(state.avatar === ref){
         state.avatar = AVATARS[0];
       }
@@ -1779,33 +1604,7 @@ function renderAvatars(){
     grid.appendChild(chip);
   });
 
-
-  if(state.customAvatar){
-  const del = document.createElement("button");
-  del.className = "chip avatarChip avatarDelete";
-  del.type = "button";
-  del.textContent = "🗑️";
-  del.title = "Delete uploaded avatar";
-
-  del.addEventListener("click", () => {
-    if(!confirm("Delete your uploaded avatar photo from this device?")) return;
-
-    state.customAvatar = null;
-
-    // If they were using it, fall back to an emoji
-    if(state.avatar === CUSTOM_AVATAR_ID){
-      state.avatar = AVATARS[0];
-    }
-
-    saveState();
-    renderAvatars();
-    renderProfile();
-  });
-
-  grid.appendChild(del);
-}
-
-
+  // plus upload
   const plus = document.createElement("button");
   plus.className = "chip avatarChip avatarPlus";
   plus.type = "button";
@@ -1822,7 +1621,6 @@ function bindAvatarUpload(){
   ensureAvatarUploadInput();
   const input = $("#avatar-upload");
   if(!input) return;
-
   if(input.__bound) return;
   input.__bound = true;
 
@@ -1835,7 +1633,6 @@ function bindAvatarUpload(){
       input.value = "";
       return;
     }
-
     if(file.size > 2_000_000){
       alert("That image is a bit large. Try one under 2MB.");
       input.value = "";
@@ -1851,7 +1648,6 @@ function bindAvatarUpload(){
       state.customAvatars = Array.isArray(state.customAvatars) ? state.customAvatars : [];
       state.customAvatars.unshift(item);
 
-      // auto-select the new upload
       state.avatar = CUSTOM_AVATAR_PREFIX + item.id;
 
       saveState();
@@ -1859,7 +1655,6 @@ function bindAvatarUpload(){
       renderProfile();
       input.value = "";
     };
-
     reader.readAsDataURL(file);
   });
 }
@@ -1871,35 +1666,31 @@ function renderProfile(){
   // keep input synced
   input.value = safeStr(state.profileName, "Player").slice(0, 24);
 
-  // avatar preview in header card
-  const emojiEl = $("#profile-avatar-emoji");
-  const imgEl   = $("#profile-avatar-img");
+  const selectedCustom = getSelectedCustomAvatar();
+  const usingCustom = !!(selectedCustom && selectedCustom.dataURL);
 
-const selectedCustom = getSelectedCustomAvatar();
-const usingCustom = !!(selectedCustom && selectedCustom.dataURL);
+  // header avatar preview
+  const headerEmojiEl = $("#profile-avatar-emoji");
+  const headerImgEl   = $("#profile-avatar-img");
 
-if(imgEl){
-  if(usingCustom){
-    imgEl.src = selectedCustom.dataURL;
-    imgEl.classList.remove("hidden");
-  }else{
-    imgEl.removeAttribute("src");
-    imgEl.classList.add("hidden");
+  if(headerImgEl && headerEmojiEl){
+    if(usingCustom){
+      headerImgEl.src = selectedCustom.dataURL;
+      headerImgEl.classList.remove("hidden");
+      headerEmojiEl.textContent = "";
+    }else{
+      headerImgEl.removeAttribute("src");
+      headerImgEl.classList.add("hidden");
+      headerEmojiEl.textContent = (!isCustomAvatarRef(state.avatar) ? (state.avatar || "🙂") : "🙂");
+    }
   }
-}
-
-const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "";
-if(nameTextEl){
-  nameTextEl.textContent = `${emoji} ${displayName}`.trim();
-}
-
 
   // stats
-  $("#profile-xp") && ($("#profile-xp").textContent = String(state.xp));
-  $("#profile-level") && ($("#profile-level").textContent = String(state.level));
+  $("#profile-xp")      && ($("#profile-xp").textContent = String(state.xp));
+  $("#profile-level")   && ($("#profile-level").textContent = String(state.level));
   $("#profile-lessons") && ($("#profile-lessons").textContent = String(state.completedDays.length));
 
-  // avatar grid + upload
+  // avatar grid
   renderAvatars();
 
   // auto-unlock badges
@@ -1913,7 +1704,7 @@ if(nameTextEl){
     wrap.innerHTML = "";
     if(state.ownedBadges.length === 0){
       empty.textContent = "No badges yet — earn XP to unlock some!";
-    } else {
+    }else{
       empty.textContent = "";
       state.ownedBadges.forEach(id => {
         const b = BADGES.find(x => x.id === id);
@@ -1925,34 +1716,18 @@ if(nameTextEl){
       });
     }
   }
-  // Profile header avatar preview (emoji or selected upload)
-  const headerEmojiEl = document.getElementById("profile-avatar-emoji");
-  const headerImgEl = document.getElementById("profile-avatar-img");
-  if(headerEmojiEl && headerImgEl){
-    if(usingCustom){
-      headerImgEl.src = selectedCustom.dataURL;
-      headerImgEl.classList.remove("hidden");
-      headerEmojiEl.textContent = "";
-    }else{
-      headerImgEl.removeAttribute("src");
-      headerImgEl.classList.add("hidden");
-      headerEmojiEl.textContent = (!isCustomAvatarRef(state.avatar) ? (state.avatar || "🙂") : "🙂");
-    }
-  }
 
-  // lessons count pill
-  document.getElementById("profile-lessons") && (document.getElementById("profile-lessons").textContent = String(state.completedDays.length));
-  
   bindProfileNameEditor();
 }
 
-
-
+/* =========================================================
+   SHOP
+========================================================= */
 function renderShop(){
   const grid = $("#shop-grid");
   if(!grid) return;
-
   grid.innerHTML = "";
+
   BADGES.forEach(b => {
     const unlocked = state.xp >= b.xpRequired;
     const card = document.createElement("div");
@@ -1973,13 +1748,12 @@ function bindRatingStarsOnce(){
   if(window.__starsBound) return;
   window.__starsBound = true;
 
-  const wrap = document.getElementById("stars");
+  const wrap = $("#stars");
   if(!wrap) return;
 
   wrap.addEventListener("click", (e) => {
     const btn = e.target.closest(".star");
     if(!btn) return;
-
     const stars = Number(btn.dataset.star);
     if(!Number.isFinite(stars)) return;
 
@@ -2008,8 +1782,8 @@ function renderRate(){
 ========================================================= */
 function renderProgress(){
   $("#completed-count") && ($("#completed-count").textContent = String(state.completedDays.length));
-  $("#highscore") && ($("#highscore").textContent = String(state.highScore));
-  $("#streak-text-2") && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
+  $("#highscore")       && ($("#highscore").textContent = String(state.highScore));
+  $("#streak-text-2")   && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
 
   const list = $("#completed-list");
   if(!list) return;
@@ -2036,12 +1810,13 @@ function renderProgress(){
 function bindReset(){
   $("#btn-reset")?.addEventListener("click", () => {
     if(!confirm("Reset progress on this device?")) return;
+
     localStorage.removeItem(STORAGE_KEY);
     state = normalizeState(loadState());
     saveState();
-    recalcLevel();
 
-    closeGameOverlay(); // also restores scroll
+    recalcLevel();
+    closeGameOverlay();
 
     updateHomeStats();
     renderProgress();
@@ -2058,15 +1833,14 @@ function bindReset(){
    INIT
 ========================================================= */
 function init(){
-  // Hard reset any “stuck no scroll” from older builds
   document.body.style.overflow = "";
-
   $("#year") && ($("#year").textContent = new Date().getFullYear());
 
+  // If a previous broken save exists, normalize fixes it.
+  state = normalizeState(loadState());
   recalcLevel();
   saveState();
 
-  // Create overlay ONCE, but keep it hidden until a game starts
   ensureGameOverlay();
 
   bindNav();
@@ -2078,8 +1852,8 @@ function init(){
   bindProfileNameEditor();
 
   $("#btn-new-tip")?.addEventListener("click", randomTip);
-  randomTip();
 
+  randomTip();
   updateHomeStats();
 
   renderLesson();
@@ -2090,7 +1864,6 @@ function init(){
   renderGamesCatalog();
   renderTrackUI();
 
-  // Default view
   showView("home");
 }
 
