@@ -224,3 +224,71 @@ h1{ margin:0; font-size:18px; }
 .locked{
   opacity:0.6;
 }
+
+/* =========================
+   FIX: Game portal text color
+========================= */
+#view-games,
+#view-games .card,
+#view-games .gameCard,
+#game-area,
+#game-content {
+  color: rgba(255,255,255,0.92);
+}
+
+#view-games .muted,
+#game-area .muted,
+#game-content .muted {
+  color: rgba(255,255,255,0.70) !important;
+}
+
+#view-games h2,
+#view-games h3,
+#game-area h3,
+#game-content p {
+  color: rgba(255,255,255,0.92);
+}
+
+#view-games .gameCard button,
+#game-area button,
+#game-content button {
+  color: rgba(255,255,255,0.92) !important;
+}
+
+#view-games .choice {
+  color: rgba(255,255,255,0.92);
+}
+
+/* If your game cards use inputs/selects anywhere */
+#view-games input,
+#view-games select,
+#view-games textarea {
+  color: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* =========================
+   Profile layout polish
+========================= */
+.profileGrid {
+  align-items: stretch;
+}
+
+#avatar-grid .chip {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+}
+
+#avatar-grid .chip:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+#view-profile .card h3 {
+  margin-bottom: 8px;
+}

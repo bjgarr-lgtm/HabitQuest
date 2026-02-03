@@ -24,7 +24,7 @@
       <button class="tab" data-view="games">Mini‑Games</button>
       <button class="tab" data-view="progress">Progress</button>
       <button class="tab" data-view="profile">Profile</button>
-      <button class="tab" data-view="shop">Badge Shop</button>
+      <button class="tab" data-view="shop">Badges</button>
       <button class="tab" data-view="rate">Rate</button>
       <button class="tab" data-view="about">About</button>
     </nav>
@@ -195,44 +195,46 @@
     </section>
 
     <!-- PROFILE -->
-    <section class="view hidden" id="view-profile">
+<section class="view hidden" id="view-profile">
+  <div class="card">
+    <h2>Profile 👤</h2>
+
+    <div class="grid profileGrid">
       <div class="card">
-        <h2>Profile 👤</h2>
-
-        <div class="grid">
-          <div class="card">
-            <h3>Name</h3>
-            <p class="big" id="profile-name">Odin Garrett</p>
-            <p class="muted">This is shown on your profile.</p>
-          </div>
-
-          <div class="divider"></div>
-
-            <h3>Choose an Avatar</h3>
-            <div id="avatar-grid" class="chips"></div>
-            <p class="muted">Your avatar shows on your profile.</p>
-
-
-          <div class="card">
-            <h3>Total XP</h3>
-            <p class="big" id="profile-xp">0</p>
-            <p class="muted">Earn XP by doing lessons, quizzes, and activities.</p>
-          </div>
-
-          <div class="card">
-            <h3>Level</h3>
-            <p class="big" id="profile-level">1</p>
-            <p class="muted">Level up as you earn XP.</p>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <h3>Your Badges</h3>
-        <div id="owned-badges" class="chips"></div>
-        <p class="muted" id="owned-badges-empty"></p>
+        <h3>Name</h3>
+        <p class="big" id="profile-name">Player</p>
+        <p class="muted">This is shown on your profile.</p>
       </div>
-    </section>
+
+      <div class="card">
+        <h3>Total XP</h3>
+        <p class="big" id="profile-xp">0</p>
+        <p class="muted">Earn XP by doing lessons, quizzes, and activities.</p>
+      </div>
+
+      <div class="card">
+        <h3>Level</h3>
+        <p class="big" id="profile-level">1</p>
+        <p class="muted">Level up as you earn XP.</p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card">
+      <h3>Choose an Avatar</h3>
+      <p class="muted">Your avatar shows on your profile.</p>
+      <div id="avatar-grid" class="chips"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Your Badges</h3>
+    <div id="owned-badges" class="chips"></div>
+    <p class="muted" id="owned-badges-empty"></p>
+  </div>
+</section>
+
 
     <!-- SHOP -->
     <section class="view hidden" id="view-shop">
