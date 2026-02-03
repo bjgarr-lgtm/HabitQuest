@@ -647,3 +647,23 @@ button, input, select, textarea {
   border:1px solid rgba(255,255,255,0.18);
   background: rgba(255,255,255,0.06);
 }
+
+/* Habit Quest – emphasize player identity */
+.hqChip.youChip{
+  padding: 6px 12px;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.hqChip.youChip img{
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+
+.hqChip.youChip .emojiAvatar{
+  font-size: 28px;
+  line-height: 1;
+}

@@ -1130,23 +1130,37 @@ function startBreathing(){
    HABIT QUEST (7 CHAPTERS)
 ========================================================= */
 function avatarForStory(){
-  // Don’t show 🖼️ in story text; use a normal emoji fallback.
-  if(state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) return "🙂";
+  if (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) {
+    return ""; // ← no emoji in story text for photo avatars
+  }
   return state.avatar || "🙂";
 }
 
-function hqYouChipHTML(){
-  const usingCustom = (state.avatar === CUSTOM_AVATAR_ID && !!state.customAvatar);
 
-  if(usingCustom){
-    // data URLs are safe here; just protect quotes for HTML attributes
-    const src = String(state.customAvatar).replaceAll('"', "&quot;");
-    return `<span class="hqAvatarWrap"><img class="hqAvatarImg" src="${src}" alt="You" /></span> You`;
+function hqYouChipEl(){
+  const youChip = document.createElement("div");
+  youChip.className = "hqChip youChip";
+
+  if (state.avatar === CUSTOM_AVATAR_ID && state.customAvatar) {
+    const img = document.createElement("img");
+    img.src = state.customAvatar;
+    img.alt = "You";
+    img.className = "youChipAvatar";
+    youChip.appendChild(img);
+  } else {
+    const span = document.createElement("span");
+    span.className = "emojiAvatar";
+    span.textContent = state.avatar || "🙂";
+    youChip.appendChild(span);
   }
 
-  const emoji = escapeHtml(state.avatar || "🙂");
-  return `${emoji} You`;
+  const label = document.createElement("span");
+  label.textContent = "You";
+  youChip.appendChild(label);
+
+  return youChip;
 }
+
 
 
 function getLastLessonTitle(){
@@ -1175,7 +1189,7 @@ const HQ = {
       name: "Chapter 1: The First Steps",
       scenes: [
         {
-          text: (ctx) => `You (${ctx.avatar}) arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
+          text: () => `You arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
           choices: [
             { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch." },
             { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1 },        why:"Fitting in isn’t worth it." },
@@ -1228,7 +1242,7 @@ const HQ = {
           ]
         },
         {
-          text: (ctx) => `Boss moment: a crowd pressures you. Your avatar ${ctx.avatar} takes a deep breath…`,
+          text: () => `Boss moment: a crowd pressures you. You take a deep breath…`,
           choices: [
             { text:"Say: “No thanks. I’m heading out.”", good:true,  effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit." },
             { text:"Say yes so nobody laughs.",          good:false, effects:{ hearts:-1 },        why:"Real friends don’t demand proof." },
@@ -1393,7 +1407,7 @@ const HQ = {
           ]
         },
         {
-          text: (ctx) => `You did it! You used skills, plans, and support. Your avatar ${ctx.avatar} shines.`,
+          text: () => `You did it! You used skills, plans, and support. You feel proud of your progress.`,
           choices: [
             { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+40 }, why:"Great job!", end:true },
           ]
