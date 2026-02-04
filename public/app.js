@@ -2473,55 +2473,135 @@ function blankSaveSlot(){
   return { savedISO: null, label: "", data: null };
 }
 
-function normalizeState(raw){
-  const s = (raw && typeof raw === "object") ? raw : {};
+/* =========================================================
+   STATE (load/save/normalize)
+========================================================= */
 
-  const out = {
-    selectedTrack: (typeof s.selectedTrack === "string" ? s.selectedTrack : "general"),
-    currentLessonIndex: Number.isFinite(+s.currentLessonIndex) ? +s.currentLessonIndex : 0,
+function defaultState(){
+  return {
+    // basics
+    profileName: "Player",
+    avatar: "🦊",
+    customAvatars: [],
 
-    profileName: (typeof s.profileName === "string" ? s.profileName : "Player"),
-    avatar: (typeof s.avatar === "string" ? s.avatar : "🦊"),
-    customAvatars: Array.isArray(s.customAvatars) ? s.customAvatars : [],
+    // progress
+    xp: 0,
+    level: 1,
+    streak: 0,
+    lastCompletedISO: null,
+    lastLoginISO: null,
+    completedDays: [],
+    currentLessonIndex: 0,
+    highScore: 0,
 
-    xp: Number.isFinite(+s.xp) ? +s.xp : 0,
-    level: Number.isFinite(+s.level) ? +s.level : 1,
-    streak: Number.isFinite(+s.streak) ? +s.streak : 0,
-    lastCompletedISO: (typeof s.lastCompletedISO === "string" ? s.lastCompletedISO : null),
-    lastLoginISO: (typeof s.lastLoginISO === "string" ? s.lastLoginISO : null),
+    // ratings
+    ratings: { total: 0, count: 0 },
 
-    completedDays: Array.isArray(s.completedDays) ? s.completedDays.filter(n => Number.isFinite(+n)).map(n => +n) : [],
-    quizAttempts: (s.quizAttempts && typeof s.quizAttempts === "object") ? s.quizAttempts : {},
+    // tracks
+    selectedTrack: "general",
 
-    highScore: Number.isFinite(+s.highScore) ? +s.highScore : 0,
-    ownedBadges: Array.isArray(s.ownedBadges) ? s.ownedBadges : [],
+    // quiz stats
+    quizAttempts: {},
 
-    ratings: (s.ratings && typeof s.ratings === "object")
-      ? { total: Number.isFinite(+s.ratings.total) ? +s.ratings.total : 0, count: Number.isFinite(+s.ratings.count) ? +s.ratings.count : 0 }
-      : { total: 0, count: 0 },
+    // badges
+    ownedBadges: [],
 
-    habitQuest: (s.habitQuest && typeof s.habitQuest === "object") ? {
-      nodeId: (typeof s.habitQuest.nodeId === "string" ? s.habitQuest.nodeId : "hq_start"),
-      hearts: Number.isFinite(+s.habitQuest.hearts) ? +s.habitQuest.hearts : 3,
-      wisdom: Number.isFinite(+s.habitQuest.wisdom) ? +s.habitQuest.wisdom : 0,
-      tokens: Number.isFinite(+s.habitQuest.tokens) ? +s.habitQuest.tokens : 0,
-      lastLessonDay: Number.isFinite(+s.habitQuest.lastLessonDay) ? +s.habitQuest.lastLessonDay : 0,
-      flags: (s.habitQuest.flags && typeof s.habitQuest.flags === "object") ? s.habitQuest.flags : {},
-      visited: (s.habitQuest.visited && typeof s.habitQuest.visited === "object") ? s.habitQuest.visited : {},
-      history: Array.isArray(s.habitQuest.history) ? s.habitQuest.history : [],
-    } : {
-      nodeId: "hq_start", hearts: 3, wisdom: 0, tokens: 0, lastLessonDay: 0,
-      flags: {}, visited: {}, history: []
+    // habit quest
+    habitQuest: {
+      nodeId: "hq_start",
+      hearts: 3,
+      wisdom: 0,
+      tokens: 0,
+      lastLessonDay: 0,
+      flags: {},
+      visited: {},
+      history: [],
     },
-
-    habitQuestSlots: Array.isArray(s.habitQuestSlots) ? s.habitQuestSlots : [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
+    habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
   };
+}
 
-  // keep index safe
-  if(out.currentLessonIndex < 0) out.currentLessonIndex = 0;
+function blankSaveSlot(){
+  return { savedISO: null, label: "", data: null };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === "object") ? parsed : defaultState();
+  }catch(e){
+    console.warn("loadState() failed, using defaults:", e);
+    return defaultState();
+  }
+}
+
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.warn("saveState() failed:", e);
+  }
+}
+
+function normalizeState(s){
+  const base = defaultState();
+  const obj = (s && typeof s === "object") ? s : {};
+
+  // shallow merge
+  const out = { ...base, ...obj };
+
+  // normalize key fields (types + fallbacks)
+  out.profileName = safeStr(out.profileName, base.profileName).slice(0, 24);
+  out.avatar = safeStr(out.avatar, base.avatar);
+
+  out.customAvatars = Array.isArray(out.customAvatars) ? out.customAvatars : [];
+  out.completedDays = Array.isArray(out.completedDays)
+    ? out.completedDays.map(n => safeNum(n, 0)).filter(n => n > 0)
+    : [];
+
+  out.currentLessonIndex = Math.max(0, safeNum(out.currentLessonIndex, 0));
+  out.xp = Math.max(0, safeNum(out.xp, 0));
+  out.level = Math.max(1, safeNum(out.level, 1));
+  out.streak = Math.max(0, safeNum(out.streak, 0));
+  out.highScore = Math.max(0, safeNum(out.highScore, 0));
+
+  out.ratings = (out.ratings && typeof out.ratings === "object") ? out.ratings : base.ratings;
+  out.ratings.total = Math.max(0, safeNum(out.ratings.total, 0));
+  out.ratings.count = Math.max(0, safeNum(out.ratings.count, 0));
+
+  out.selectedTrack = TRACKS[out.selectedTrack] ? out.selectedTrack : "general";
+
+  out.quizAttempts = (out.quizAttempts && typeof out.quizAttempts === "object") ? out.quizAttempts : {};
+
+  out.ownedBadges = Array.isArray(out.ownedBadges) ? out.ownedBadges : [];
+
+  // habit quest
+  out.habitQuest = (out.habitQuest && typeof out.habitQuest === "object") ? out.habitQuest : base.habitQuest;
+  out.habitQuest.nodeId = safeStr(out.habitQuest.nodeId, "hq_start");
+  out.habitQuest.hearts = clamp(safeNum(out.habitQuest.hearts, 3), 0, 5);
+  out.habitQuest.wisdom = Math.max(0, safeNum(out.habitQuest.wisdom, 0));
+  out.habitQuest.tokens = Math.max(0, safeNum(out.habitQuest.tokens, 0));
+  out.habitQuest.lastLessonDay = Math.max(0, safeNum(out.habitQuest.lastLessonDay, 0));
+  out.habitQuest.flags = (out.habitQuest.flags && typeof out.habitQuest.flags === "object") ? out.habitQuest.flags : {};
+  out.habitQuest.visited = (out.habitQuest.visited && typeof out.habitQuest.visited === "object") ? out.habitQuest.visited : {};
+  out.habitQuest.history = Array.isArray(out.habitQuest.history) ? out.habitQuest.history.slice(-80) : [];
+
+  out.habitQuestSlots = Array.isArray(out.habitQuestSlots) ? out.habitQuestSlots : base.habitQuestSlots;
+  while(out.habitQuestSlots.length < 3) out.habitQuestSlots.push(blankSaveSlot());
+  out.habitQuestSlots = out.habitQuestSlots.slice(0, 3).map(slot => {
+    if(!slot || typeof slot !== "object") return blankSaveSlot();
+    return {
+      savedISO: slot.savedISO ? safeStr(slot.savedISO, null) : null,
+      label: safeStr(slot.label, "").slice(0, 24),
+      data: (slot.data && typeof slot.data === "object") ? slot.data : null,
+    };
+  });
 
   return out;
 }
+
 
 
 /* =========================================================
