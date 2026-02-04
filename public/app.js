@@ -15,197 +15,6 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 ========================================================= */
 const STORAGE_KEY = "htaa_v3_state";
 
-/* =========================================================
-   STATE + STORAGE (RESTORE)
-   Paste below STORAGE_KEY and before any use of `state`.
-========================================================= */
-
-let state = null;
-
-function blankSaveSlot(){
-  return { savedISO: null, label: "", data: null };
-}
-
-const DEFAULT_STATE = {
-  // core progress
-  selectedTrack: "general",
-  currentLessonIndex: 0,
-  completedDays: [],
-  quizAttempts: {},
-
-  // xp/levels
-  xp: 0,
-  level: 1,
-  highScore: 0,
-
-  // streak/login
-  streak: 0,
-  lastCompletedISO: null,
-  lastLoginISO: null,
-
-  // profile
-  profileName: "Player",
-  avatar: "🦊",
-  customAvatars: [],
-  ownedBadges: [],
-
-  // rating
-  ratings: { total: 0, count: 0 },
-
-  // reflections (by day)
-  reflections: {},
-
-  // Habit Quest
-  habitQuest: {
-    nodeId: "hq_start",
-    hearts: 3,
-    wisdom: 0,
-    tokens: 0,
-    lastLessonDay: 0,
-    flags: {},
-    visited: {},
-    history: [],
-  },
-  habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
-};
-
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return null;
-    const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === "object") ? parsed : null;
-  }catch(err){
-    console.warn("loadState failed:", err);
-    return null;
-  }
-}
-
-function saveState(){
-  try{
-    if(!state || typeof state !== "object") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }catch(err){
-    console.warn("saveState failed:", err);
-  }
-}
-
-// small safe helpers used here too
-function asObj(x){ return (x && typeof x === "object") ? x : {}; }
-function asArr(x){ return Array.isArray(x) ? x : []; }
-
-function normalizeState(raw){
-  const s = asObj(raw);
-
-  // shallow merge defaults first
-  const out = { ...DEFAULT_STATE, ...s };
-
-  // fix nested objects/arrays
-  out.completedDays = asArr(out.completedDays)
-    .map(n => Number(n))
-    .filter(n => Number.isFinite(n) && n > 0);
-
-  out.quizAttempts = asObj(out.quizAttempts);
-
-  out.ratings = { ...DEFAULT_STATE.ratings, ...asObj(out.ratings) };
-
-  out.customAvatars = asArr(out.customAvatars).filter(x => x && typeof x === "object");
-  out.ownedBadges = asArr(out.ownedBadges).filter(x => typeof x === "string");
-
-  out.reflections = asObj(out.reflections);
-
-  out.habitQuest = { ...DEFAULT_STATE.habitQuest, ...asObj(out.habitQuest) };
-  out.habitQuest.flags   = asObj(out.habitQuest.flags);
-  out.habitQuest.visited = asObj(out.habitQuest.visited);
-  out.habitQuest.history = asArr(out.habitQuest.history);
-
-  out.habitQuestSlots = asArr(out.habitQuestSlots);
-  while(out.habitQuestSlots.length < 3) out.habitQuestSlots.push(blankSaveSlot());
-  out.habitQuestSlots = out.habitQuestSlots.slice(0,3).map(slot => {
-    const z = asObj(slot);
-    return {
-      savedISO: (typeof z.savedISO === "string" ? z.savedISO : null),
-      label: (typeof z.label === "string" ? z.label : ""),
-      data: (z.data && typeof z.data === "object") ? z.data : null,
-    };
-  });
-
-  // numbers
-  out.xp = safeNum(out.xp, 0);
-  out.level = safeNum(out.level, 1);
-  out.highScore = safeNum(out.highScore, 0);
-  out.streak = safeNum(out.streak, 0);
-  out.currentLessonIndex = safeNum(out.currentLessonIndex, 0);
-
-  // strings
-  out.selectedTrack = safeStr(out.selectedTrack, "general");
-  out.profileName = safeStr(out.profileName, "Player").slice(0,24);
-  out.avatar = safeStr(out.avatar, "🦊");
-
-  return out;
-}
-
-/* =========================================================
-   MISSING GAME CATALOG (RESTORE)
-========================================================= */
-const GAMES = [
-  { id:"choicequest",      title:"Choice Quest",      desc:"Pick the healthiest option.",                 status:"ready", unlock:{type:"free"} },
-  { id:"breathing",        title:"Breathing Buddy",   desc:"Calm your body for 60 seconds.",             status:"ready", unlock:{type:"free"} },
-  { id:"habitquest",       title:"Habit Quest",       desc:"Branching story where choices change path.", status:"ready", unlock:{type:"free"} },
-  { id:"responsebuilder",  title:"Response Builder",  desc:"Build a strong response to pressure.",       status:"ready", unlock:{type:"xp", xp:150} },
-  { id:"pressuremeter",    title:"Pressure Meter",    desc:"Keep pressure low with calm + exit moves.",  status:"ready", unlock:{type:"xp", xp:250} },
-];
-
-/* =========================================================
-   MISSING AVATAR HELPERS (RESTORE)
-========================================================= */
-function getSelectedCustomAvatar(){
-  if(!isCustomAvatarRef(state?.avatar)) return null;
-  const id = String(state.avatar).slice(CUSTOM_AVATAR_PREFIX.length);
-  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
-  return list.find(x => x && x.id === id) || null;
-}
-function getSelectedAvatarDataURL(){
-  const c = getSelectedCustomAvatar();
-  return c && typeof c.dataURL === "string" ? c.dataURL : null;
-}
-
-/* =========================================================
-   MISSING REFLECTION RENDER (RESTORE)
-========================================================= */
-function renderReflection(lesson){
-  const wrap = $("#reflection");
-  if(!wrap) return;
-
-  const dayKey = String(lesson.day);
-  const saved = safeStr(state.reflections?.[dayKey], "");
-
-  wrap.innerHTML = `
-    <div class="card" style="background: rgba(255,255,255,0.06);">
-      <p style="font-weight:900; margin-top:0;">Reflection</p>
-      <p class="muted">${escapeHtml(getBlueprintForLesson(lesson).reflection || "What did you practice today?")}</p>
-      <textarea id="reflection-input" rows="4" style="width:100%;"></textarea>
-      <div class="actions" style="margin-top:10px;">
-        <button class="btn small" id="btn-save-reflection" type="button">Save</button>
-      </div>
-      <p class="muted" id="reflection-status" style="margin-top:10px;"></p>
-    </div>
-  `;
-
-  const input = $("#reflection-input");
-  const status = $("#reflection-status");
-  if(input) input.value = saved;
-
-  $("#btn-save-reflection")?.addEventListener("click", () => {
-    const text = safeStr(input?.value, "").slice(0, 2000);
-    state.reflections = (state.reflections && typeof state.reflections === "object") ? state.reflections : {};
-    state.reflections[dayKey] = text;
-    saveState();
-    if(status) status.textContent = "Saved ✅";
-  });
-}
-
-
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
 function isoDate(d){
@@ -341,569 +150,906 @@ function isCustomAvatarRef(v){
 }
 
 /* =========================================================
-   TRACKS + CURRICULUM META (60-day curriculum + track bonus packs)
+   TRACKS + CURRICULUM META
 ========================================================= */
 const TRACKS = {
-  general:     { name:"General",                  desc:"Core skills: choices, stress tools, boundaries, friends, routines, asking for help." },
-  nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, routines, refusal skills, and recovery after slips." },
-  alcohol:     { name:"Alcohol",                  desc:"Social pressure, party plans, consent/safety boundaries, and getting help." },
-  gaming:      { name:"Gaming / Screen habits",   desc:"Balance, stop plans, focus, sleep protection, and habit loops." },
-  socialmedia: { name:"Social media / Scrolling", desc:"Algorithms, comparison, trend pressure, attention protection, and online boundaries." },
-  caffeine:    { name:"Caffeine / Energy drinks", desc:"Sleep/energy basics, hydration/food timing, anxiety reduction, and safer alternatives." },
+  general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
+  nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, coping skills, and refusing offers." },
+  alcohol:     { name:"Alcohol",                  desc:"Safer choices, boundaries, and handling social pressure." },
+  gaming:      { name:"Gaming / Screen habits",   desc:"Balance, routines, and stopping when you planned to stop." },
+  socialmedia: { name:"Social media / Scrolling", desc:"Trends, influence, focus, and safer online choices." },
+  caffeine:    { name:"Caffeine / Energy drinks", desc:"Sleep/energy basics and alternatives to overstimulation." },
 };
 
-/* =========================================================
-   60-DAY CURRICULUM (GENERAL)
-   - 4 phases: Foundations (1-15), Skills (16-30), Environment (31-45), Maintenance (46-60)
-========================================================= */
-const CURRICULUM_GENERAL = [
-  // Foundations (1–15)
-  { day: 1,  title:"Choices & Consequences",                goal:"Learn how tiny choices compound into habits." },
-  { day: 2,  title:"Stress Signals",                         goal:"Spot body stress signals early and calm them safely." },
-  { day: 3,  title:"Refusal Basics",                         goal:"Say no clearly without over-explaining." },
-  { day: 4,  title:"Pressure vs Friendship",                 goal:"Tell the difference between real friends and pressure tactics." },
-  { day: 5,  title:"Boredom Without Risk",                   goal:"Build a safe-fun plan before boredom pushes you." },
-  { day: 6,  title:"Name the Feeling",                       goal:"Label emotions so you can choose your next step." },
-  { day: 7,  title:"Emotion Spike Plan",                     goal:"Use a 3-step plan when feelings surge." },
-  { day: 8,  title:"Asking for Help",                        goal:"Practice a simple help-ask script and support map." },
-  { day: 9,  title:"Online Influence",                       goal:"Use a trend filter so you don’t get pulled by dares." },
-  { day: 10, title:"Values Anchor",                          goal:"Choose values that guide choices during pressure." },
-  { day: 11, title:"Healthy Coping vs Risky Escape",          goal:"Pick coping tools that help now AND later." },
-  { day: 12, title:"Brain Fuel Basics",                       goal:"Protect sleep/food/water so cravings and stress drop." },
-  { day: 13, title:"School Stress Plan",                      goal:"Break stress stacks into doable next steps." },
-  { day: 14, title:"Tiny-Step Goals",                         goal:"Build goals that are so small they actually happen." },
-  { day: 15, title:"Comebacks After Mistakes",                goal:"Recover fast from slips without shame spirals." },
-
-  // Skills (16–30)
-  { day: 16, title:"Problem Solving Map",                     goal:"Generate options and choose the safest long-term one." },
-  { day: 17, title:"Stop-Signal Routine",                     goal:"Install a realistic stop plan for screens/impulses." },
-  { day: 18, title:"Boundaries 101",                          goal:"Set boundaries clearly and repeat calmly." },
-  { day: 19, title:"Conflict Without Escalation",             goal:"Lower heat, use requests, and pause when needed." },
-  { day: 20, title:"Support Team Map",                        goal:"Build a personal support system you can actually use." },
-  { day: 21, title:"Urge Surfing",                            goal:"Ride urges like waves with delay + distraction + support." },
-  { day: 22, title:"Refusal Under Pressure",                  goal:"Use short lines + exits when everyone is watching." },
-  { day: 23, title:"Hangout Safety Plan",                     goal:"Plan exits, buddies, and safe check-ins." },
-  { day: 24, title:"Helping a Friend Safely",                 goal:"Support friends without carrying it alone or promising secrecy." },
-  { day: 25, title:"Coach-Voice Self Talk",                   goal:"Replace bully self-talk with useful coaching." },
-  { day: 26, title:"Anger Skills",                            goal:"Cool down safely and communicate without damage." },
-  { day: 27, title:"Anxiety Grounding",                       goal:"Use grounding and reality-checking during spikes." },
-  { day: 28, title:"Confidence Through Reps",                 goal:"Build confidence by repeating small brave actions." },
-  { day: 29, title:"Leadership & Influence",                  goal:"Steer groups toward safer choices without drama." },
-  { day: 30, title:"Lock-In Week",                            goal:"Choose your top 2 skills and build a practice plan." },
-
-  // Environment (31–45)
-  { day: 31, title:"Triggers & Patterns",                     goal:"Identify triggers (places/people/moods) and plan around them." },
-  { day: 32, title:"If–Then Planning",                        goal:"Create simple if–then plans for risky moments." },
-  { day: 33, title:"Identity & Reputation",                   goal:"Choose the kind of person you want to be known as." },
-  { day: 34, title:"Social Scripts",                          goal:"Prepare phrases for awkward moments so you don’t freeze." },
-  { day: 35, title:"Time & Energy Budget",                    goal:"Protect time/energy so you don’t rely on shortcuts." },
-  { day: 36, title:"Sleep Protection",                        goal:"Build a sleep boundary that makes everything easier." },
-  { day: 37, title:"Food & Mood",                             goal:"Use food timing to reduce irritability and cravings." },
-  { day: 38, title:"Movement as Medicine",                    goal:"Use short movement to lower stress and reset attention." },
-  { day: 39, title:"Reducing Drama",                          goal:"Spot drama bait and exit calmly." },
-  { day: 40, title:"Digital Boundaries",                      goal:"Set limits that protect attention and self-worth." },
-  { day: 41, title:"Building New Rewards",                    goal:"Replace risky rewards with safe rewards you actually like." },
-  { day: 42, title:"Replacement Habits",                      goal:"Swap a risky routine with a safer routine step-by-step." },
-  { day: 43, title:"People & Places Audit",                   goal:"Identify who/where makes choices harder and adjust." },
-  { day: 44, title:"Handling Setbacks",                       goal:"Make a setback plan that prevents “might as well” spirals." },
-  { day: 45, title:"Respect & Consent Boundaries",            goal:"Practice boundaries that protect your body and safety." },
-
-  // Maintenance (46–60)
-  { day: 46, title:"Streaks the Right Way",                   goal:"Use streaks for motivation without shame." },
-  { day: 47, title:"Relapse Prevention Basics",               goal:"Plan for the ‘danger zones’ and what you’ll do first." },
-  { day: 48, title:"Self-Respect Systems",                    goal:"Build daily systems that protect your choices." },
-  { day: 49, title:"Handling Big Events",                     goal:"Make a plan for parties, trips, and high-pressure events." },
-  { day: 50, title:"Communication Skills",                    goal:"Ask, refuse, and repair with respect." },
-  { day: 51, title:"Repair & Apologies",                      goal:"Fix mistakes with real repair actions, not excuses." },
-  { day: 52, title:"Friendship Upgrade",                      goal:"Strengthen healthy friendships and step back from toxic ones." },
-  { day: 53, title:"Building Purpose",                        goal:"Use goals/purpose so escapes feel less tempting." },
-  { day: 54, title:"Handling Loneliness",                     goal:"Use connection plans instead of risky coping." },
-  { day: 55, title:"Handling Shame",                          goal:"Separate who you are from what you did; reset fast." },
-  { day: 56, title:"Handling Anger + Anxiety Together",       goal:"Use a combined plan for mixed emotions." },
-  { day: 57, title:"Helping Others Without Burning Out",      goal:"Support friends while protecting your own mental space." },
-  { day: 58, title:"Your Personal Rulebook",                  goal:"Write 5 personal safety rules you’ll follow." },
-  { day: 59, title:"Your 30-Day Follow-Up Plan",              goal:"Create a lightweight plan to keep progress going." },
-  { day: 60, title:"Graduation: Keep Going",                  goal:"Pick your next level: review, track bonus pack, or mentor mode." },
+const CURRICULUM = [
+  { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",                track:"general" },
+  { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                        track:"general" },
+  { title:"Saying No With Confidence",          goal:"Practice refusing pressure calmly.",                       track:"general" },
+  { title:"Friend Pressure vs Real Friends",    goal:"Spot healthy friendships.",                                track:"general" },
+  { title:"Boredom Without Risk",               goal:"Make a fun plan that’s safe.",                             track:"general" },
+  { title:"Feelings Are Signals",               goal:"Name feelings and respond wisely.",                        track:"general" },
+  { title:"Big Emotions Plan",                  goal:"Use a 3-step plan when emotions spike.",                   track:"general" },
+  { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                      track:"general" },
+  { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",               track:"socialmedia" },
+  { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",              track:"general" },
+  { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                 track:"general" },
+  { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                    track:"caffeine" },
+  { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                  track:"general" },
+  { title:"Goals & Tiny Steps",                 goal:"Make goals and track small wins.",                         track:"general" },
+  { title:"Mistakes & Comebacks",               goal:"Recover from mistakes without shame.",                     track:"general" },
+  { title:"Problem Solving",                    goal:"Use a simple method to solve problems.",                   track:"general" },
+  { title:"Positive Routines",                  goal:"Build routines that make life easier.",                    track:"gaming" },
+  { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                       track:"general" },
+  { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                  track:"general" },
+  { title:"Trusted Adults",                     goal:"Build your support team.",                                 track:"general" },
+  { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",               track:"nicotine" },
+  { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                    track:"nicotine" },
+  { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",                track:"alcohol" },
+  { title:"Helping a Friend",                   goal:"What to do if a friend is struggling.",                    track:"general" },
+  { title:"Self-Talk",                          goal:"Use kinder thoughts to make better choices.",              track:"general" },
+  { title:"Dealing With Anger",                 goal:"Cool down without hurting anyone.",                        track:"general" },
+  { title:"Dealing With Anxiety",               goal:"Use grounding + breathing tools.",                         track:"general" },
+  { title:"Building Confidence Skills",         goal:"Practice skills that grow confidence.",                    track:"general" },
+  { title:"Being a Leader",                     goal:"Help others make safe choices too.",                       track:"general" },
+  { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                 track:"general" },
 ];
 
 /* =========================================================
-   TRACK BONUS PACKS (12 lessons each, separate day ranges so saves don't collide)
-   - nicotine:   101–112
-   - alcohol:    201–212
-   - gaming:     301–312
-   - social:     401–412
-   - caffeine:   501–512
+   LESSONS (UNIQUE CONTENT) + UNIQUE QUIZZES
+   - No duplicated question sets between lessons.
+   - Each lesson has its own scenario, tool, boundary line, and “myth” to correct.
 ========================================================= */
-const TRACK_BONUS = {
-  nicotine: [
-    { day:101, title:"Nicotine Loop Basics",          goal:"Understand craving loops: trigger → urge → action → relief → repeat." },
-    { day:102, title:"Craving Timer",                 goal:"Delay urges using a timer + body reset." },
-    { day:103, title:"Offer Refusal Under Heat",      goal:"Refuse quickly and exit when offers happen in groups." },
-    { day:104, title:"Replacement Routine",           goal:"Swap the ‘hit’ moment with a safer 2-minute reset." },
-    { day:105, title:"Stress Without Nicotine",       goal:"Build a stress plan that doesn’t rely on nicotine." },
-    { day:106, title:"Social Triggers",               goal:"Plan for friends/places that trigger cravings." },
-    { day:107, title:"Slip Recovery",                 goal:"Recover after a slip without spiraling." },
-    { day:108, title:"Boundary Scripts",              goal:"Use scripts for friends who keep offering." },
-    { day:109, title:"Urge Surfing Advanced",         goal:"Ride stronger urges using movement + distraction + support." },
-    { day:110, title:"Identity Shift",                goal:"Practice thinking/acting like a non-user." },
-    { day:111, title:"Support & Help",                goal:"Build a real help plan: adult + professional options." },
-    { day:112, title:"Maintenance Plan",              goal:"Create a prevention plan for stress weeks and high-risk days." },
-  ],
-  alcohol: [
-    { day:201, title:"Alcohol Reality Check",         goal:"Know common risks and why “everyone does it” is a myth." },
-    { day:202, title:"Party Plan",                    goal:"Buddy + exit + check-in + safe adult plan." },
-    { day:203, title:"Refusal Scripts (Social)",      goal:"Refuse without drama and keep your status." },
-    { day:204, title:"Pressure Tactics",              goal:"Spot tactics (prove it, teasing, threats) and respond." },
-    { day:205, title:"Safety Boundaries",             goal:"Practice boundaries that protect body and safety." },
-    { day:206, title:"Mixed Groups",                  goal:"Handle older-kid pressure and risky environments." },
-    { day:207, title:"Helping a Friend at a Party",   goal:"Get help; don’t carry it alone; prioritize safety." },
-    { day:208, title:"After-Event Reset",             goal:"Recover after a rough night/weekend: repair, rest, reset." },
-    { day:209, title:"Social Confidence",             goal:"Be confident without going along." },
-    { day:210, title:"Family / Culture Pressure",     goal:"Handle pressure from family norms or traditions safely." },
-    { day:211, title:"Getting Help",                  goal:"Know when and how to involve adults/pros." },
-    { day:212, title:"Long-Term Plan",                goal:"Create rules that keep you safe in social situations." },
-  ],
-  gaming: [
-    { day:301, title:"Game Loop & Dopamine",          goal:"Understand why ‘one more’ happens and how to interrupt it." },
-    { day:302, title:"Stop Plan That Works",          goal:"Timer + stand + water + replacement task." },
-    { day:303, title:"Rage & Tilt",                   goal:"Handle anger and frustration without going longer." },
-    { day:304, title:"Sleep Defense",                 goal:"Protect sleep from late-night sessions." },
-    { day:305, title:"Homework First Systems",        goal:"Build a start plan that makes work easier to begin." },
-    { day:306, title:"Weekend Balance",               goal:"Plan long sessions safely with breaks and limits." },
-    { day:307, title:"Social Gaming Pressure",        goal:"Say no to teammates/friends when you need to stop." },
-    { day:308, title:"Replace Scroll/Gaming Urges",   goal:"Build 2 quick replacements that feel rewarding." },
-    { day:309, title:"Focus Training",                goal:"Use short focus sprints to rebuild attention." },
-    { day:310, title:"Device Boundaries",             goal:"Create boundaries with devices (zones, times, rules)." },
-    { day:311, title:"Slip Recovery",                 goal:"Reset after binge sessions without shame." },
-    { day:312, title:"Maintenance Plan",              goal:"Create a weekly plan you can keep." },
-  ],
-  socialmedia: [
-    { day:401, title:"Algorithm Awareness",           goal:"Understand how feeds pull attention and how to resist." },
-    { day:402, title:"Trend Filter Pro",              goal:"Spot risky trends fast and opt out confidently." },
-    { day:403, title:"Comparison Detox",              goal:"Reduce comparison and protect self-worth." },
-    { day:404, title:"Comment / Drama Boundaries",    goal:"Don’t feed drama; exit safely." },
-    { day:405, title:"Time Limits That Stick",        goal:"Use timers + friction + replacement routines." },
-    { day:406, title:"Notifications Audit",           goal:"Stop constant checking with notification rules." },
-    { day:407, title:"FOMO vs Values",                goal:"Choose values over FOMO in real time." },
-    { day:408, title:"Online Safety",                 goal:"Handle DMs, strangers, and oversharing safely." },
-    { day:409, title:"Content Diet",                  goal:"Choose what you consume so mood improves." },
-    { day:410, title:"Friend Pressure Online",        goal:"Handle group chats and dares without losing status." },
-    { day:411, title:"Slip Recovery",                 goal:"Reset after doom-scrolling without giving up." },
-    { day:412, title:"Maintenance Plan",              goal:"Build a weekly system for attention protection." },
-  ],
-  caffeine: [
-    { day:501, title:"Caffeine Basics",               goal:"Understand how caffeine affects sleep, anxiety, and energy crashes." },
-    { day:502, title:"Sleep First Plan",              goal:"Use sleep routines as your #1 energy tool." },
-    { day:503, title:"Hydration & Salt",              goal:"Use hydration properly to improve energy and focus." },
-    { day:504, title:"Food Timing",                   goal:"Use breakfast/snacks to prevent crashes." },
-    { day:505, title:"Anxiety vs Energy",             goal:"Tell the difference and respond correctly." },
-    { day:506, title:"Safer Alternatives",            goal:"Build non-caffeine energy resets that actually work." },
-    { day:507, title:"School Day Plan",               goal:"Prevent the 2pm crash with a simple system." },
-    { day:508, title:"Social Pressure",               goal:"Handle ‘everyone drinks it’ pressure." },
-    { day:509, title:"Habit Loop Swap",               goal:"Replace the ‘grab a drink’ habit with a better loop." },
-    { day:510, title:"Slip Recovery",                 goal:"Reset after overdoing it without doubling down." },
-    { day:511, title:"Long Game Health",              goal:"Choose habits that protect your body and mood long-term." },
-    { day:512, title:"Maintenance Plan",              goal:"Create a weekly plan for steady energy." },
-  ],
-};
-
-/* =========================================================
-   BLUEPRINTS (60 unique lesson blueprints + track bonus blueprints)
-   Each blueprint has: toolName, scenario, safePlan, boundaryLine, myth, tinyStep, reflection, content[]
-========================================================= */
-function bp(toolName, scenario, safePlan, boundaryLine, myth, tinyStep, reflection, content){
-  return { toolName, scenario, safePlan, boundaryLine, myth, tinyStep, reflection, content };
-}
-
-/* 60-day general blueprints (tight but real; each day is distinct) */
-const BLUEPRINT_GENERAL = [
-  bp("Time‑Zoom (Now → Later)",
-    "You’re tempted to do something risky for a quick win.",
-    "Pause, time‑zoom 10 minutes/10 days/10 months, then choose the smallest safe step.",
-    "I’m not doing that. I’m choosing the safer option.",
-    "‘One decision doesn’t matter.’",
-    "Write one 5‑minute safe step.",
-    "What choice would Future You thank you for this week?",
-    ["Habits are built from repeated choices, not one giant moment.",
-     "Time‑Zoom helps your brain see consequences before you act.",
-     "If the ‘later’ version looks messy, choose another path."]),
-  bp("Body‑First Reset",
-    "You feel stressed and want instant escape.",
-    "Reset your body (breath/water/move) before deciding what to do.",
-    "I’m calming down first, then I’ll decide.",
-    "‘Stress means I’m weak.’",
-    "4 slow breaths + water.",
-    "What are 2 reset tools you can do anywhere?",
-    ["Stress is an alarm. It gives info; it does not give orders.",
-     "Your best choices happen after the alarm lowers."]),
-  bp("No‑Switch‑Exit",
-    "Someone pushes you to join a risky plan.",
-    "Say no clearly, switch to another idea, exit if they keep pushing.",
-    "No thanks. I’m heading out.",
-    "‘Saying no is rude.’",
-    "Say your script out loud once.",
-    "Write your best ‘No + Switch’ line.",
-    ["You don’t need a long explanation.",
-     "Clarity protects you. Practice makes it automatic."]),
-  bp("Friend Check",
-    "Someone says, ‘If you’re real you’ll do it.’",
-    "Use the friend check: respect, safety, listens to no. If it fails, step back.",
-    "A real friend wouldn’t ask me to prove it.",
-    "‘Real friends push you.’",
-    "List 2 people who respect your no.",
-    "How can you tell pressure from friendship?",
-    ["Friends expand options; pressure shrinks options.",
-     "Respecting boundaries is the minimum standard."]),
-  bp("Safe‑Fun Menu",
-    "You’re bored and someone suggests risky ‘fun.’",
-    "Use a safe-fun menu: pick 3 safe options and choose one.",
-    "I’m down to hang, but not like that.",
-    "‘Safe fun is boring.’",
-    "Write 3 boredom breakers you’d do.",
-    "What’s your go-to safe fun this week?",
-    ["Boredom is a signal, not an emergency.",
-     "Planning ahead makes pressure weaker."]),
-  bp("Name‑It Map",
-    "You feel ‘bad’ and want to escape.",
-    "Name the feeling → name the need → choose a matching action.",
-    "I need a minute. I’m not deciding right now.",
-    "‘Feelings should be ignored.’",
-    "Write: I feel ___ because ___.",
-    "What feeling showed up today and what did it need?",
-    ["Naming emotions gives you control.",
-     "Needs can be met safely—without creating problems."]),
-  bp("3‑Step Spike Plan",
-    "You’re heated and want to say something nuclear.",
-    "Pause body → name goal → choose calm action.",
-    "I’m too heated. I’ll come back in 10 minutes.",
-    "‘Big emotions mean I must act.’",
-    "Set a 2‑minute cooldown timer.",
-    "What’s your personal spike plan?",
-    ["Spikes feel urgent, but you can ride the wave.",
-     "Pausing is steering, not quitting."]),
-  bp("Help‑Ask Script",
-    "You’re overwhelmed and don’t want to bother anyone.",
-    "Use: ‘Can I talk?’ + what’s happening + one specific ask.",
-    "Can I talk about something stressing me out?",
-    "‘Asking for help is embarrassing.’",
-    "Write one trusted adult’s name.",
-    "Who can you ask, and what will you say?",
-    ["Help early keeps problems smaller.",
-     "Specific asks work better than vague hints."]),
-  bp("Trend Filter",
-    "A viral challenge pressures you to do it now.",
-    "Check: risk? secrecy? harm? If yes, skip and choose your own plan.",
-    "Nope. I’m not doing dares for attention.",
-    "‘Online trends are harmless.’",
-    "Set a 15‑minute timer for apps.",
-    "What rule will you follow online?",
-    ["Safety uses pause; trends use speed.",
-     "You can be bold without being reckless."]),
-  bp("Values Anchor",
-    "You’re tempted to act cool in a way that isn’t you.",
-    "Pick a value (health/honesty/respect) and act like that person.",
-    "That’s not me. I’m good.",
-    "‘Confidence means never doubting.’",
-    "Write one value + one action.",
-    "What boundary will you practice this week?",
-    ["Values make choices easier under pressure.",
-     "Confidence is steady, not loud."]),
-  // 11–60 generated below to keep this paste-able without being 20 pages of repetitive fluff.
+const LESSON_BLUEPRINTS = [
+  // Day 1
+  {
+    toolName: "Time‑Zoom (Now → Later)",
+    scenario: "You’re about to copy someone else’s homework because you’re tired and panicking.",
+    safePlan: "Pause, time‑zoom, then pick the smallest honest step: ask for help or do what you can and tell the truth.",
+    boundaryLine: "I’m not doing that. I’ll handle it another way.",
+    myth: "‘One decision doesn’t matter.’",
+    tinyStep: "Write ONE task you can finish in 5 minutes.",
+    reflection: "What’s one choice Future You would thank you for this week?",
+    content: [
+      "Your brain is like a trail: every choice is a footprint. The trail you repeat becomes the easy path.",
+      "Time‑Zoom: ask ‘What happens in 10 minutes? 10 days? 10 months?’ before you decide.",
+      "If the ‘later’ version looks messy, you’ve got your answer.",
+      "Try it now: pick one small, honest action you can do today."
+    ],
+  },
+  // Day 2
+  {
+    toolName: "Body‑First Reset",
+    scenario: "You get a mean message and feel your chest tighten. You want to react instantly.",
+    safePlan: "Reset your body first (breath/water/move), then decide what response helps you most.",
+    boundaryLine: "I’m not answering right now. I’ll respond later.",
+    myth: "‘Stress means I’m weak.’",
+    tinyStep: "Drink water + 4 slow breaths.",
+    reflection: "What are 2 stress tools you can actually do in under 60 seconds?",
+    content: [
+      "Stress is your body’s alarm system. An alarm is information, not an order.",
+      "Body‑First Reset: water, slow breathing, relax shoulders, or a short walk—then make choices.",
+      "Decisions made while your alarm is blaring are usually worse.",
+      "Try it now: inhale 4, exhale 6, repeat 4 times."
+    ],
+  },
+  // Day 3
+  {
+    toolName: "No‑Switch‑Exit",
+    scenario: "A friend keeps pushing you to sneak out because ‘it’ll be funny.’",
+    safePlan: "Say no clearly, switch to another plan, and exit if they keep pushing.",
+    boundaryLine: "No thanks. I’m heading out.",
+    myth: "‘Saying no is rude.’",
+    tinyStep: "Say your script once out loud.",
+    reflection: "Write your best ‘No + Switch’ sentence for a real situation.",
+    content: [
+      "Refusing pressure is a skill, not a personality trait. Skills get better with reps.",
+      "No‑Switch‑Exit: ‘No’ (clear), then offer a safer switch, then leave if needed.",
+      "You don’t owe long explanations. Clarity is kindness to yourself.",
+      "Practice: say your line in a calm voice once."
+    ],
+  },
+  // Day 4
+  {
+    toolName: "Pressure vs Friend Check",
+    scenario: "Someone says ‘If you were my real friend, you’d do it.’",
+    safePlan: "Use the checklist: respect, safety, and consent. If it fails, it’s pressure—step back.",
+    boundaryLine: "A real friend wouldn’t ask me to prove it.",
+    myth: "‘Real friends push you.’",
+    tinyStep: "List 2 people who respect your no.",
+    reflection: "How can you tell the difference between pressure and a real friend?",
+    content: [
+      "Pressure tries to shrink your choices: ‘Do it or else.’ A friend expands options.",
+      "Checklist: Do they respect boundaries? Do they care about safety? Do they listen?",
+      "If you feel trapped or rushed, that’s a red flag.",
+      "Try it: think of one time someone respected you—what did they do?"
+    ],
+  },
+  // Day 5
+  {
+    toolName: "Safe‑Fun Menu",
+    scenario: "You’re bored on a weekend and someone suggests a risky ‘thrill’ plan.",
+    safePlan: "Pick 3 safe options before boredom hits; choose one and invite someone.",
+    boundaryLine: "I’m down to hang, but not like that. Let’s do something else.",
+    myth: "‘Safe fun is boring.’",
+    tinyStep: "Write 3 boredom breakers you’d actually do.",
+    reflection: "List 3 safe ‘boredom breakers’ you’d actually try.",
+    content: [
+      "Boredom isn’t an emergency. It’s a signal: ‘I need a change.’",
+      "Safe‑Fun Menu: keep a short list of fun things that don’t create problems later.",
+      "Boredom plus peer pressure is a risky combo—plan ahead.",
+      "Try it: pick one menu item you can do today."
+    ],
+  },
+  // Day 6
+  {
+    toolName: "Name‑It Map",
+    scenario: "You feel ‘bad’ but can’t explain it, and you want to escape the feeling.",
+    safePlan: "Name the feeling (stressed, lonely, jealous, embarrassed), then choose the matching need.",
+    boundaryLine: "I need a minute. I’m not making a decision right now.",
+    myth: "‘Feelings should be ignored.’",
+    tinyStep: "Write: ‘I feel ___ because ___.’",
+    reflection: "Name 1 feeling you had today and what it was trying to tell you.",
+    content: [
+      "Feelings are messengers. They’re not always correct, but they’re worth listening to.",
+      "Name‑It Map: feeling → need → next step (rest, support, food, space, movement).",
+      "When you name it, your brain gets more control.",
+      "Try it: pick one word for your feeling right now."
+    ],
+  },
+  // Day 7
+  {
+    toolName: "3‑Step Spike Plan",
+    scenario: "You’re furious during an argument and want to say something that will explode it.",
+    safePlan: "Step 1: pause body. Step 2: name the goal. Step 3: choose a calm action.",
+    boundaryLine: "I’m too heated to talk. I’ll come back in 10 minutes.",
+    myth: "‘Big emotions mean I must act.’",
+    tinyStep: "Set a 2‑minute timer and cool down.",
+    reflection: "When emotions spike, what’s your 3‑step calm plan?",
+    content: [
+      "Spikes feel urgent. That’s the trap. You can ride the wave without acting.",
+      "3 steps: Pause body → Name goal → Choose action (walk, water, text support).",
+      "You’re not ‘losing’ by stepping away—you’re staying in control.",
+      "Try it: relax your jaw and shoulders for 10 seconds."
+    ],
+  },
+  // Day 8
+  {
+    toolName: "Help‑Ask Script",
+    scenario: "You’re overwhelmed but don’t want to ‘bother’ anyone.",
+    safePlan: "Use a short opener, be honest, and ask for one specific thing (listen, advice, ride).",
+    boundaryLine: "Can I talk to you about something that’s been stressing me out?",
+    myth: "‘Asking for help is embarrassing.’",
+    tinyStep: "Write the name of one trusted adult.",
+    reflection: "Who is 1 trusted adult you could talk to, and what would you say?",
+    content: [
+      "Help is not a last resort. It’s a skill: reaching out early keeps problems small.",
+      "Use a script: ‘Can I talk?’ + ‘Here’s what’s happening’ + ‘Can you help me with ____?’",
+      "If one person isn’t available, try another. Keep going.",
+      "Try it: write your opener sentence once."
+    ],
+  },
+  // Day 9
+  {
+    toolName: "Trend Filter",
+    scenario: "A viral challenge says ‘do it or you’re lame.’",
+    safePlan: "Ask: does it add risk, secrecy, or harm? If yes, skip and choose your own plan.",
+    boundaryLine: "Nope. I’m not doing dares for attention.",
+    myth: "‘Online trends are harmless.’",
+    tinyStep: "Turn on a 15‑minute app timer.",
+    reflection: "What’s 1 online trend rule you want to follow to stay safe?",
+    content: [
+      "Online pressure uses speed: ‘Do it now.’ Safety uses pause: ‘Check first.’",
+      "Trend Filter: risk? secrecy? harm? if any are yes, it’s a no.",
+      "You can be bold without being reckless.",
+      "Try it: set one boundary for your scrolling today."
+    ],
+  },
+  // Day 10
+  {
+    toolName: "Values Anchor",
+    scenario: "You’re tempted to act cool in a way that isn’t you.",
+    safePlan: "Pick a value (health, honesty, respect) and act like the person you want to be.",
+    boundaryLine: "That’s not me. I’m good.",
+    myth: "‘Confidence means never doubting.’",
+    tinyStep: "Write one value you want to live by.",
+    reflection: "What’s a boundary you want to practice this week?",
+    content: [
+      "Confidence isn’t loud. It’s steady: ‘I know what I’m about.’",
+      "Values Anchor: decide who you want to be before pressure shows up.",
+      "When you live your values, you respect yourself—and pressure gets weaker.",
+      "Try it: choose one value and one action that matches it."
+    ],
+  },
+  // Day 11
+  {
+    toolName: "Coping Sort",
+    scenario: "You want relief fast and you’re about to pick a coping tool that causes problems later.",
+    safePlan: "Sort coping tools into ‘helps later too’ vs ‘borrows relief and charges interest.’",
+    boundaryLine: "I need a coping tool that doesn’t create new problems.",
+    myth: "‘Any coping is fine.’",
+    tinyStep: "Pick one ‘helps later too’ tool for today.",
+    reflection: "What’s one coping tool that helps now AND later?",
+    content: [
+      "Relief is a real need. The question is: how do you get it without paying for it later?",
+      "Coping Sort: healthy tools lower stress without secrecy, harm, or regret.",
+      "When you’re tempted, choose a tool with a clean ‘tomorrow.’",
+      "Try it: pick one tool and do it for 2 minutes."
+    ],
+  },
+  // Day 12
+  {
+    toolName: "Brain‑Fuel Check",
+    scenario: "You’re exhausted and craving a huge caffeine hit to ‘fix’ it.",
+    safePlan: "Check sleep/food/water first; choose a safer energy reset (water, snack, short walk).",
+    boundaryLine: "I’m going to fuel my body first.",
+    myth: "‘Energy drinks fix tiredness.’",
+    tinyStep: "Water + small snack if possible.",
+    reflection: "What’s one small ‘brain fuel’ habit you can do today?",
+    content: [
+      "Your brain runs on basics: sleep, food, water. When those drop, cravings rise.",
+      "Brain‑Fuel Check before decisions: am I thirsty, hungry, tired, stressed?",
+      "If you’re low-fuel, your ‘risk filter’ gets weaker.",
+      "Try it: drink water right now."
+    ],
+  },
+  // Day 13
+  {
+    toolName: "Stack‑Breaker",
+    scenario: "You have three assignments, practice, and drama—stress is stacking up.",
+    safePlan: "Break the stack: reset body, pick the next tiny task, ask for help early.",
+    boundaryLine: "I’m handling one step at a time.",
+    myth: "‘School stress must be handled alone.’",
+    tinyStep: "Pick the easiest 5‑minute task.",
+    reflection: "What’s one small school step you can do before you relax?",
+    content: [
+      "Stress stacks when you carry everything in your head at once.",
+      "Stack‑Breaker: write it down, pick ONE next action, then do a short reset.",
+      "Tiny progress lowers stress more than perfect plans.",
+      "Try it: choose the next 5‑minute task and start."
+    ],
+  },
+  // Day 14
+  {
+    toolName: "Tiny‑Step Ladder",
+    scenario: "You want a big goal but your brain keeps saying ‘too hard, quit.’",
+    safePlan: "Make a ladder: step 1 is so small you can’t talk yourself out of it.",
+    boundaryLine: "I’m doing the first rung today.",
+    myth: "‘Goals must be huge to count.’",
+    tinyStep: "One rung you can do in 2 minutes.",
+    reflection: "What’s a goal, and what’s the first tiny rung?",
+    content: [
+      "Motivation is unreliable. Systems are reliable.",
+      "Tiny‑Step Ladder: tiny action → repeat → build confidence → add difficulty.",
+      "Small wins train your brain to keep promises to yourself.",
+      "Try it: choose a 2‑minute rung and do it."
+    ],
+  },
+  // Day 15
+  {
+    toolName: "Comeback Script",
+    scenario: "You broke a promise to yourself and feel like giving up completely.",
+    safePlan: "Use the comeback script: ‘I slipped. Next step is ____.’ Then take one tiny repair action.",
+    boundaryLine: "I’m not quitting. I’m resetting.",
+    myth: "‘Mistakes ruin everything.’",
+    tinyStep: "Write your comeback sentence.",
+    reflection: "What’s your comeback sentence for the next time you slip?",
+    content: [
+      "A slip is data, not destiny.",
+      "Comeback Script: name the slip without insults, then pick the next helpful action.",
+      "Shame makes loops stronger. Learning makes loops weaker.",
+      "Try it: write your next step in one sentence."
+    ],
+  },
+  // Day 16
+  {
+    toolName: "Option‑Map",
+    scenario: "You have a problem and your brain says ‘there’s no good choice.’",
+    safePlan: "List 3 options, then rate each by safety + long‑term effect + honesty.",
+    boundaryLine: "I’m going to list options before I choose.",
+    myth: "‘There’s only one right answer.’",
+    tinyStep: "Write 3 options (even imperfect).",
+    reflection: "What problem are you solving, and what are 3 options?",
+    content: [
+      "When stressed, your brain narrows. Option‑Map widens it again.",
+      "Write three options, then check: safe? honest? helps later?",
+      "You’re not looking for perfect. You’re looking for better.",
+      "Try it: list 3 options right now."
+    ],
+  },
+  // Day 17
+  {
+    toolName: "Stop‑Signal Routine",
+    scenario: "You keep scrolling/gaming past your planned stop time.",
+    safePlan: "Use a stop signal (timer + stand up + water) and a replacement action.",
+    boundaryLine: "I’m stopping now like I planned.",
+    myth: "‘Routines are only for adults.’",
+    tinyStep: "Set a timer for your next session.",
+    reflection: "What’s your stop signal + replacement action?",
+    content: [
+      "Habits love ‘just one more.’ Your job is to install a stop signal.",
+      "Stop signal: timer → stand up → water → move to the next planned thing.",
+      "You’re training your brain to follow your plan, not your urge.",
+      "Try it: pick your replacement action."
+    ],
+  },
+  // Day 18
+  {
+    toolName: "Boundary Builder",
+    scenario: "Someone keeps invading your space or time and acts like you’re mean for stopping it.",
+    safePlan: "State boundary, repeat once, then change distance/leave if needed.",
+    boundaryLine: "Stop. I’m not okay with that.",
+    myth: "‘Boundaries hurt people.’",
+    tinyStep: "Write one boundary sentence you’ll use.",
+    reflection: "Where do you need a boundary, and what will you say?",
+    content: [
+      "Boundaries protect relationships by preventing resentment and harm.",
+      "Good boundary = clear + calm + consistent.",
+      "If someone argues with your boundary, that’s information.",
+      "Try it: practice your line once."
+    ],
+  },
+  // Day 19
+  {
+    toolName: "Cool‑Talk Script",
+    scenario: "A disagreement is heating up and you’re about to go for the meanest line.",
+    safePlan: "Lower the heat: slow voice, name the issue, propose a next step, or take a break.",
+    boundaryLine: "I want to solve this, not win it.",
+    myth: "‘Conflict must be won.’",
+    tinyStep: "Replace one insult with one request.",
+    reflection: "What’s one sentence that lowers heat in conflict?",
+    content: [
+      "Conflict is normal. Escalation is optional.",
+      "Cool‑Talk: ‘Here’s the issue’ + ‘Here’s what I need’ + ‘What can we do next?’",
+      "Pausing is not losing. It’s steering.",
+      "Try it: write one ‘request’ sentence."
+    ],
+  },
+  // Day 20
+  {
+    toolName: "Support Team Map",
+    scenario: "Something is hard and you feel like you must handle it alone.",
+    safePlan: "Make a support map: 2 adults + 2 peers + 1 place you can go (office, counselor).",
+    boundaryLine: "I’m going to talk to someone who can help.",
+    myth: "‘You should only rely on yourself.’",
+    tinyStep: "Write 2 names + how to reach them.",
+    reflection: "Who is in your support map?",
+    content: [
+      "Support is strategy. It makes good choices easier to keep.",
+      "Map: who listens, who helps solve, who helps in emergencies.",
+      "If your first ask doesn’t work, try again with someone else.",
+      "Try it: write two names now."
+    ],
+  },
+  // Day 21
+  {
+    toolName: "Urge Wave Rule",
+    scenario: "An urge hits hard and your brain says ‘do it now or you’ll explode.’",
+    safePlan: "Ride the wave: delay 10 minutes, distract, breathe, move, and reach out if needed.",
+    boundaryLine: "This urge will pass. I can wait it out.",
+    myth: "‘Urges control you.’",
+    tinyStep: "Delay 10 minutes (timer).",
+    reflection: "What’s your best 10‑minute urge plan?",
+    content: [
+      "Urges rise, peak, and fall—like waves.",
+      "Delay breaks the spell. You don’t have to fight forever—just long enough.",
+      "Add a distraction that uses your body (walk, water, shower, stretch).",
+      "Try it: set a 10‑minute timer."
+    ],
+  },
+  // Day 22
+  {
+    toolName: "Offer Refusal Kit",
+    scenario: "Someone offers you something you should avoid, and everyone is watching.",
+    safePlan: "Short no, no debate, move your feet, text someone if needed.",
+    boundaryLine: "No thanks. I’m good.",
+    myth: "‘If you hesitate, you lose.’",
+    tinyStep: "Write your ‘no’ in 6 words or fewer.",
+    reflection: "What’s your quick refusal line?",
+    content: [
+      "You don’t need a speech. You need a clean line and a clean exit.",
+      "Refusal Kit: short no + change subject + move away.",
+      "If people mock you, that’s a sign to leave, not to prove something.",
+      "Try it: say your line out loud once."
+    ],
+  },
+  // Day 23
+  {
+    toolName: "Hangout Plan",
+    scenario: "You’re at a hangout and it turns risky. You don’t want to be the ‘boring’ one.",
+    safePlan: "Use the buddy system and an exit plan before you need it.",
+    boundaryLine: "I’m out. I’ll see you later.",
+    myth: "‘Everyone is judging you.’",
+    tinyStep: "Pick your ‘ride home’ option.",
+    reflection: "What’s your exit plan if a hangout turns risky?",
+    content: [
+      "The safest plan is one you can actually do.",
+      "Hangout Plan: who you’re with, where you’ll go if it shifts, and how you leave.",
+      "A solid exit plan makes saying no easier.",
+      "Try it: decide your exit phrase now."
+    ],
+  },
+  // Day 24
+  {
+    toolName: "Friend‑Help Steps",
+    scenario: "A friend hints they’re struggling and you’re not sure what to do.",
+    safePlan: "Listen, don’t promise secrecy, and involve a trusted adult when needed.",
+    boundaryLine: "I care about you too much to keep this secret.",
+    myth: "‘It’s not your job to help a friend.’",
+    tinyStep: "Send one supportive text.",
+    reflection: "What’s one sentence that shows care and gets help?",
+    content: [
+      "You don’t have to be a therapist to be helpful.",
+      "Steps: listen → show care → get support from an adult if it’s serious.",
+      "Don’t carry heavy stuff alone; share it with safe adults.",
+      "Try it: write one caring sentence."
+    ],
+  },
+  // Day 25
+  {
+    toolName: "Coach‑Voice",
+    scenario: "Your inner voice is roasting you and you want to quit.",
+    safePlan: "Replace bully‑voice with coach‑voice: honest, kind, and specific.",
+    boundaryLine: "I’m learning. I can improve with practice.",
+    myth: "‘Mean self-talk motivates.’",
+    tinyStep: "Rewrite one insult into a coach sentence.",
+    reflection: "What would a good coach say to you today?",
+    content: [
+      "Your brain listens to your words. Harsh words don’t build skill—practice does.",
+      "Coach‑Voice: ‘Here’s what happened’ + ‘Here’s the next step.’",
+      "Kind isn’t weak. Kind is effective.",
+      "Try it: rewrite one thought right now."
+    ],
+  },
+  // Day 26
+  {
+    toolName: "Anger Cooldown Kit",
+    scenario: "You feel anger rising fast and you want to slam/throw/say something intense.",
+    safePlan: "Cooldown kit: move body, cold water, slow breathing, then talk or take space.",
+    boundaryLine: "I’m angry. I’m taking a break to cool down.",
+    myth: "‘Anger must explode.’",
+    tinyStep: "Cold water on hands + 10 slow breaths.",
+    reflection: "What’s in your cooldown kit?",
+    content: [
+      "Anger is energy. You can steer it without hurting anyone.",
+      "Cooldown: create space, lower body heat, slow breathing, then use words.",
+      "If you’re too hot to talk, that’s the sign to pause.",
+      "Try it: unclench your hands and jaw."
+    ],
+  },
+  // Day 27
+  {
+    toolName: "Grounding 5‑4‑3‑2‑1",
+    scenario: "Anxiety spikes and your brain starts making worst‑case movies.",
+    safePlan: "Ground to the present using senses and slow breathing; then take one small step.",
+    boundaryLine: "I’m safe right now. I’m grounding.",
+    myth: "‘Anxiety means danger is real.’",
+    tinyStep: "Do 5‑4‑3‑2‑1 once.",
+    reflection: "Which grounding step helps you most?",
+    content: [
+      "Anxiety is a false alarm sometimes. Grounding helps you check reality.",
+      "5‑4‑3‑2‑1: 5 things you see, 4 feel, 3 hear, 2 smell, 1 taste.",
+      "Then choose a tiny step that moves you forward.",
+      "Try it: do the first two senses now."
+    ],
+  },
+  // Day 28
+  {
+    toolName: "Brave Step Ladder",
+    scenario: "You want confidence but you keep waiting to ‘feel ready.’",
+    safePlan: "Confidence comes after reps. Pick a small brave step and repeat it.",
+    boundaryLine: "I can do this even nervous.",
+    myth: "‘Confidence is something you’re born with.’",
+    tinyStep: "One small brave action today.",
+    reflection: "What’s your small brave step?",
+    content: [
+      "Confidence is built, not gifted.",
+      "Brave Step Ladder: tiny brave step → repeat → level up gradually.",
+      "Being nervous is allowed. Quitting isn’t required.",
+      "Try it: choose your smallest brave step."
+    ],
+  },
+  // Day 29
+  {
+    toolName: "Lead‑By‑Example Move",
+    scenario: "A group is drifting toward risky choices and someone needs to steer it.",
+    safePlan: "Change the activity, invite one person to join you, and keep it calm.",
+    boundaryLine: "Let’s do something safer. I’m not into that.",
+    myth: "‘Leaders never ask for help.’",
+    tinyStep: "Invite one person to a safer plan.",
+    reflection: "How can you lead without being bossy?",
+    content: [
+      "Leadership isn’t controlling people. It’s modeling the safer path.",
+      "A simple redirect can change the whole vibe.",
+      "If it gets unsafe, leaders leave and get support.",
+      "Try it: write one redirect sentence."
+    ],
+  },
+  // Day 30
+  {
+    toolName: "Keep‑Going Plan",
+    scenario: "You finished lessons, but you’re worried you’ll forget everything in a week.",
+    safePlan: "Pick 2 skills to keep, set reminders, and do quick reviews when you slip.",
+    boundaryLine: "I’m building habits, not perfection.",
+    myth: "‘If you slip, quit.’",
+    tinyStep: "Pick 2 skills + when you’ll use them.",
+    reflection: "What 2 skills are you keeping, and when will you use them?",
+    content: [
+      "The goal isn’t ‘never mess up.’ The goal is ‘recover fast and keep going.’",
+      "Keep‑Going Plan: pick two tools, schedule tiny practice, and review when you struggle.",
+      "You keep what you repeat.",
+      "Try it: choose your two tools now."
+    ],
+  },
 ];
 
-/* Fill days 11–60 with distinct, non-cringe, real lesson blueprints */
-(function buildGeneralBlueprints(){
-  const needed = 60;
-  const have = BLUEPRINT_GENERAL.length;
-  if(have >= needed) return;
-
-  const tools = [
-    "Coping Sort", "Brain‑Fuel Check", "Stack‑Breaker", "Tiny‑Step Ladder", "Comeback Script",
-    "Option‑Map", "Stop‑Signal Routine", "Boundary Builder", "Cool‑Talk Script", "Support Team Map",
-    "Urge Wave Rule", "Refusal Kit", "Hangout Plan", "Friend‑Help Steps", "Coach‑Voice",
-    "Anger Cooldown Kit", "Grounding 5‑4‑3‑2‑1", "Brave Step Ladder", "Lead‑By‑Example",
-    "Practice Plan", "Trigger Map", "If–Then Planner", "Identity Statement", "Social Script Pack",
-    "Time Budget", "Sleep Shield", "Snack Plan", "2‑Minute Movement", "Drama Exit", "Digital Fence",
-    "New Rewards", "Swap Routine", "People/Places Audit", "Setback Plan", "Consent Boundary",
-    "Streak Without Shame", "Danger‑Zone Plan", "Daily Systems", "Big Event Plan", "Repair Plan",
-    "Friendship Upgrade", "Purpose Plan", "Connection Plan", "Shame Reset", "Mixed‑Emotion Plan",
-    "Help Others Safely", "Personal Rulebook", "30‑Day Follow‑Up", "Graduation Plan"
-  ];
-
-  const mythPool = [
-    "‘If I feel it, I must do it.’",
-    "‘I can’t change habits.’",
-    "‘If I’m not perfect, it doesn’t count.’",
-    "‘Everyone will judge me.’",
-    "‘I have to handle it alone.’",
-    "‘My brain will explode if I wait.’",
-    "‘Boundaries are mean.’",
-    "‘If I slipped once, I failed.’",
-    "‘I need this to calm down.’",
-    "‘Planning is for other people.’"
-  ];
-
-  for(let d = have + 1; d <= 60; d++){
-    const toolName = tools[(d - 11) % tools.length] || `Skill Tool ${d}`;
-    const myth = mythPool[(d * 3) % mythPool.length];
-    BLUEPRINT_GENERAL.push(bp(
-      toolName,
-      `A real-life moment happens on Day ${d} where you feel pulled toward a quick escape or pressure.`,
-      `Use “${toolName}”: pause, pick the safest long-term move, and do one tiny step.`,
-      "I’m choosing what’s safest for me.",
-      myth,
-      `Do one 2–5 minute action that matches “${toolName}.”`,
-      `What did you practice today that will help you on a hard day?`,
-      [
-        `Day ${d} focuses on a practical skill: ${toolName}.`,
-        "The goal is not perfection — it’s making the next safer move.",
-        "Practice beats willpower: small reps make big changes."
-      ]
-    ));
-  }
-})();
-
-/* Track bonus blueprints (12 each, tuned per track) */
-const BLUEPRINT_TRACK = {
-  nicotine: [
-    bp("Loop Label", "You get a craving after stress.", "Name the loop and choose a replacement action for 2 minutes.", "This is a craving, not a command.", "‘Cravings mean I need it.’", "2-minute replacement action.", "What triggered the urge and what helped?", ["Cravings spike and fall.", "Interrupt the loop early."]),
-    bp("Craving Timer", "An offer happens at lunch.", "Delay 10 minutes and move away; text support if needed.", "No thanks. I’m good.", "‘I can’t say no fast.’", "Write a 6-word refusal line.", "What’s your fastest refusal line?", ["Short lines work best.", "Exit beats debate."]),
-    bp("Offer Exit Plan", "Friends keep pushing after you refuse.", "Repeat once, then exit; change location.", "I already said no. I’m out.", "‘If I leave, I’m weak.’", "Plan your exit phrase.", "Where will you go if it gets pushy?", ["Leaving is a power move.", "Safety first."]),
-    bp("Replacement Routine", "You reach for the привычка moment.", "Replace with water + movement + gum/breathing.", "I’m doing my reset instead.", "‘Replacement won’t work.’", "Do the reset once.", "Which reset worked best?", ["Replacement must be easy.", "Make it automatic."]),
-    bp("Stress Plan", "Stress hits after school.", "Body reset + support + simple task list.", "I’m calming down first.", "‘Stress needs an escape.’", "4 breaths + write 1 task.", "What’s your stress plan step 1?", ["Stress tools reduce cravings.", "Start with the body."]),
-    bp("Social Trigger Map", "A place/person triggers cravings.", "Avoid or modify: buddy, route change, adult help.", "Not today. I’m switching plans.", "‘I can’t avoid triggers.’", "Write 1 trigger + 1 change.", "What trigger can you redesign?", ["Triggers are predictable.", "Plans beat surprises."]),
-    bp("Slip Recovery", "You slip once and feel shame.", "Name it, learn, next step, support.", "I’m resetting, not quitting.", "‘I ruined everything.’", "Write your comeback sentence.", "What’s your comeback sentence?", ["Slips are data.", "Recovery is skill."]),
-    bp("Boundary Scripts", "Someone offers again.", "Use scripts + repeat + exit.", "No. Don’t ask again.", "‘I must be nice.’", "Practice your line out loud.", "Which line feels strongest?", ["Boundaries are protection.", "Calm voice, firm words."]),
-    bp("Urge Surfing+", "A strong urge hits at night.", "Delay + movement + distraction + support.", "This urge will pass.", "‘I can’t wait it out.’", "10-minute timer.", "What helped you ride it out?", ["Urges are waves.", "Delay breaks the spell."]),
-    bp("Identity Shift", "You think ‘I’m just that person.’", "Act like your future self for 1 choice.", "I’m becoming who I choose.", "‘People don’t change.’", "Do 1 identity-aligned action.", "What action matched the new identity?", ["Identity follows actions.", "One choice at a time."]),
-    bp("Help Plan", "You need more support than willpower.", "Pick adults, resources, and a check-in plan.", "I’m getting support.", "‘Help is embarrassing.’", "Write 2 contacts.", "Who’s on your help list?", ["Support multiplies success.", "You deserve help."]),
-    bp("Maintenance", "A stressful week is coming.", "Write your danger-zone plan.", "I’m planning ahead.", "‘Planning doesn’t matter.’", "Write 3 danger zones + 3 responses.", "What’s your plan for the hardest moment?", ["High-risk weeks are predictable.", "Plan now, not mid-crisis."]),
-  ],
-  alcohol: [
-    bp("Reality Check", "Someone says ‘it’s harmless.’", "Name the risk and choose a safer plan.", "I’m not doing that.", "‘Everyone does it.’", "Write 1 rule you’ll follow.", "What’s your safety rule?", ["Popularity isn’t safety.", "Have rules before pressure."]),
-    bp("Party Plan", "You’re invited and unsure.", "Buddy + exit + check-in + adult backup.", "I have a plan.", "‘Plans ruin fun.’", "Write your exit plan.", "What’s your exit plan?", ["Plans reduce pressure.", "Safety enables freedom."]),
-    bp("Refusal Scripts", "Someone offers while others watch.", "Short no + switch + move away.", "No thanks. I’m good.", "‘I need an excuse.’", "Write a 6-word no.", "What’s your clean no?", ["You don’t owe details.", "Feet move > words."]),
-    bp("Pressure Tactics", "They tease you.", "Name tactic; repeat boundary; exit.", "Not interested.", "‘If I say no, I lose.’", "Practice calm repeat.", "What phrase will you repeat?", ["Mocking is a red flag.", "Repeat once, then leave."]),
-    bp("Safety Boundaries", "Situation feels unsafe.", "Leave, call support, stay with buddy.", "I’m leaving now.", "‘I should stay to be cool.’", "Text a trusted adult.", "Who can you text?", ["Safety > status.", "You can leave anytime."]),
-    bp("Mixed Groups", "Older kid pressure.", "Use adult support + exit + buddy.", "No. I’m out.", "‘Older kids know best.’", "Plan the ‘call’ option.", "What’s your backup ride?", ["Age doesn’t equal safe.", "Backups matter."]),
-    bp("Help a Friend", "Friend is not okay.", "Get adult help; don’t promise secrecy.", "I care too much to keep this secret.", "‘I’ll get them in trouble.’", "Name 1 adult.", "Who will you tell?", ["Safety first.", "Adults exist for this."]),
-    bp("After-Event Reset", "You regret something.", "Repair + rest + talk to adult + plan.", "I’m fixing this.", "‘I’m doomed now.’", "Write 1 repair step.", "What repair step is realistic?", ["Repair builds trust.", "Reset is possible."]),
-    bp("Social Confidence", "You fear judgment.", "Values + calm refusal + switch.", "That’s not me.", "‘Everyone is judging.’", "Do 1 confident posture rep.", "What helps you feel steady?", ["Most people forget fast.", "You remember your values."]),
-    bp("Family Pressure", "Family/culture messaging conflicts.", "Ask a trusted adult; set boundaries.", "I’m making my own choice.", "‘I can’t choose differently.’", "Write 1 boundary sentence.", "What will you say?", ["You can respect family and set limits.", "Ask for support."]),
-    bp("Getting Help", "You feel stuck.", "Talk to adult/professional; set check-ins.", "I’m asking for help.", "‘Help is only for emergencies.’", "Write 2 contacts.", "Who are your contacts?", ["Help early works best.", "You deserve support."]),
-    bp("Long-Term Rules", "Next party comes up.", "Use personal rulebook + plan.", "I follow my rules.", "‘Rules are lame.’", "Write 3 rules.", "What 3 rules protect you?", ["Rules reduce stress.", "Clarity beats chaos."]),
-  ],
-  gaming: [
-    bp("Loop Awareness", "You keep saying ‘one more.’", "Interrupt loop with stop signal + stand + water.", "I’m stopping like I planned.", "‘I can’t stop once I start.’", "Set a timer.", "What’s your stop signal?", ["Stop signals beat willpower.", "Make it automatic."]),
-    bp("Stop Plan", "Timer goes off and you ignore it.", "Stand up immediately; change location.", "Timer means stop.", "‘I’ll stop when I feel like it.’", "Stand + water now.", "What’s your replacement task?", ["Location change helps.", "Plan the next step."]),
-    bp("Rage/Tilt", "You get tilted and chase wins.", "Cooldown + quit rule + reset.", "I’m done for now.", "‘I must fix it right now.’", "Cold water + 10 breaths.", "What’s your quit rule?", ["Tilt causes bad choices.", "Pause protects you."]),
-    bp("Sleep Defense", "Late night pulls you.", "Night cutoff + device out of room.", "I protect my sleep.", "‘Sleep doesn’t matter.’", "Set a cutoff time.", "What’s your cutoff time?", ["Sleep fuels self-control.", "Protect it first."]),
-    bp("Start Homework", "You avoid starting.", "2-minute start + tiny step ladder.", "I’m starting for 2 minutes.", "‘If I can’t finish, don’t start.’", "Do 2 minutes.", "What’s your first step?", ["Starting is the hard part.", "Tiny starts work."]),
-    bp("Weekend Balance", "All-day sessions happen.", "Schedule breaks + meals + movement.", "I’m taking a break now.", "‘Breaks waste time.’", "Set a break timer.", "What break helps most?", ["Breaks improve focus.", "Food/water matter."]),
-    bp("Social Pressure", "Friends want you online longer.", "Script + boundary + schedule next time.", "I’m off. Tomorrow works.", "‘I’ll lose friends if I stop.’", "Write your script.", "What will you say?", ["Good friends respect limits.", "Plan future hangouts."]),
-    bp("Replace Urges", "You auto-open apps.", "Friction + replacement routine.", "I’m doing my replacement.", "‘I need it to relax.’", "2-minute replacement.", "What replacement feels good?", ["Friction slows autopilot.", "Replacements must be easy."]),
-    bp("Focus Training", "Focus feels broken.", "Short focus sprints + reward.", "One sprint. Then break.", "‘My focus is gone forever.’", "Do one 10-minute sprint.", "What did you finish?", ["Attention is trainable.", "Small reps rebuild it."]),
-    bp("Device Boundaries", "Devices invade everything.", "Zones/times rules + charging station.", "Devices have a place, not everywhere.", "‘Rules won’t work.’", "Choose one device zone.", "What zone will you set?", ["Environment shapes behavior.", "Make good choices easy."]),
-    bp("Slip Recovery", "You binge again.", "Reset, learn trigger, adjust plan.", "Reset. Learn. Next step.", "‘I failed.’", "Write one adjustment.", "What will you change next time?", ["Slips are data.", "Adjust systems."]),
-    bp("Maintenance", "You want consistency.", "Weekly plan: school nights vs weekends.", "I follow the plan.", "‘Consistency is impossible.’", "Write your weekly schedule.", "What’s your weekly plan?", ["Plans reduce stress.", "Structure protects balance."]),
-  ],
-  socialmedia: [
-    bp("Algorithm Awareness", "You scroll without meaning to.", "Name the pull; set a timer; switch activity.", "I’m choosing my attention.", "‘It’s just a few minutes.’", "Set a 15-min timer.", "What’s your replacement activity?", ["Algorithms optimize for time, not your wellbeing.", "Timers add a stop signal."]),
-    bp("Trend Filter Pro", "Dare pressure hits.", "Risk/secrecy/harm = no. Exit chat if needed.", "No dares.", "‘If I skip, I’m lame.’", "Mute a chat for 1 hour.", "What boundary will you set?", ["Speed is the trick.", "Pause is power."]),
-    bp("Comparison Detox", "You feel worse after scrolling.", "Curate feed; follow real-life goals.", "I’m not comparing my life to highlights.", "‘Everyone is doing better.’", "Unfollow 1 account that hurts mood.", "What content helps you?", ["Comparison lies.", "Feed choices matter."]),
-    bp("Drama Boundaries", "Comments get nasty.", "Don’t feed; exit; report/block when needed.", "I’m not engaging with drama.", "‘I must respond.’", "Take one boundary action.", "What boundary did you use?", ["Engagement fuels drama.", "Silence can be strength."]),
-    bp("Limits That Stick", "You ignore time limits.", "Add friction: log out, grayscale, timer + stand.", "Timer means stop.", "‘I’ll stop naturally.’", "Log out of one app.", "What friction helps most?", ["Friction breaks autopilot.", "Make stopping easy."]),
-    bp("Notification Audit", "Buzzing pulls you all day.", "Turn off non-essential notifications.", "I control my phone, not the reverse.", "‘I’ll miss everything.’", "Disable 3 notifications.", "What changed in your mood?", ["Notifications are attention hooks.", "You can choose peace."]),
-    bp("FOMO vs Values", "You fear missing out.", "Choose a value action instead.", "I’m choosing what matters.", "‘FOMO means I must go.’", "Write 1 value choice.", "What value guided you today?", ["FOMO fades.", "Values last."]),
-    bp("Online Safety", "A stranger DMs you.", "Don’t share private info; tell adult if needed.", "I’m not sharing that.", "‘They seem nice so it’s fine.’", "Block/report if needed.", "What’s your safety rule?", ["Strangers can manipulate.", "Safety first."]),
-    bp("Content Diet", "You consume doom content.", "Choose content that improves mood and goals.", "I’m choosing better inputs.", "‘What I watch doesn’t affect me.’", "Replace 1 feed category.", "What content helps you feel better?", ["Inputs shape mood.", "Curate like food."]),
-    bp("Group Chat Pressure", "Friends push in chat.", "Short no + exit chat + talk IRL if needed.", "Nope.", "‘I must keep up.’", "Leave/mute one chat.", "What boundary did you set?", ["Chats amplify pressure.", "Exit is okay."]),
-    bp("Slip Recovery", "You doom-scroll again.", "Reset: stand, water, walk, plan limit.", "Reset. Then plan.", "‘I’ll never change.’", "Do 2-minute reset.", "What helped you stop?", ["Stop sooner next time.", "Systems beat guilt."]),
-    bp("Maintenance Plan", "You want consistency.", "Weekly rules: timers, zones, no-phone times.", "I follow my rules.", "‘This is just how life is.’", "Write 3 weekly rules.", "What 3 rules protect you?", ["Rules protect attention.", "Consistency is built."]),
-  ],
-  caffeine: [
-    bp("Caffeine Basics", "You want a huge energy drink.", "Check sleep/food/water first; choose safer reset.", "I’m fueling my body first.", "‘Energy drinks fix tired.’", "Water + snack.", "What’s your best energy reset?", ["Energy is a system, not a can.", "Basics matter most."]),
-    bp("Sleep First", "You’re short on sleep.", "Protect sleep; earlier wind-down; device boundary.", "Sleep is my priority.", "‘Sleep is optional.’", "Set a bedtime cue.", "What’s your wind-down cue?", ["Sleep improves mood and self-control.", "Protect it."]),
-    bp("Hydration", "You feel tired and jittery.", "Hydrate; don’t confuse thirst with fatigue.", "I’m hydrating first.", "‘Thirst isn’t a big deal.’", "Drink water now.", "How did hydration change your focus?", ["Dehydration feels like fatigue.", "Water first."]),
-    bp("Food Timing", "You crash mid-day.", "Snack plan: protein + carbs; don’t skip meals.", "I’m eating to stabilize energy.", "‘Skipping meals helps focus.’", "Plan one snack.", "What snack works best for you?", ["Stable blood sugar helps mood.", "Fuel prevents crashes."]),
-    bp("Anxiety vs Energy", "Caffeine makes you anxious.", "Reduce dose; use calming reset; ask adult if needed.", "I’m choosing calm over jittery.", "‘Anxiety means I need more.’", "Do 4-6 breathing.", "What helped you feel calmer?", ["Jitters are not energy.", "Calm helps performance."]),
-    bp("Alternatives", "You need a boost.", "Use movement/light/water/music; short nap if possible.", "I’m doing a safe boost.", "‘Only caffeine works.’", "2-minute movement.", "Which alternative worked best?", ["Movement boosts alertness.", "Safer tools exist."]),
-    bp("School Day Plan", "2pm crash hits daily.", "Build a routine: breakfast + water + snack + break.", "I follow my routine.", "‘Crashes are unavoidable.’", "Write your routine.", "What step helped most today?", ["Routines reduce crashes.", "Consistency matters."]),
-    bp("Social Pressure", "Friends hype energy drinks.", "Refuse + switch: water/snack; keep it calm.", "No thanks. I’m good.", "‘I’ll look lame.’", "Practice your refusal line.", "What line feels natural?", ["Short refusals work.", "You don’t owe explanations."]),
-    bp("Loop Swap", "You grab caffeine automatically.", "Swap with water/tea/snack first.", "I’m swapping the habit.", "‘Autopilot can’t change.’", "Swap once today.", "What made swapping easier?", ["Habits are cues + actions.", "Swap action, keep cue."]),
-    bp("Slip Recovery", "You overdo caffeine.", "Reset: water, food, calm, earlier bedtime.", "I’m resetting.", "‘I ruined my week.’", "Write one repair step.", "What repair step is most realistic?", ["Repair fast.", "Don’t double down."]),
-    bp("Long Game", "You want steady energy.", "Choose basics; reduce extremes; build sleep/food system.", "I’m choosing steady energy.", "‘Extreme fixes are best.’", "Write 2 steady habits.", "What habits will you keep?", ["Steady beats spiky.", "Basics win."]),
-    bp("Maintenance", "You want consistency.", "Weekly rules for caffeine timing and max amount.", "I follow my plan.", "‘Rules don’t work.’", "Write 3 weekly rules.", "What rules protect you?", ["Rules reduce decision fatigue.", "Plan ahead."]),
-  ],
-};
-
-/* =========================================================
-   LESSON FACTORY
-========================================================= */
-function getBlueprintForLesson(lesson){
-  const d = safeNum(lesson.day, 1);
-  // General 1–60
-  if(d >= 1 && d <= 60){
-    return BLUEPRINT_GENERAL[d - 1] || BLUEPRINT_GENERAL[0];
-  }
-  // Bonus packs
-  if(d >= 101 && d <= 112) return BLUEPRINT_TRACK.nicotine[d - 101] || BLUEPRINT_TRACK.nicotine[0];
-  if(d >= 201 && d <= 212) return BLUEPRINT_TRACK.alcohol[d - 201] || BLUEPRINT_TRACK.alcohol[0];
-  if(d >= 301 && d <= 312) return BLUEPRINT_TRACK.gaming[d - 301] || BLUEPRINT_TRACK.gaming[0];
-  if(d >= 401 && d <= 412) return BLUEPRINT_TRACK.socialmedia[d - 401] || BLUEPRINT_TRACK.socialmedia[0];
-  if(d >= 501 && d <= 512) return BLUEPRINT_TRACK.caffeine[d - 501] || BLUEPRINT_TRACK.caffeine[0];
-  return BLUEPRINT_GENERAL[0];
+function getBlueprint(day){
+  const idx = clamp(day, 1, 30) - 1;
+  return LESSON_BLUEPRINTS[idx] || LESSON_BLUEPRINTS[0];
 }
 
-function makeLessonContent(lesson){
-  const bp = getBlueprintForLesson(lesson);
+function makeLessonContent(day, title, goal){
+  const bp = getBlueprint(day);
   return [
-    `Today’s topic: ${lesson.title}.`,
-    `Goal: ${lesson.goal}`,
+    `Today’s topic: ${title}.`,
+    `Goal: ${goal}`,
     ...bp.content,
-    `Tool: ${bp.toolName}`,
-    `Tiny Step: ${bp.tinyStep}`,
   ];
 }
 
 /* =========================================================
-   QUIZ BUILDER (12 QUESTIONS PER LESSON)
-   - Uses blueprint + lesson text
-   - Track bonus lessons naturally produce track-specific quizzes
+   QUIZ BUILDER (12 QUESTIONS PER DAY, DAY-SPECIFIC WORDING)
+   - No “same five platitudes” re-used as-is across lessons.
 ========================================================= */
-function makeQuizForLesson(lesson){
-  const bp = getBlueprintForLesson(lesson);
-  const seed = 70000 + safeNum(lesson.day, 1) * 9973;
-  const rng = mulberry32(seed);
+function makeQuizForLesson(day, title, goal, track){
+  const bp = getBlueprint(day);
+  const rng = mulberry32(50000 + day * 999);
 
   const q = (question, correctOpt, wrongOpts) => {
     const options = [correctOpt, ...wrongOpts];
     shuffleInPlace(options, rng);
-    return { q: question, options, answer: options.indexOf(correctOpt) };
+    const answer = options.indexOf(correctOpt);
+    return { q: question, options, answer };
   };
 
-  // “Skill application” questions that feel real (not platitudes)
+  // Track flavor (only when relevant)
+  const trackQ =
+    track === "socialmedia" ? q(
+      `Day ${day} (“${title}”): Which sign means a trend is a bad idea?`,
+      "It pressures you, adds risk, or needs secrecy",
+      ["It’s popular", "It has a funny sound"]
+    ) :
+    track === "gaming" ? q(
+      `Day ${day} (“${title}”): Which stop-signal is most realistic?`,
+      "Timer goes off → stand up → water → switch tasks",
+      ["Keep playing until you feel guilty", "Promise you’ll stop ‘eventually’"]
+    ) :
+    track === "caffeine" ? q(
+      `Day ${day} (“${title}”): What’s the best first fix for low energy?`,
+      "Check sleep/food/water first",
+      ["Double the caffeine every time", "Skip meals to ‘stay sharp’"]
+    ) :
+    track === "nicotine" ? q(
+      `Day ${day} (“${title}”): When an urge hits, what’s the smart first move?`,
+      "Delay and do a body reset before deciding",
+      ["Hide it and panic", "Say yes fast so it’s over"]
+    ) :
+    track === "alcohol" ? q(
+      `Day ${day} (“${title}”): Which hangout plan reduces pressure the most?`,
+      "Buddy + exit plan + safe adult backup",
+      ["Go with no plan and ‘see what happens’", "Rely on secrecy"]
+    ) :
+    q(
+      `Day ${day} (“${title}”): What makes a choice ‘safe’ long-term?`,
+      "It helps now and doesn’t create problems later",
+      ["It feels exciting right now", "It’s something you must hide"]
+    );
+
   const questions = [
     q(
-      `Day ${lesson.day}: What is today’s goal in “${lesson.title}”?`,
-      lesson.goal,
-      ["To impress people", "To hide problems", "To rush without thinking"]
+      `Day ${day}: What is the main goal of “${title}”?`,
+      goal,
+      ["To hide problems", "To take bigger risks"]
     ),
     q(
-      `Tool check: What is the name of today’s main tool?`,
+      `Tool check: Which tool is today’s key skill?`,
       bp.toolName,
-      ["Hope", "Luck", "Ignore it and wait"]
+      ["Luck", "Doing it fast before you think"]
     ),
     q(
-      `Scenario: ${bp.scenario} What is the best safe plan?`,
+      `Scenario: ${bp.scenario} What’s the best safe plan?`,
       bp.safePlan,
-      ["Do it secretly so nobody knows", "Act immediately without calming down", "Pick the riskiest option to feel something"]
+      ["Do it secretly so nobody knows", "Pick the riskiest option to feel something"]
     ),
     q(
-      `Myth check: Which belief is today challenging?`,
+      `Myth check: Which belief does today correct?`,
       bp.myth,
-      ["‘If someone pressures you, you must agree.’", "‘Adults never help.’", "‘Boundaries are impossible.’"]
+      ["‘If you’re nervous, you’re doomed.’", "‘Only adults need plans.’"]
     ),
     q(
-      `Boundary line: Which sentence matches today’s boundary style?`,
+      `Which sentence matches today’s boundary style best?`,
       bp.boundaryLine,
-      ["I guess… maybe…", "Stop talking forever.", "Fine, but don’t tell anyone."]
+      ["I guess… maybe…", "Stop talking forever."]
     ),
     q(
-      `Why do “tiny steps” work?`,
-      "They’re doable now, so they actually happen",
-      ["They prove you’re perfect", "They have to be huge to matter", "They remove all stress forever"]
+      `What’s the point of doing a “tiny step”?`,
+      "It’s doable today, so it actually happens",
+      ["It proves you’re perfect", "It has to be huge to count"]
     ),
     q(
-      `When your body feels stressed (alarm high), what should you do first?`,
-      "Lower the alarm, then decide",
-      ["Decide immediately", "Ignore it and push harder", "Scroll until it goes away"]
-    ),
-    q(
-      `Which friend behavior is healthiest during pressure?`,
+      `Pick the strongest friend behavior in a pressure moment:`,
       "They respect your no and help you switch plans",
-      ["They tease you until you give in", "They demand proof", "They make you keep secrets"]
+      ["They tease you until you give in", "They say ‘prove it’"]
     ),
     q(
-      `Which action is the best “exit” move when pressure keeps going?`,
-      "Change distance and leave the situation",
-      ["Argue until you win", "Stay to prove something", "Do it quickly to end it"]
+      `When your body alarm is high, what should happen first?`,
+      "Lower the alarm, then decide",
+      ["Decide immediately", "Ignore it and push harder"]
     ),
     q(
-      `Trusted help: which is a real support option?`,
-      "Parent/guardian/teacher/coach/counselor",
-      ["Only strangers online", "Nobody ever", "Only people who never judge"]
+      `Which option is the best “switch” after saying no?`,
+      "Let’s do something else.",
+      ["Fine, I’ll do it.", "You’re annoying."]
     ),
     q(
-      `Reflection: which question best matches today’s reflection prompt?`,
-      bp.reflection,
-      ["Why are you the worst?", "How can you impress everyone?", "What’s the fastest risky thing you could do?"]
+      `Trusted adult: which is a real example?`,
+      "Parent/guardian/teacher/coach",
+      ["Only strangers online", "Nobody ever"]
     ),
+    trackQ,
     q(
-      `Tiny step for Day ${lesson.day}: what should you do today?`,
+      `Tiny step for Day ${day}: which is closest to today’s tiny step?`,
       bp.tinyStep,
-      ["A huge impossible promise", "Wait until you feel ready", "Never talk to anyone"]
+      ["A huge impossible promise", "Wait until you feel ready"]
     ),
   ];
 
-  // Ensure exactly 12
-  return questions.slice(0, 12);
+  // Ensure 12 and ensure question text uniqueness within the quiz
+  const out = [];
+  const seen = new Set();
+  for(const item of questions){
+    if(!seen.has(item.q)){
+      seen.add(item.q);
+      out.push(item);
+    }
+    if(out.length >= 12) break;
+  }
+  return out.slice(0, 12);
 }
 
 /* =========================================================
-   LESSON LISTS (General 60 + optional bonus pack)
+   LESSONS ARRAY
 ========================================================= */
-const LESSONS_GENERAL = CURRICULUM_GENERAL.map(item => {
-  const lesson = {
-    day: item.day,
-    track: "general",
-    title: item.title,
-    goal: item.goal,
-  };
-  return {
-    ...lesson,
-    content: makeLessonContent(lesson),
-    quiz: makeQuizForLesson(lesson),
-  };
-});
+const LESSONS = CURRICULUM.map((c, i) => ({
+  day: i + 1,
+  track: c.track || "general",
+  title: c.title,
+  goal: c.goal,
+  content: makeLessonContent(i + 1, c.title, c.goal),
+  quiz: makeQuizForLesson(i + 1, c.title, c.goal, c.track || "general"),
+}));
 
-function buildBonusLessons(trackKey){
-  const pack = TRACK_BONUS[trackKey] || [];
-  return pack.map(item => {
-    const lesson = {
-      day: item.day,
-      track: trackKey,
-      title: item.title,
-      goal: item.goal,
-    };
-    return {
-      ...lesson,
-      content: makeLessonContent(lesson),
-      quiz: makeQuizForLesson(lesson),
-    };
-  });
+/* =========================================================
+   GAMES CATALOG
+========================================================= */
+const GAMES = [
+  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.", status:"ready", unlock:{ type:"free" } },
+  { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",         status:"ready", unlock:{ type:"free" } },
+  { id:"responsebuilder", title:"Response Builder", desc:"Build a strong response to pressure.",  status:"ready", unlock:{ type:"free" } },
+  { id:"pressuremeter", title:"Pressure Meter", desc:"Keep pressure low using healthy moves.",    status:"ready", unlock:{ type:"lessons", lessons:3 } },
+  { id:"memory",      title:"Memory Match",    desc:"Match healthy coping tools.",                status:"soon", unlock:{ type:"xp", xp:250 } },
+  { id:"coping-sort", title:"Coping Sort",     desc:"Sort coping tools into helpful vs not.",     status:"soon", unlock:{ type:"lessons", lessons:5 } },
+  { id:"streak-run",  title:"Streak Run",      desc:"Quick reaction game to keep your streak.",   status:"soon", unlock:{ type:"level", level:4 } },
+  { id:"focus-dodge", title:"Focus Dodge",     desc:"Avoid distractions; build focus.",           status:"soon", unlock:{ type:"level", level:5 } },
+  { id:"goal-builder",title:"Goal Builder",    desc:"Pick goals + tiny steps to reach them.",     status:"soon", unlock:{ type:"xp", xp:600 } },
+  { id:"friendship-quiz", title:"Friendship Signals", desc:"Spot healthy vs unhealthy friend behaviors.", status:"soon", unlock:{ type:"lessons", lessons:10 } },
+  { id:"stress-lab",  title:"Stress Lab",      desc:"Try safe stress tools and see what works.",  status:"soon", unlock:{ type:"xp", xp:900 } },
+];
+
+/* =========================================================
+   STATE
+========================================================= */
+function blankSaveSlot(){
+  return { savedISO: null, label: "", data: null };
 }
 
-const LESSONS_BONUS = {
-  nicotine:    buildBonusLessons("nicotine"),
-  alcohol:     buildBonusLessons("alcohol"),
-  gaming:      buildBonusLessons("gaming"),
-  socialmedia: buildBonusLessons("socialmedia"),
-  caffeine:    buildBonusLessons("caffeine"),
+const DEFAULT_STATE = {
+  currentLessonIndex: 0,
+  completedDays: [],
+  lastCompletedISO: null,
+  streak: 0,
+  highScore: 0,
+  xp: 0,
+  level: 1,
+  profileName: "Player",
+  avatar: AVATARS[0],
+  customAvatars: [],
+  ownedBadges: [],
+  ratings: { total: 0, count: 0 },
+  selectedTrack: "general",
+  reflections: { /* day -> { text, savedISO, rewarded } */ },
+  lastLoginISO: null,
+  quizAttempts: { /* day -> { attempts, wrongTotal, lastISO } */ },
+  habitQuest: {
+    nodeId: "hq_start",
+    hearts: 3,
+    wisdom: 0,
+    tokens: 0,
+    lastLessonDay: 0,
+    flags: {},
+    visited: {},
+    history: [],
+  },
+  habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
 };
 
-const LESSONS = [...LESSONS_GENERAL];
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return { ...DEFAULT_STATE };
+    return JSON.parse(raw);
+  }catch{
+    return { ...DEFAULT_STATE };
+  }
+}
+
+function normalizeState(s){
+  const safe = (s && typeof s === "object") ? s : {};
+  const merged = {
+    ...DEFAULT_STATE,
+    ...safe,
+    completedDays: Array.isArray(safe.completedDays) ? safe.completedDays : [],
+    ownedBadges: Array.isArray(safe.ownedBadges) ? safe.ownedBadges : [],
+    ratings: {
+      ...DEFAULT_STATE.ratings,
+      ...(safe.ratings && typeof safe.ratings === "object" ? safe.ratings : {})
+    },
+    quizAttempts: (safe.quizAttempts && typeof safe.quizAttempts === "object") ? safe.quizAttempts : {},
+    reflections: (safe.reflections && typeof safe.reflections === "object") ? safe.reflections : {},
+    habitQuest: {
+      ...DEFAULT_STATE.habitQuest,
+      ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
+    },
+    habitQuestSlots: Array.isArray(safe.habitQuestSlots) ? safe.habitQuestSlots : DEFAULT_STATE.habitQuestSlots,
+  };
+
+  merged.profileName = safeStr(merged.profileName, "Player").slice(0, 24);
+  merged.selectedTrack = TRACKS[merged.selectedTrack] ? merged.selectedTrack : "general";
+  merged.xp = safeNum(merged.xp, 0);
+  merged.level = safeNum(merged.level, 1);
+  merged.highScore = safeNum(merged.highScore, 0);
+  merged.streak = safeNum(merged.streak, 0);
+  merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
+
+  merged.customAvatars = Array.isArray(safe.customAvatars) ? safe.customAvatars : [];
+  merged.customAvatars = merged.customAvatars
+    .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
+    .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
+
+  if(typeof safe.customAvatar === "string" && safe.customAvatar.startsWith("data:image/")){
+    const exists = merged.customAvatars.some(a => a.dataURL === safe.customAvatar);
+    if(!exists){
+      merged.customAvatars.unshift({ id: uid(), dataURL: safe.customAvatar, createdISO: isoDate(new Date()) });
+    }
+  }
+
+  const isEmoji = AVATARS.includes(merged.avatar);
+  const isCustomRef = isCustomAvatarRef(merged.avatar);
+  if(!isEmoji && !isCustomRef){
+    if(merged.avatar === "__custom__" && merged.customAvatars.length){
+      merged.avatar = CUSTOM_AVATAR_PREFIX + merged.customAvatars[0].id;
+    }else{
+      merged.avatar = AVATARS[0];
+    }
+  }
+  if(isCustomAvatarRef(merged.avatar)){
+    const id = merged.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+    const found = merged.customAvatars.some(a => a.id === id);
+    if(!found) merged.avatar = AVATARS[0];
+  }
+
+  const hq = merged.habitQuest || {};
+  merged.habitQuest.nodeId = safeStr(hq.nodeId, DEFAULT_STATE.habitQuest.nodeId);
+  merged.habitQuest.hearts = clamp(safeNum(hq.hearts, 3), 0, 5);
+  merged.habitQuest.wisdom = Math.max(0, safeNum(hq.wisdom, 0));
+  merged.habitQuest.tokens = Math.max(0, safeNum(hq.tokens, 0));
+  merged.habitQuest.lastLessonDay = Math.max(0, safeNum(hq.lastLessonDay, 0));
+  merged.habitQuest.flags = (hq.flags && typeof hq.flags === "object") ? hq.flags : {};
+  merged.habitQuest.visited = (hq.visited && typeof hq.visited === "object") ? hq.visited : {};
+  merged.habitQuest.history = Array.isArray(hq.history) ? hq.history.slice(-80) : [];
+
+  const slots = Array.isArray(merged.habitQuestSlots) ? merged.habitQuestSlots : [];
+  while(slots.length < 3) slots.push(blankSaveSlot());
+  merged.habitQuestSlots = slots.slice(0, 3).map(slot => {
+    const out = blankSaveSlot();
+    if(slot && typeof slot === "object"){
+      out.savedISO = safeStr(slot.savedISO, null);
+      out.label = safeStr(slot.label, "").slice(0, 24);
+      out.data = (slot.data && typeof slot.data === "object") ? slot.data : null;
+    }
+    return out;
+  });
+
+  return merged;
+}
+
+let state = normalizeState(loadState());
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
 /* =========================================================
-   TRACKS (FIXED BEHAVIOR)
-   - General = 60-day plan
-   - Any track = 60-day plan + bonus pack (so track actually changes content)
+   AVATAR HELPERS
+========================================================= */
+function getCustomAvatarById(id){
+  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+  return list.find(a => a && a.id === id) || null;
+}
+function getSelectedCustomAvatar(){
+  if(!isCustomAvatarRef(state.avatar)) return null;
+  const id = state.avatar.slice(CUSTOM_AVATAR_PREFIX.length);
+  return getCustomAvatarById(id);
+}
+function getSelectedAvatarDataURL(){
+  const c = getSelectedCustomAvatar();
+  return c && c.dataURL ? c.dataURL : null;
+}
+
+/* =========================================================
+   REFLECTION PROMPTS (unique by lesson)
+========================================================= */
+function getReflectionPromptForLesson(lesson){
+  const bp = getBlueprint(lesson.day);
+  return bp.reflection || "What’s one thing you learned today, and how will you use it?";
+}
+
+function renderReflection(lesson){
+  const promptEl = $("#reflection-prompt");
+  const inputEl = $("#reflection-input");
+  const statusEl = $("#reflection-status");
+  const saveBtn = $("#btn-save-reflection");
+  if(!promptEl || !inputEl || !saveBtn) return;
+
+  promptEl.textContent = getReflectionPromptForLesson(lesson);
+
+  const entry = state.reflections?.[String(lesson.day)];
+  inputEl.value = entry?.text || "";
+  if(statusEl) statusEl.textContent = entry?.savedISO ? `Saved (${entry.savedISO})` : "";
+
+  if(!saveBtn.__bound){
+    saveBtn.__bound = true;
+    saveBtn.addEventListener("click", () => {
+      const lessons = getActiveLessons();
+      const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+      const cur = lessons[idx];
+      const txt = safeStr($("#reflection-input")?.value || "", "").slice(0, 800);
+
+      state.reflections = (state.reflections && typeof state.reflections === "object") ? state.reflections : {};
+      const key = String(cur.day);
+      const prev = state.reflections[key] && typeof state.reflections[key] === "object" ? state.reflections[key] : {};
+      const firstReward = !prev.rewarded && txt.length >= 20;
+
+      state.reflections[key] = {
+        text: txt,
+        savedISO: isoDate(new Date()),
+        rewarded: prev.rewarded || (txt.length >= 20)
+      };
+
+      saveState();
+      if(firstReward) addXP(10);
+      renderReflection(cur);
+    });
+  }
+}
+
+/* =========================================================
+   TRACKS
 ========================================================= */
 function getActiveLessons(){
   const t = state.selectedTrack || "general";
-  if(t === "general") return LESSONS_GENERAL;
-  const bonus = LESSONS_BONUS[t] || [];
-  return [...LESSONS_GENERAL, ...bonus];
+  if(t === "general") return LESSONS;
+  const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
+  return filtered.length ? filtered : LESSONS;
 }
 
 function renderTrackUI(){
@@ -1134,8 +1280,7 @@ function renderLesson(){
   const lesson = lessons[idx];
 
   $("#lesson-title") && ($("#lesson-title").textContent = lesson.title);
-  const shownTrack = TRACKS[lesson.track]?.name || "General";
-  $("#lesson-day") && ($("#lesson-day").textContent   = `Day ${lesson.day} • Track: ${shownTrack}`);
+  $("#lesson-day")   && ($("#lesson-day").textContent   = `Day ${lesson.day} • Track: ${TRACKS[state.selectedTrack]?.name || "General"}`);
   $("#lesson-goal")  && ($("#lesson-goal").textContent  = `Goal: ${lesson.goal}`);
 
   const body = $("#lesson-content");
@@ -2667,13 +2812,10 @@ function init(){
   document.body.style.overflow = "";
   $("#year") && ($("#year").textContent = new Date().getFullYear());
 
-  // ✅ load state FIRST
   state = normalizeState(loadState());
-  saveState();
-
-  // ✅ now it's safe to use state-dependent functions
   recalcLevel();
   applyDailyLoginBonus();
+  saveState();
 
   ensureGameOverlay();
   bindNav();
@@ -2706,3 +2848,4 @@ function init(){
   });
 }
 
+init();
