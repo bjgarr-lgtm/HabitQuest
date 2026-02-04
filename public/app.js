@@ -2271,6 +2271,9 @@ function renderProfile(){
   $("#profile-lessons") && ($("#profile-lessons").textContent = String(state.completedDays.length));
   $("#profile-highscore") && ($("#profile-highscore").textContent = String(state.highScore));
   $("#profile-streak") && ($("#profile-streak").textContent = String(state.streak) + (state.streak === 1 ? " day" : " days"));
+  const displayName = state.name?.trim() || "Profile";
+  $("#profile-display-name") &&
+    ($("#profile-display-name").textContent = displayName);
 
   renderAvatars();
 
