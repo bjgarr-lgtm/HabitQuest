@@ -484,3 +484,11 @@ h1{ margin:0; font-size:18px; }
 .profileStats .statPill{ min-width: 120px; }
 .profileAvatar{ border-radius: 14px; }
 
+/* Profile: make stat pills feel cleaner + fit 5 across */
+.profileStats { gap: 10px; }
+.statPill { min-width: 120px; }
+.statValue { letter-spacing: -0.3px; }
+
+/* Make the right column badges area align nicely */
+#owned-badges .chip { white-space: nowrap; }
+
