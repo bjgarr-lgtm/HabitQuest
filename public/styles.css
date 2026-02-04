@@ -398,3 +398,49 @@ h1{ margin:0; font-size:18px; }
 #games-grid.grid > .card{
   grid-column: auto;
 }
+
+/* Home condense */
+.homeGrid > .homeToday{ grid-column: span 9; }
+.homeGrid > .homeSafety{ grid-column: span 3; }
+
+.homeTodayGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 860px){
+  .homeGrid > .homeToday,
+  .homeGrid > .homeSafety{ grid-column: span 12; }
+
+  .homeTodayGrid{ grid-template-columns: 1fr; }
+}
+
+/* Dashboard layout */
+.dashTop{
+  display:flex;
+  gap:14px;
+  align-items:flex-start;
+  justify-content:space-between;
+  flex-wrap:wrap;
+}
+
+.dashStats{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.dashGrid{
+  margin-top: 14px;
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap:12px;
+}
+.dashGrid > .card{ grid-column: span 6; }
+.dashGrid > .card:nth-child(3){ grid-column: span 12; } /* Progress card full width */
+@media (max-width: 860px){
+  .dashGrid > .card{ grid-column: span 12; }
+}

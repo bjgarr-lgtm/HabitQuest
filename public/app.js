@@ -612,8 +612,11 @@ function showView(name){
 
   if(name === "lesson")   renderLesson();
   if(name === "games")    renderGamesCatalog();
-  if(name === "progress") renderProgress();
-  if(name === "profile")  renderProfile();
+  if(name === "profile"){
+    renderProfile();
+    renderProgress(); // now lives inside profile
+  }
+  if(name === "progress") name = "home";
   if(name === "shop")     renderShop();
   if(name === "rate")     renderRate();
   if(name === "tracks")   renderTrackUI();
@@ -640,6 +643,7 @@ function bindNav(){
   $("#btn-open-rate")?.addEventListener("click", () => showView("rate"));
   $("#btn-start-lesson")?.addEventListener("click", () => showView("lesson"));
   $("#btn-start-game")?.addEventListener("click", () => showView("games"));
+  $("#btn-open-habitquest-tab")?.addEventListener("click", () => showView("habitquest"));
 }
 
 function renderHabitQuestLanding(){
@@ -932,9 +936,17 @@ function bindLessonButtons(){
    HOME STATS
 ========================================================= */
 function updateHomeStats(){
-  $("#streak-text")   && ($("#streak-text").textContent   = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
-  $("#streak-text-2") && ($("#streak-text-2").textContent = `${state.streak} day${state.streak === 1 ? "" : "s"}`);
+  // streak
+  const streakLabel = `${state.streak} day${state.streak === 1 ? "" : "s"}`;
+  $("#streak-text")   && ($("#streak-text").textContent   = streakLabel);
+  $("#streak-text-2") && ($("#streak-text-2").textContent = streakLabel);
+
+  // dashboard stats
+  $("#dash-xp")      && ($("#dash-xp").textContent = String(state.xp));
+  $("#dash-level")   && ($("#dash-level").textContent = String(state.level));
+  $("#dash-lessons") && ($("#dash-lessons").textContent = String(state.completedDays.length));
 }
+
 
 /* =========================================================
    GAME OVERLAY (RELIABLE)
@@ -2422,7 +2434,6 @@ function init(){
   updateHomeStats();
 
   renderLesson();
-  renderProgress();
   renderProfile();
   renderShop();
   renderRate();
@@ -2443,3 +2454,5 @@ function init(){
 }
 
 init();
+
+
