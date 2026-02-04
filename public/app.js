@@ -175,15 +175,49 @@ const CURRICULUM = [
   { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                 track:"general" },
 ];
 
-function makeLessonContent(title, goal){
-  return [
+function makeLessonContent(title, goal, day){
+  const punchy = [
     `Today’s topic: ${title}.`,
     `Goal: ${goal}`,
-    "Key idea: your brain gets stronger when you practice safe choices and healthy coping tools.",
-    "Try it: pick one small action you can do today that helps your future self.",
-    "Remember: if something feels risky or confusing, talk to a trusted adult."
+    "Why it matters: your brain learns from repeats — small safe choices become automatic.",
+    "Try it now (30 seconds): take 4 slow breaths and relax your shoulders.",
+    "Real life win: if something feels risky or confusing, talk to a trusted adult."
   ];
+
+  const upgrades = {
+    2: [
+      `Today’s topic: ${title}.`,
+      `Goal: ${goal}`,
+      "Stress is your body’s alarm — not a command.",
+      "Fast reset: inhale 4, exhale 6, repeat 4 times.",
+      "Next step: pick ONE helpful action (water, walk, talk, music, stretch)."
+    ],
+    3: [
+      `Today’s topic: ${title}.`,
+      `Goal: ${goal}`,
+      "Script that works: **No + reason (optional) + switch + exit**.",
+      "Example: “No thanks. I’m good. Let’s do something else.”",
+      "Practice: say your script out loud one time."
+    ],
+    8: [
+      `Today’s topic: ${title}.`,
+      `Goal: ${goal}`,
+      "Asking for help is a strength move, not a weakness move.",
+      "Starter line: “Can I talk to you about something kinda stressful?”",
+      "If one adult isn’t helpful, try a different trusted adult."
+    ],
+    12: [
+      `Today’s topic: ${title}.`,
+      `Goal: ${goal}`,
+      "Brain fuel is the cheat code: sleep + food + water.",
+      "If you feel weird, snack + water first before making decisions.",
+      "Tiny step: drink water right now."
+    ],
+  };
+
+  return upgrades[day] || punchy;
 }
+
 
 /* =========================================================
    QUIZZES — DETERMINISTIC
@@ -327,7 +361,7 @@ const LESSONS = CURRICULUM.map((c, i) => ({
   track: c.track || "general",
   title: c.title,
   goal: c.goal,
-  content: makeLessonContent(c.title, c.goal),
+  content: makeLessonContent(c.title, c.goal, i + 1),
   quiz: makeQuizForLesson(i + 1, c.title, c.goal, c.track || "general"),
 }));
 
@@ -337,6 +371,8 @@ const LESSONS = CURRICULUM.map((c, i) => ({
 const GAMES = [
   { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.",                 status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",                         status:"ready", unlock:{ type:"free" } },
+  { id:"responsebuilder", title:"Response Builder", desc:"Build a strong ‘No + Switch’ sentence.", status:"ready", unlock:{ type:"free" } },
+  { id:"pressuremeter", title:"Pressure Meter", desc:"Keep pressure low using healthy moves.", status:"ready", unlock:{ type:"lessons", lessons:3 } },
 
   // “Soon” stays soon, but unlock gates are a bit later so it feels paced.
   { id:"memory",          title:"Memory Match",        desc:"Match healthy coping tools.",                          status:"soon", unlock:{ type:"xp",     xp:250 } },
@@ -373,6 +409,11 @@ const DEFAULT_STATE = {
   ownedBadges: [],
   ratings: { total: 0, count: 0 },
   selectedTrack: "general",
+  reflections: {
+  // day -> { text, savedISO, rewarded: true/false }
+  },
+  lastLoginISO: null,
+
 
   // PHASE 3: store “struggles” to recommend next lesson
   quizAttempts: {
@@ -417,6 +458,8 @@ function normalizeState(s){
       ...(safe.ratings && typeof safe.ratings === "object" ? safe.ratings : {})
     },
     quizAttempts: (safe.quizAttempts && typeof safe.quizAttempts === "object") ? safe.quizAttempts : {},
+    reflections: (safe.reflections && typeof safe.reflections === "object") ? safe.reflections : {},
+
     habitQuest: {
       ...DEFAULT_STATE.habitQuest,
       ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
@@ -512,6 +555,65 @@ function getSelectedAvatarDataURL(){
   const c = getSelectedCustomAvatar();
   return c && c.dataURL ? c.dataURL : null;
 }
+
+function getReflectionPromptForLesson(lesson){
+  // You can customize per day (below). Fallback is generic.
+  const prompts = {
+    1: "What’s one choice Future You would thank you for this week?",
+    2: "What are 2 stress tools you can actually do in under 60 seconds?",
+    3: "Write your best ‘No + Switch’ sentence for a real situation.",
+    4: "How can you tell the difference between pressure and a real friend?",
+    5: "List 3 safe ‘boredom breakers’ you’d actually try.",
+    6: "Name 1 feeling you had today and what it was trying to tell you.",
+    7: "When emotions spike, what’s your 3‑step calm plan?",
+    8: "Who is 1 trusted adult you could talk to, and what would you say?",
+    9: "What’s 1 online trend rule you want to follow to stay safe?",
+    10:"What’s a boundary you want to practice this week?"
+  };
+  return prompts[lesson.day] || "What’s one thing you learned today, and how will you use it?";
+}
+
+function renderReflection(lesson){
+  const promptEl = $("#reflection-prompt");
+  const inputEl = $("#reflection-input");
+  const statusEl = $("#reflection-status");
+  const saveBtn = $("#btn-save-reflection");
+  if(!promptEl || !inputEl || !saveBtn) return;
+
+  promptEl.textContent = getReflectionPromptForLesson(lesson);
+
+  const entry = state.reflections?.[String(lesson.day)];
+  inputEl.value = entry?.text || "";
+  if(statusEl) statusEl.textContent = entry?.savedISO ? `Saved (${entry.savedISO})` : "";
+
+  if(!saveBtn.__bound){
+    saveBtn.__bound = true;
+    saveBtn.addEventListener("click", () => {
+      const lessons = getActiveLessons();
+      const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+      const cur = lessons[idx];
+      const txt = safeStr($("#reflection-input")?.value || "", "").slice(0, 800);
+
+      state.reflections = (state.reflections && typeof state.reflections === "object") ? state.reflections : {};
+      const key = String(cur.day);
+      const prev = state.reflections[key] && typeof state.reflections[key] === "object" ? state.reflections[key] : {};
+      const firstReward = !prev.rewarded && txt.length >= 20;
+
+      state.reflections[key] = {
+        text: txt,
+        savedISO: isoDate(new Date()),
+        rewarded: prev.rewarded || (txt.length >= 20)
+      };
+      saveState();
+
+      if(firstReward){
+        addXP(10); // small reflection reward once
+      }
+      renderReflection(cur);
+    });
+  }
+}
+
 
 /* =========================================================
    TRACKS
@@ -784,6 +886,8 @@ function renderLesson(){
     });
   }
   renderQuiz(lesson);
+  renderReflection(lesson);
+
   updateLessonStatus(lesson.day);
 }
 
@@ -931,6 +1035,19 @@ function bindLessonButtons(){
     renderHomeRecommendation();
   });
 }
+
+function applyDailyLoginBonus(){
+  const today = isoDate(new Date());
+  if(state.lastLoginISO === today) return;
+
+  // daily login bonus
+  state.habitQuest.tokens = safeNum(state.habitQuest.tokens, 0) + 1;
+  addXP(5);
+
+  state.lastLoginISO = today;
+  saveState();
+}
+
 
 /* =========================================================
    HOME STATS
@@ -1500,7 +1617,89 @@ function launchGame(id){
   if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
   if(id === "habitquest") return startHabitQuest();
+  if(id === "responsebuilder") return startResponseBuilder();
+  if(id === "pressuremeter") return startPressureMeter();
+
   alert("This game is coming soon. Keep earning XP to unlock more!");
+}
+
+function startPressureMeter(){
+  gameMode = "pressuremeter";
+  gameScore = 0;
+  openGameOverlay("Pressure Meter", "Use calm + exit moves to keep pressure low.");
+  renderPressureMeter();
+}
+
+function renderPressureMeter(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  let pressure = 35; // 0..100
+  let t = 0;
+  let alive = true;
+  let loopId = null;
+
+  const draw = (msg="") => {
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Goal: keep pressure under <strong>80</strong> for 30 seconds.</p>
+      <div class="card" style="background: rgba(255,255,255,0.06);">
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div><strong>Time:</strong> ${t}s / 30s</div>
+          <div><strong>Pressure:</strong> ${pressure}</div>
+        </div>
+        <div style="height:12px; border-radius:999px; background: rgba(255,255,255,0.08); margin-top:10px; overflow:hidden;">
+          <div style="height:100%; width:${pressure}%; background: ${pressure<50 ? "rgba(68,215,182,0.9)" : pressure<80 ? "rgba(255,220,90,0.9)" : "rgba(255,85,119,0.9)"};"></div>
+        </div>
+      </div>
+
+      <div class="hqRow" style="margin-top:12px;">
+        <button class="btn small" id="pm-breathe" type="button">🫁 4 Breaths</button>
+        <button class="btn small" id="pm-switch" type="button">🔁 No + Switch</button>
+        <button class="btn small" id="pm-exit" type="button">🚪 Exit Plan</button>
+        <button class="btn small" id="pm-text" type="button">📱 Text Adult</button>
+      </div>
+
+      <p class="muted" id="pm-msg" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+
+    area.querySelector("#pm-breathe")?.addEventListener("click", () => { pressure = clamp(pressure - 12, 0, 100); draw("Breathing lowers the body alarm."); });
+    area.querySelector("#pm-switch")?.addEventListener("click", () => { pressure = clamp(pressure - 8, 0, 100);  draw("Switching activities breaks pressure."); });
+    area.querySelector("#pm-exit")?.addEventListener("click", () => { pressure = clamp(pressure - 10, 0, 100); draw("Exit plan = safety."); });
+    area.querySelector("#pm-text")?.addEventListener("click", () => { pressure = clamp(pressure - 15, 0, 100); draw("Support makes choices easier."); });
+  };
+
+  const end = (win) => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+    const restartBtn = overlay.querySelector("#go-restart");
+    if(restartBtn) restartBtn.style.display = "inline-block";
+
+    if(win){
+      gameScore += 40;
+      addXP(20);
+      area.innerHTML += `<p class="big">✅ Nice!</p><p>You kept pressure manageable.</p>`;
+    }else{
+      area.innerHTML += `<p class="big">⚠️ Oops</p><p class="muted">Pressure got too high. Try using tools earlier.</p>`;
+    }
+    overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+  };
+
+  draw();
+
+  loopId = setInterval(() => {
+    if(!alive) return;
+    t += 1;
+
+    // pressure slowly rises; rises faster later
+    pressure = clamp(pressure + (t < 10 ? 4 : t < 20 ? 5 : 6), 0, 100);
+
+    // win / lose
+    if(pressure >= 80) return end(false);
+    if(t >= 30) return end(true);
+
+    draw();
+  }, 1000);
 }
 
 
@@ -1661,6 +1860,100 @@ function startBreathing(){
     }
   }, 1000);
 }
+
+function startResponseBuilder(){
+  gameMode = "responsebuilder";
+  gameScore = 0;
+  openGameOverlay("Response Builder", "Build a strong response to pressure.");
+  renderResponseBuilder();
+}
+
+function renderResponseBuilder(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const sets = [
+    {
+      prompt: "Friend: “Try it. Everyone’s doing it.”",
+      parts: [
+        ["No thanks.", "Uhh… maybe.", "Fine."],
+        ["I’m not into that.", "Don’t tell anyone.", "I have to prove myself."],
+        ["Let’s do something else.", "Let’s hide it.", "Let’s push it further."]
+      ],
+      best: [0,0,0]
+    },
+    {
+      prompt: "Someone laughs when you say no.",
+      parts: [
+        ["No.", "Okay then.", "Whatever."],
+        ["I’m heading out.", "I’ll do it later.", "Stop talking forever."],
+        ["See you later.", "Don’t tell adults.", "I’ll risk it anyway."]
+      ],
+      best: [0,0,0]
+    }
+  ];
+
+  const rng = mulberry32(7777 + state.xp);
+  const round = sets[Math.floor(rng() * sets.length)];
+
+  let picks = [null,null,null];
+
+  const render = () => {
+    const built = picks.map((p,i) => (p==null ? "____" : round.parts[i][p])).join(" ");
+    area.innerHTML = `
+      <p style="font-weight:900;">${escapeHtml(round.prompt)}</p>
+      <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
+        <p class="muted" style="margin:0 0 8px;">Your response:</p>
+        <p style="font-weight:900; font-size:18px; margin:0;">${escapeHtml(built)}</p>
+      </div>
+
+      <div style="margin-top:12px;">
+        ${round.parts.map((opts, i) => `
+          <div class="card" style="margin:10px 0; background: rgba(255,255,255,0.05);">
+            <p class="muted" style="margin:0 0 8px;">Pick part ${i+1}</p>
+            ${opts.map((t, oi) => `
+              <button class="choiceBtn" data-part="${i}" data-opt="${oi}" type="button">${escapeHtml(t)}</button>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="rb-submit" type="button" ${picks.some(p=>p==null) ? "disabled" : ""}>Submit</button>
+      </div>
+      <p class="muted" id="rb-msg" style="margin-top:10px;"></p>
+    `;
+
+    area.querySelectorAll("button[data-part]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const part = Number(btn.getAttribute("data-part"));
+        const opt  = Number(btn.getAttribute("data-opt"));
+        picks[part] = opt;
+        render();
+      });
+    });
+
+    area.querySelector("#rb-submit")?.addEventListener("click", () => {
+      const ok = picks.every((p,i) => p === round.best[i]);
+      const msg = area.querySelector("#rb-msg");
+      if(ok){
+        gameScore += 25;
+        addXP(15);
+        if(msg) msg.textContent = "✅ Strong response. Clear ‘no’ + switch. Nice.";
+      }else{
+        gameScore = Math.max(0, gameScore - 5);
+        if(msg) msg.textContent = "Almost. Try making it more clear and safer.";
+      }
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+    });
+  };
+
+  render();
+}
+
 
 /* =========================================================
    HABIT QUEST — BRANCHING NODE GRAPH
@@ -2776,6 +3069,10 @@ function init(){
 
   state = normalizeState(loadState());
   recalcLevel();
+  saveState();
+  state = normalizeState(loadState());
+  recalcLevel();
+  applyDailyLoginBonus();
   saveState();
 
   ensureGameOverlay();
