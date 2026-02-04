@@ -2243,8 +2243,17 @@ function bindAvatarUpload(){
 }
 
 function renderProfile(){
-  const input = $("#profile-name-input");
+    const input = $("#profile-name-input");
   if(!input) return;
+
+  const name = safeStr(state.profileName, "Player").slice(0, 24);
+
+  // keep input synced
+  input.value = name;
+
+  // ✅ update the Profile banner title
+  const title = $("#profile-title");
+  if(title) title.textContent = `${name} 👤`;
 
   input.value = safeStr(state.profileName, "Player").slice(0, 24);
 
