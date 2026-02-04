@@ -267,40 +267,112 @@ function makeQuizForLesson(day, title, goal, track){
   const rng = mulberry32(1000 + day * 97);
   const focus = LESSON_FOCUS[day] || { words:["choices","safe","plan","help"], skill:"Healthy choices" };
   const w = focus.words;
-  const q = (question, options, answer) => ({ q: question, options, answer });
+
+  // helper: shuffle array deterministically
+  const shuffleInPlace = (arr) => {
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(rng() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  // build question where we mark the correct option by value, then shuffle options
+  const q = (question, correctOpt, wrongOpts) => {
+    const options = [correctOpt, ...wrongOpts];
+    shuffleInPlace(options);
+    const answer = options.indexOf(correctOpt);
+    return { q: question, options, answer };
+  };
 
   const anchors = [
-    q(`Today’s lesson (“${title}”) is mostly about…`, [`${focus.skill}`, "Hiding problems", "Taking bigger risks"], 0),
-    q(`A helpful question for “${w[0]}” moments is…`, ["Will this help Future Me?", "How do I keep this secret?", "What’s the riskiest option?"], 0),
-    q(`A strong “safe choice” is usually…`, ["Safe and helpful long‑term", "Risky but exciting", "Something you must hide"], 0),
+    q(
+      `Today’s lesson (“${title}”) is mostly about…`,
+      `${focus.skill}`,
+      ["Hiding problems", "Taking bigger risks"]
+    ),
+    q(
+      `A helpful question for “${w[0]}” moments is…`,
+      "Will this help Future Me?",
+      ["How do I keep this secret?", "What’s the riskiest option?"]
+    ),
+    q(
+      `A strong “safe choice” is usually…`,
+      "Safe and helpful long‑term",
+      ["Risky but exciting", "Something you must hide"]
+    ),
   ];
 
   const poolEasy = [
-    q(`When you feel ${w[1] || "pressure"}, the best first step is…`, ["Pause and think", "Say yes fast", "Do it secretly"], 0),
-    q(`A trusted adult could be…`, ["Parent/guardian/teacher/coach", "Only strangers online", "Nobody"], 0),
-    q(`Good friends will…`, ["Respect your boundaries", "Force you to prove yourself", "Laugh when you’re uncomfortable"], 0),
+    q(
+      `When you feel ${w[1] || "pressure"}, the best first step is…`,
+      "Pause and think",
+      ["Say yes fast", "Do it secretly"]
+    ),
+    q(
+      `A trusted adult could be…`,
+      "Parent/guardian/teacher/coach",
+      ["Only strangers online", "Nobody"]
+    ),
+    q(
+      `Good friends will…`,
+      "Respect your boundaries",
+      ["Force you to prove yourself", "Laugh when you’re uncomfortable"]
+    ),
   ];
 
   const poolMed = [
-    q(`Pick the best “switch” after saying no:`, ["Let’s do something else.", "You’re annoying.", "Fine, I’ll do it."], 0),
-    q(`If stress is high, a smart tool is…`, ["Slow breathing + water", "Start a fight", "Do something risky"], 0),
-    q(`A “tiny step” is…`, ["Small and doable today", "Huge and impossible", "Only for adults"], 0),
+    q(
+      `Pick the best “switch” after saying no:`,
+      "Let’s do something else.",
+      ["You’re annoying.", "Fine, I’ll do it."]
+    ),
+    q(
+      `If stress is high, a smart tool is…`,
+      "Slow breathing + water",
+      ["Start a fight", "Do something risky"]
+    ),
+    q(
+      `A “tiny step” is…`,
+      "Small and doable today",
+      ["Huge and impossible", "Only for adults"]
+    ),
   ];
 
   const poolHard = [
-    q(`Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
-      ["Delay + distract + talk to someone", "Keep it secret", "Say yes to fit in"], 0),
-    q(`A good boundary sounds like…`, ["No thanks. I’m heading out.", "I guess… maybe…", "Stop talking forever."], 0),
-    q(`If you make a mistake, the best comeback is…`, ["Learn + get support + try again", "Give up forever", "Blame everyone"], 0),
+    q(
+      `Scenario: You feel ${w[2] || "stressed"} and someone offers a risky escape. Best plan:`,
+      "Delay + distract + talk to someone",
+      ["Keep it secret", "Say yes to fit in"]
+    ),
+    q(
+      `A good boundary sounds like…`,
+      "No thanks. I’m heading out.",
+      ["I guess… maybe…", "Stop talking forever."]
+    ),
+    q(
+      `If you make a mistake, the best comeback is…`,
+      "Learn + get support + try again",
+      ["Give up forever", "Blame everyone"]
+    ),
   ];
 
   const poolBoss = [
-    q(`Boss moment: Your friend laughs at your “no.” Best move is…`,
-      ["Repeat no calmly and step away", "Prove yourself by saying yes", "Start a fight"], 0),
-    q(`Which plan is safest AND realistic?`,
-      ["One you can do today + a trusted adult if needed", "A secret plan nobody knows", "A plan that needs expensive stuff"], 0),
-    q(`When you feel a big urge, it helps to remember…`,
-      ["Urges rise and fall like waves", "Urges never change", "You must obey urges"], 0),
+    q(
+      `Boss moment: Your friend laughs at your “no.” Best move is…`,
+      "Repeat no calmly and step away",
+      ["Prove yourself by saying yes", "Start a fight"]
+    ),
+    q(
+      `Which plan is safest AND realistic?`,
+      "One you can do today + a trusted adult if needed",
+      ["A secret plan nobody knows", "A plan that needs expensive stuff"]
+    ),
+    q(
+      `When you feel a big urge, it helps to remember…`,
+      "Urges rise and fall like waves",
+      ["Urges never change", "You must obey urges"]
+    ),
   ];
 
   let pool = [...poolEasy];
@@ -308,53 +380,68 @@ function makeQuizForLesson(day, title, goal, track){
   if(diff >= 3) pool = pool.concat(poolHard);
   if(diff >= 4) pool = pool.concat(poolBoss);
 
+  // track-specific additions
   if(track === "socialmedia"){
     pool.push(
-      q("Online dares are safest when you…", ["Skip them and choose your own plan", "Do them for likes", "Hide them from adults"], 0),
-      q("A smart scroll rule is…", ["Set a stop time and follow it", "Scroll until 2AM", "Never stop"], 0),
+      q("Online dares are safest when you…", "Skip them and choose your own plan", ["Do them for likes", "Hide them from adults"]),
+      q("A smart scroll rule is…", "Set a stop time and follow it", ["Scroll until 2AM", "Never stop"])
     );
   }
   if(track === "gaming"){
     pool.push(
-      q("A healthy gaming habit is…", ["Stop when you planned to stop", "Play forever", "Skip sleep for one more level"], 0),
-      q("Best first step when you feel stuck in a loop:", ["Stand up + water + 2‑minute reset", "Keep clicking", "Get mad at yourself"], 0),
+      q("A healthy gaming habit is…", "Stop when you planned to stop", ["Play forever", "Skip sleep for one more level"]),
+      q("Best first step when you feel stuck in a loop:", "Stand up + water + 2‑minute reset", ["Keep clicking", "Get mad at yourself"])
     );
   }
   if(track === "caffeine"){
     pool.push(
-      q("Brain fuel usually starts with…", ["Sleep + food + water", "Only energy drinks", "Skipping meals"], 0),
-      q("If you’re tired, a smart option is…", ["Drink water and take a short break", "Chug caffeine every time", "Give up"], 0),
+      q("Brain fuel usually starts with…", "Sleep + food + water", ["Only energy drinks", "Skipping meals"]),
+      q("If you’re tired, a smart option is…", "Drink water and take a short break", ["Chug caffeine every time", "Give up"])
     );
   }
   if(track === "nicotine"){
     pool.push(
-      q("A cravings plan often begins with…", ["Delay and distract", "Hide and panic", "Say yes fast"], 0),
-      q("If someone offers you something risky, you can say…", ["No thanks. I’m good.", "Maybe later secretly.", "Okay to fit in."], 0),
+      q("A cravings plan often begins with…", "Delay and distract", ["Hide and panic", "Say yes fast"]),
+      q("If someone offers you something risky, you can say…", "No thanks. I’m good.", ["Maybe later secretly.", "Okay to fit in."])
     );
   }
   if(track === "alcohol"){
     pool.push(
-      q("At a party, a strong plan is…", ["Have an exit plan + buddy/adult backup", "Do whatever the crowd does", "Hide it"], 0),
-      q("Pressure is not friendship. True or false?", ["True", "False"], 0),
+      q("At a party, a strong plan is…", "Have an exit plan + buddy/adult backup", ["Do whatever the crowd does", "Hide it"]),
+      q("Pressure is not friendship. True or false?", "True", ["False"])
     );
   }
 
-  // Shuffle deterministically
-  for(let i = pool.length - 1; i > 0; i--){
-    const j = Math.floor(rng() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+  // Shuffle pool, then pick UNIQUE questions
+  shuffleInPlace(pool);
+
+  const picked = [];
+  const seen = new Set();
+
+  const addUnique = (item) => {
+    if(!item || !item.q) return false;
+    if(seen.has(item.q)) return false;
+    seen.add(item.q);
+    picked.push(item);
+    return true;
+  };
+
+  anchors.forEach(addUnique);
+  pool.forEach(item => {
+    if(picked.length < 12) addUnique(item);
+  });
+
+  // If still short (should be rare), add unique from combined pools
+  const fallback = shuffleInPlace([...poolEasy, ...poolMed, ...poolHard, ...poolBoss]);
+  for(const item of fallback){
+    if(picked.length >= 12) break;
+    addUnique(item);
   }
 
-  const picked = [...anchors];
-  for(const item of pool){
-    if(picked.length >= 12) break;
-    if(!picked.some(x => x.q === item.q)) picked.push(item);
-  }
-  while(picked.length < 12){
-    picked.push(poolEasy[Math.floor(rng() * poolEasy.length)]);
-  }
-  return picked;
+  // hard guarantee: trim to 12
+  return picked.slice(0, 12);
 }
+
 
 const LESSONS = CURRICULUM.map((c, i) => ({
   day: i + 1,
