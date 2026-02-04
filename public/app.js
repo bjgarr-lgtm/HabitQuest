@@ -15,6 +15,197 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 ========================================================= */
 const STORAGE_KEY = "htaa_v3_state";
 
+/* =========================================================
+   STATE + STORAGE (RESTORE)
+   Paste below STORAGE_KEY and before any use of `state`.
+========================================================= */
+
+let state = null;
+
+function blankSaveSlot(){
+  return { savedISO: null, label: "", data: null };
+}
+
+const DEFAULT_STATE = {
+  // core progress
+  selectedTrack: "general",
+  currentLessonIndex: 0,
+  completedDays: [],
+  quizAttempts: {},
+
+  // xp/levels
+  xp: 0,
+  level: 1,
+  highScore: 0,
+
+  // streak/login
+  streak: 0,
+  lastCompletedISO: null,
+  lastLoginISO: null,
+
+  // profile
+  profileName: "Player",
+  avatar: "🦊",
+  customAvatars: [],
+  ownedBadges: [],
+
+  // rating
+  ratings: { total: 0, count: 0 },
+
+  // reflections (by day)
+  reflections: {},
+
+  // Habit Quest
+  habitQuest: {
+    nodeId: "hq_start",
+    hearts: 3,
+    wisdom: 0,
+    tokens: 0,
+    lastLessonDay: 0,
+    flags: {},
+    visited: {},
+    history: [],
+  },
+  habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === "object") ? parsed : null;
+  }catch(err){
+    console.warn("loadState failed:", err);
+    return null;
+  }
+}
+
+function saveState(){
+  try{
+    if(!state || typeof state !== "object") return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(err){
+    console.warn("saveState failed:", err);
+  }
+}
+
+// small safe helpers used here too
+function asObj(x){ return (x && typeof x === "object") ? x : {}; }
+function asArr(x){ return Array.isArray(x) ? x : []; }
+
+function normalizeState(raw){
+  const s = asObj(raw);
+
+  // shallow merge defaults first
+  const out = { ...DEFAULT_STATE, ...s };
+
+  // fix nested objects/arrays
+  out.completedDays = asArr(out.completedDays)
+    .map(n => Number(n))
+    .filter(n => Number.isFinite(n) && n > 0);
+
+  out.quizAttempts = asObj(out.quizAttempts);
+
+  out.ratings = { ...DEFAULT_STATE.ratings, ...asObj(out.ratings) };
+
+  out.customAvatars = asArr(out.customAvatars).filter(x => x && typeof x === "object");
+  out.ownedBadges = asArr(out.ownedBadges).filter(x => typeof x === "string");
+
+  out.reflections = asObj(out.reflections);
+
+  out.habitQuest = { ...DEFAULT_STATE.habitQuest, ...asObj(out.habitQuest) };
+  out.habitQuest.flags   = asObj(out.habitQuest.flags);
+  out.habitQuest.visited = asObj(out.habitQuest.visited);
+  out.habitQuest.history = asArr(out.habitQuest.history);
+
+  out.habitQuestSlots = asArr(out.habitQuestSlots);
+  while(out.habitQuestSlots.length < 3) out.habitQuestSlots.push(blankSaveSlot());
+  out.habitQuestSlots = out.habitQuestSlots.slice(0,3).map(slot => {
+    const z = asObj(slot);
+    return {
+      savedISO: (typeof z.savedISO === "string" ? z.savedISO : null),
+      label: (typeof z.label === "string" ? z.label : ""),
+      data: (z.data && typeof z.data === "object") ? z.data : null,
+    };
+  });
+
+  // numbers
+  out.xp = safeNum(out.xp, 0);
+  out.level = safeNum(out.level, 1);
+  out.highScore = safeNum(out.highScore, 0);
+  out.streak = safeNum(out.streak, 0);
+  out.currentLessonIndex = safeNum(out.currentLessonIndex, 0);
+
+  // strings
+  out.selectedTrack = safeStr(out.selectedTrack, "general");
+  out.profileName = safeStr(out.profileName, "Player").slice(0,24);
+  out.avatar = safeStr(out.avatar, "🦊");
+
+  return out;
+}
+
+/* =========================================================
+   MISSING GAME CATALOG (RESTORE)
+========================================================= */
+const GAMES = [
+  { id:"choicequest",      title:"Choice Quest",      desc:"Pick the healthiest option.",                 status:"ready", unlock:{type:"free"} },
+  { id:"breathing",        title:"Breathing Buddy",   desc:"Calm your body for 60 seconds.",             status:"ready", unlock:{type:"free"} },
+  { id:"habitquest",       title:"Habit Quest",       desc:"Branching story where choices change path.", status:"ready", unlock:{type:"free"} },
+  { id:"responsebuilder",  title:"Response Builder",  desc:"Build a strong response to pressure.",       status:"ready", unlock:{type:"xp", xp:150} },
+  { id:"pressuremeter",    title:"Pressure Meter",    desc:"Keep pressure low with calm + exit moves.",  status:"ready", unlock:{type:"xp", xp:250} },
+];
+
+/* =========================================================
+   MISSING AVATAR HELPERS (RESTORE)
+========================================================= */
+function getSelectedCustomAvatar(){
+  if(!isCustomAvatarRef(state?.avatar)) return null;
+  const id = String(state.avatar).slice(CUSTOM_AVATAR_PREFIX.length);
+  const list = Array.isArray(state.customAvatars) ? state.customAvatars : [];
+  return list.find(x => x && x.id === id) || null;
+}
+function getSelectedAvatarDataURL(){
+  const c = getSelectedCustomAvatar();
+  return c && typeof c.dataURL === "string" ? c.dataURL : null;
+}
+
+/* =========================================================
+   MISSING REFLECTION RENDER (RESTORE)
+========================================================= */
+function renderReflection(lesson){
+  const wrap = $("#reflection");
+  if(!wrap) return;
+
+  const dayKey = String(lesson.day);
+  const saved = safeStr(state.reflections?.[dayKey], "");
+
+  wrap.innerHTML = `
+    <div class="card" style="background: rgba(255,255,255,0.06);">
+      <p style="font-weight:900; margin-top:0;">Reflection</p>
+      <p class="muted">${escapeHtml(getBlueprintForLesson(lesson).reflection || "What did you practice today?")}</p>
+      <textarea id="reflection-input" rows="4" style="width:100%;"></textarea>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn small" id="btn-save-reflection" type="button">Save</button>
+      </div>
+      <p class="muted" id="reflection-status" style="margin-top:10px;"></p>
+    </div>
+  `;
+
+  const input = $("#reflection-input");
+  const status = $("#reflection-status");
+  if(input) input.value = saved;
+
+  $("#btn-save-reflection")?.addEventListener("click", () => {
+    const text = safeStr(input?.value, "").slice(0, 2000);
+    state.reflections = (state.reflections && typeof state.reflections === "object") ? state.reflections : {};
+    state.reflections[dayKey] = text;
+    saveState();
+    if(status) status.textContent = "Saved ✅";
+  });
+}
+
+
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
 function isoDate(d){
@@ -2469,7 +2660,6 @@ function bindReset(){
   });
 }
 
-let state = null;
 function blankSaveSlot(){
   return { savedISO: null, label: "", data: null };
 }
@@ -2612,10 +2802,13 @@ function init(){
   document.body.style.overflow = "";
   $("#year") && ($("#year").textContent = new Date().getFullYear());
 
-  state = normalizeState(loadState());
   recalcLevel();
   applyDailyLoginBonus();
-  saveState();
+  const loaded = loadState();
+  state = normalizeState(loaded);
+  recalcLevel();
+  applyDailyLoginBonus();
+  if(loaded) saveState(); // only re-save if we actually loaded something
 
   ensureGameOverlay();
   bindNav();
