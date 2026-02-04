@@ -1629,6 +1629,7 @@ const HQ_NODES = {
     choices: [
       { text:"Pause and ask: “Will this help Future Me?”", good:true,  effects:{ wisdom:+1, xp:+15, flag:{ key:"usedFutureMe", value:true } }, why:"That question protects you.", next:"hq_forest_step" },
       { text:"Do it without thinking.",                    good:false, effects:{ hearts:-1 },               why:"Pausing is your superpower.", next:"hq_forest_step" },
+      { text:"Take a side path to get support + a plan.",  good:true,  effects:{ xp:+8 },                   why:"A plan beats pressure.", next:"hq_forest_sidepath" },
     ]
   },
   hq_forest_step: {
@@ -1638,7 +1639,9 @@ const HQ_NODES = {
       { text:"Drink water + snack (brain fuel).",       good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"brainFuel", value:true } }, why:"Brain fuel helps choices.", next:"hq_forest_boss" },
       { text:"2‑minute tidy reset.",                    good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"tidyReset", value:true } }, why:"Small wins add up.", next:"hq_forest_boss" },
       { text:"Write 1 helpful thought about yourself.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"kindThought", value:true } }, why:"Kind self-talk matters.", next:"hq_forest_boss" },
+      { text:"Stop at a rest spot (spend tokens to recover).", good:true, effects:{ xp:+5 }, why:"Resting is part of winning.", next:"hq_campfire_rest" },
     ]
+
   },
   hq_forest_boss: {
     chapter: "Chapter 2: The Focus Forest",
@@ -1656,8 +1659,10 @@ const HQ_NODES = {
     text: () => `A bridge guard says: “Tokens open the bridge.”`,
     choices: [
       { text:"Use 1 token to cross.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Forward!", next:"hq_mountain_intro" },
-      { text:"Exit and earn a token by completing a lesson.", good:true, end:true, why:"Lessons give tokens." },
+      { text:"Try a shortcut path (riskier, no token).",   good:false, effects:{ hearts:-1, xp:+8 },  why:"Shortcuts can cost you.", next:"hq_bridge_shortcut" },
+      { text:"Exit and make a plan to come back stronger.", good:true, effects:{ xp:+5 }, why:"Planning is a power move.", next:"hq_mini_end_plan" },
     ]
+
   },
   hq_mountain_intro: {
     chapter: "Chapter 3: The Mood Mountain",
@@ -1665,7 +1670,9 @@ const HQ_NODES = {
     choices: [
       { text:"Try a calm reset: slow breaths + relax shoulders.", good:true, effects:{ wisdom:+1, xp:+15 }, why:"Calm first = better choices.", next:"hq_mountain_boost" },
       { text:"Yell and storm off.",                               good:false,effects:{ hearts:-1 },        why:"Big reactions can backfire.", next:"hq_mountain_boost" },
+      { text:"Check on a friend who looks overwhelmed.",          good:true, effects:{ xp:+10 },           why:"Helping others builds courage.", next:"hq_mountain_friend" },
     ]
+
   },
   hq_mountain_boost: {
     chapter: "Chapter 3: The Mood Mountain",
@@ -1688,9 +1695,11 @@ const HQ_NODES = {
     chapter: "Chapter 3: The Mood Mountain",
     text: () => `A tunnel gate needs a token.`,
     choices: [
-      { text:"Use 1 token to enter the tunnel.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Onward!", next:"hq_win" },
-      { text:"Exit and earn a token by completing a lesson.",          good:true, end:true,                     why:"Lessons give tokens." },
+      { text:"Use 1 token to enter the tunnel.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Onward!", next:"hq_tunnel_echo" },
+      { text:"Ask for help and step away from the risk.",             good:true, effects:{ xp:+10, flag:{ key:"askedAdult", value:true } }, why:"That’s a strong choice.", next:"hq_mini_end_help" },
+      { text:"Exit and earn a token by completing a lesson.",         good:true, effects:{ xp:+5 }, why:"Lessons give tokens.", next:"hq_mini_end_plan" },
     ]
+
   },
   hq_win: {
     chapter: "Chapter 4+: Coming Soon",
@@ -1699,6 +1708,108 @@ const HQ_NODES = {
       { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+40 }, why:"Great job!", end:true },
     ]
   },
+  hq_forest_sidepath: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: () => `You take a quieter trail. A sign says: “Support is a shortcut to better choices.”`,
+    choices: [
+      { text:"Practice a refusal script again (Pause → No → Switch).", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"practicedNo", value:true } }, why:"Practice makes it automatic.", next:"hq_forest_phonecall" },
+      { text:"Write a tiny plan: what you’ll do if pressured today.",  good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"madePlan", value:true } },     why:"Plans protect Future You.", next:"hq_forest_phonecall" },
+      { text:"Ignore the sign and rush back.",                          good:false,effects:{ hearts:-1 },                                                why:"Rushing can cause slips.", next:"hq_forest_boss" },
+    ]
+  },
+
+  hq_forest_phonecall: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: (ctx) => {
+      const name = ctx.name || "Player";
+      return `${name}, you find a “Call/Check‑in” booth. It’s normal to ask for support before things get hard.`;
+    },
+    choices: [
+      { text:"Send a quick check-in to a trusted adult.", good:true, effects:{ xp:+12, flag:{ key:"askedAdult", value:true } }, why:"Support makes choices easier.", next:"hq_forest_boss" },
+      { text:"Text a friend who respects boundaries.",    good:true, effects:{ xp:+10, flag:{ key:"supportFriend", value:true } }, why:"Good friends help you stay steady.", next:"hq_forest_boss" },
+      { text:"Say “I’m fine” and keep it inside.",        good:false,effects:{ hearts:-1 }, why:"Keeping it in can build pressure.", next:"hq_forest_boss" },
+    ]
+  },
+
+  // TOKEN SINK: heart restore (spend tokens)
+  hq_campfire_rest: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: () => `You reach a warm rest stop. A helper says: “Tokens can buy a recovery moment.”`,
+    choices: [
+      { text:"Spend 1 token to restore +1 heart.", require:{ token:1 }, good:true, effects:{ tokens:-1, hearts:+1, xp:+6, flag:{ key:"usedRest", value:true } }, why:"Recovery helps you keep going.", next:"hq_campfire_scene" },
+      { text:"Spend 2 tokens to restore +2 hearts.", require:{ token:2 }, good:true, effects:{ tokens:-2, hearts:+2, xp:+10, flag:{ key:"usedBigRest", value:true } }, why:"Big recovery can be worth it.", next:"hq_campfire_scene" },
+      { text:"Save tokens and keep going.",           good:true, effects:{ xp:+3 }, why:"Saving is okay too.", next:"hq_forest_boss" },
+    ]
+  },
+
+  hq_campfire_scene: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: () => `You feel steadier. A sign reads: “Strong choices are easier when your body is cared for.”`,
+    choices: [
+      { text:"Return to the main trail.", good:true, effects:{ xp:+5 }, why:"Back to the story.", next:"hq_forest_boss" },
+      { text:"Practice one more calm breath cycle.", good:true, effects:{ xp:+6, wisdom:+1 }, why:"Calm is a skill.", next:"hq_forest_boss" },
+    ]
+  },
+
+  hq_bridge_shortcut: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: () => `You try the shortcut. It’s shaky, loud, and full of distractions.`,
+    choices: [
+      { text:"Stop, reset, and go back to the safe bridge.", good:true, effects:{ xp:+10 }, why:"Knowing when to stop is strength.", next:"hq_bridge" },
+      { text:"Push through anyway (not recommended).",        good:false,effects:{ hearts:-1 }, why:"Pushing through risk can cost you.", next:"hq_mountain_cliff" },
+    ]
+  },
+
+  hq_mountain_cliff: {
+    chapter: "Chapter 3: The Mood Mountain",
+    text: () => `You reach a cliff overlook. A guide says: “Big emotions shrink when you slow down.”`,
+    choices: [
+      { text:"Use “Name it to tame it.” (say the feeling).", good:true, effects:{ wisdom:+1, xp:+12, flag:{ key:"namedFeeling", value:true } }, why:"Naming feelings gives you control.", next:"hq_mountain_boost" },
+      { text:"Blame yourself harshly.",                       good:false,effects:{ hearts:-1 }, why:"Harsh self-talk makes it harder.", next:"hq_mountain_boost" },
+      { text:"If you already asked an adult, check in now.",  require:{ flag:"askedAdult" }, good:true, effects:{ xp:+15 }, why:"Support + timing = success.", next:"hq_mountain_boost" },
+    ]
+  },
+
+  hq_mountain_friend: {
+    chapter: "Chapter 3: The Mood Mountain",
+    text: () => `Your friend says: “I don’t know how to say no.” You can model it.`,
+    choices: [
+      { text:"Teach them a quick refusal script.", good:true, effects:{ xp:+14, wisdom:+1, flag:{ key:"helpedFriend", value:true } }, why:"Helping others strengthens you too.", next:"hq_mountain_boost" },
+      { text:"Tell them “figure it out.”",         good:false,effects:{ hearts:-1 }, why:"Kindness matters.", next:"hq_mountain_boost" },
+    ]
+  },
+
+  hq_tunnel_echo: {
+    chapter: "Chapter 3: The Mood Mountain",
+    text: (ctx) => {
+      const extra = ctx.flags?.practicedNo ? "Because you practiced, you feel more confident." : "You wish you had practiced a little more.";
+      return `Inside the tunnel, you hear echoes of pressure. ${extra}`;
+    },
+    choices: [
+      { text:"Use your practiced ‘No + Switch’ and keep moving.", require:{ flag:"practicedNo" }, good:true, effects:{ xp:+18, wisdom:+1 }, why:"Practice pays off later.", next:"hq_win" },
+      { text:"Pause, breathe, and choose the safest next step.",  good:true, effects:{ xp:+12 }, why:"Pause beats panic.", next:"hq_win" },
+      { text:"Exit and come back after a lesson.",                good:true, effects:{ xp:+6 },  why:"Building skill first is smart.", next:"hq_mini_end_plan" },
+    ]
+  },
+
+  // MINI-ENDING #1
+  hq_mini_end_help: {
+    chapter: "Mini‑Ending: Support Win",
+    text: () => `You choose support over risk. That’s a real win. You can come back anytime with more tokens and stronger skills.`,
+    choices: [
+      { text:"Finish (for now).", good:true, effects:{ xp:+25 }, why:"Support is strength.", end:true },
+    ]
+  },
+
+  // MINI-ENDING #2
+  hq_mini_end_plan: {
+    chapter: "Mini‑Ending: Plan + Return",
+    text: () => `You step away, make a plan, and decide to return after completing a lesson. That’s how you build long-term confidence.`,
+    choices: [
+      { text:"Finish (for now).", good:true, effects:{ xp:+20 }, why:"A plan beats pressure.", end:true },
+    ]
+  },
+
 };
 
 function hqGetNode(nodeId){
