@@ -2297,6 +2297,8 @@ function renderProfile(){
   }
 
   bindProfileNameEditor();
+  renderProgress();
+  updateHomeStats();
 }
 
 /* =========================================================

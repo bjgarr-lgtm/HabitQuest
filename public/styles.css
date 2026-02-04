@@ -444,3 +444,43 @@ h1{ margin:0; font-size:18px; }
 @media (max-width: 860px){
   .dashGrid > .card{ grid-column: span 12; }
 }
+
+/* =========================
+   Home: condensed layout
+========================= */
+.homeGridCompact > .card{ grid-column: span 6; }
+@media (max-width: 860px){
+  .homeGridCompact > .card{ grid-column: span 12; }
+}
+
+/* Make the Home hero feel tighter */
+.hero p{ max-width: 70ch; }
+.hero .actions{ margin-top: 12px; }
+
+/* =========================
+   Profile: less ugly, better structure
+========================= */
+.profileTwoCol{
+  display:grid;
+  grid-template-columns: 1.3fr 0.7fr;
+  gap:12px;
+}
+@media (max-width: 860px){
+  .profileTwoCol{ grid-template-columns: 1fr; }
+}
+
+/* Progress-in-profile grid */
+.profileMiniStats > .card{ grid-column: span 4; }
+@media (max-width: 860px){
+  .profileMiniStats > .card{ grid-column: span 12; }
+}
+
+/* Cards inside cards: reduce visual “puff” */
+.profileProgressCard .card{
+  background: rgba(255,255,255,0.06);
+  box-shadow: none;
+}
+
+.profileStats .statPill{ min-width: 120px; }
+.profileAvatar{ border-radius: 14px; }
+
