@@ -2469,6 +2469,7 @@ function bindReset(){
   });
 }
 
+let state = null;
 function blankSaveSlot(){
   return { savedISO: null, label: "", data: null };
 }
