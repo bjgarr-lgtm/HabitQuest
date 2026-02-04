@@ -262,6 +262,23 @@ function difficultyForDay(day){
   return 4;
 }
 
+function shuffleInPlace(arr, rng){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Shuffles the options and updates the answer index accordingly
+function shuffleQuestionOptions(item, rng){
+  const opts = item.options.map((text, idx) => ({ text, idx }));
+  shuffleInPlace(opts, rng);
+  const newAnswer = opts.findIndex(o => o.idx === item.answer);
+  return { ...item, options: opts.map(o => o.text), answer: newAnswer };
+}
+
+
 function makeQuizForLesson(day, title, goal, track){
   const diff = difficultyForDay(day);
   const rng = mulberry32(1000 + day * 97);
