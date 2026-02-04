@@ -2667,17 +2667,14 @@ function init(){
   document.body.style.overflow = "";
   $("#year") && ($("#year").textContent = new Date().getFullYear());
 
-  // 1) Load + normalize first
+  // ✅ load state FIRST
   state = normalizeState(loadState());
+  saveState();
 
-  // 2) Derived fields + daily bonus AFTER state exists
+  // ✅ now it's safe to use state-dependent functions
   recalcLevel();
   applyDailyLoginBonus();
 
-  // 3) Persist any normalization / new fields
-  saveState();
-
-  // 4) UI + bindings
   ensureGameOverlay();
   bindNav();
   bindTracks();
@@ -2688,9 +2685,8 @@ function init(){
   bindProfileNameEditor();
 
   $("#btn-new-tip")?.addEventListener("click", randomTip);
-  randomTip();
 
-  // 5) Initial renders
+  randomTip();
   updateHomeStats();
   renderLesson();
   renderProfile();
@@ -2699,7 +2695,6 @@ function init(){
   renderGamesCatalog();
   renderTrackUI();
   renderHomeRecommendation();
-
   showView("home");
 
   $("#btn-hq-play")?.addEventListener("click", () => startHabitQuest());
@@ -2710,3 +2705,4 @@ function init(){
     }
   });
 }
+
