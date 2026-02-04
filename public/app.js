@@ -1102,8 +1102,141 @@ function ensureGameOverlay(){
     if(e.key === "Escape" && overlayEl() && overlayEl().style.display === "block"){
       closeGameOverlay();
     }
+        // Ctrl+Shift+D opens Dev Panel
+    if(e.ctrlKey && e.shiftKey && (e.key === "D" || e.key === "d")){
+      e.preventDefault();
+      openDevPanel();
+    }
+
   });
 }
+
+/* =========================================================
+   DEV PANEL (PHASE 2)
+   Ctrl+Shift+D to open. For testing branches fast.
+========================================================= */
+function openDevPanel(){
+  ensureGameOverlay();
+  gameMode = "devpanel";
+  gameScore = 0;
+  openGameOverlay("Dev Panel", "Testing tools (local only).");
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const flags = (state.habitQuest.flags && typeof state.habitQuest.flags === "object")
+    ? state.habitQuest.flags
+    : {};
+
+  area.innerHTML = `
+    <div class="card" style="background: rgba(255,255,255,0.06);">
+      <p style="margin:0 0 10px; font-weight:900;">Jump to node</p>
+      <div class="row" style="margin:0;">
+        <input id="dev-node" class="textInput" placeholder="ex: hq_start" />
+        <button class="btn small" id="dev-jump" type="button">Jump</button>
+      </div>
+      <p class="muted" style="margin:10px 0 0;">Tip: use the Story Map in Habit Quest overlay for nodeIds.</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card" style="background: rgba(255,255,255,0.06);">
+      <p style="margin:0 0 10px; font-weight:900;">Grant resources</p>
+      <div class="row" style="margin:0;">
+        <button class="btn small" id="dev-token" type="button">+1 Token</button>
+        <button class="btn small" id="dev-heart" type="button">+1 Heart</button>
+        <button class="btn small" id="dev-xp" type="button">+100 XP</button>
+        <button class="btn small danger" id="dev-reset-hq" type="button">Reset Run</button>
+      </div>
+      <p class="muted" style="margin:10px 0 0;">
+        Hearts clamp at 5. Tokens/Xp can grow.
+      </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card" style="background: rgba(255,255,255,0.06);">
+      <p style="margin:0 0 10px; font-weight:900;">Flags + history</p>
+      <div class="row" style="margin:0;">
+        <button class="btn small" id="dev-clear-flags" type="button">Clear Flags</button>
+        <button class="btn small" id="dev-print-flags" type="button">Print Flags</button>
+        <button class="btn small" id="dev-dump-history" type="button">Dump History</button>
+      </div>
+      <pre id="dev-flags-out" style="margin:10px 0 0; white-space:pre-wrap; color:rgba(255,255,255,0.85);"></pre>
+    </div>
+  `;
+
+  const out = area.querySelector("#dev-flags-out");
+  const refreshOut = () => {
+    const f = (state.habitQuest.flags && typeof state.habitQuest.flags === "object") ? state.habitQuest.flags : {};
+    out.textContent = JSON.stringify(f, null, 2);
+  };
+  refreshOut();
+
+  area.querySelector("#dev-jump")?.addEventListener("click", () => {
+    const id = (area.querySelector("#dev-node")?.value || "").trim();
+    if(!id) return;
+    if(!HQ_NODES[id]) return alert("Unknown nodeId: " + id);
+    state.habitQuest.nodeId = id;
+    saveState();
+    closeGameOverlay();
+    startHabitQuest();
+  });
+
+  area.querySelector("#dev-token")?.addEventListener("click", () => {
+    state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+    saveState();
+    refreshOut();
+  });
+  area.querySelector("#dev-heart")?.addEventListener("click", () => {
+    state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + 1, 0, 5);
+    saveState();
+    refreshOut();
+  });
+  area.querySelector("#dev-xp")?.addEventListener("click", () => {
+    addXP(100);
+    refreshOut();
+  });
+  area.querySelector("#dev-reset-hq")?.addEventListener("click", () => {
+    if(!confirm("Reset Habit Quest run?")) return;
+    hqResetRun();
+    refreshOut();
+  });
+
+  area.querySelector("#dev-clear-flags")?.addEventListener("click", () => {
+    if(!confirm("Clear all HQ flags?")) return;
+    state.habitQuest.flags = {};
+    saveState();
+    refreshOut();
+  });
+  area.querySelector("#dev-print-flags")?.addEventListener("click", () => {
+    console.log("HQ flags:", structuredClone(state.habitQuest.flags || {}));
+    refreshOut();
+    alert("Flags printed to console.");
+  });
+  area.querySelector("#dev-dump-history")?.addEventListener("click", async () => {
+    const dump = {
+      nodeId: state.habitQuest.nodeId,
+      hearts: state.habitQuest.hearts,
+      wisdom: state.habitQuest.wisdom,
+      tokens: state.habitQuest.tokens,
+      flags: state.habitQuest.flags || {},
+      visited: state.habitQuest.visited || {},
+      history: state.habitQuest.history || [],
+    };
+    console.log("HQ dump:", structuredClone(dump));
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(dump, null, 2));
+      alert("Dump copied to clipboard (and printed to console).");
+    }catch{
+      alert("Dump printed to console (clipboard blocked).");
+    }
+  });
+
+  const restartBtn = overlay?.querySelector("#go-restart");
+  if(restartBtn) restartBtn.style.display = "none";
+}
+
 
 function openGameOverlay(title, subtitle=""){
   const overlay = overlayEl();
@@ -1578,11 +1711,20 @@ function hqHasFlag(key){
 function hqCan(choice){
   const req = choice.require || null;
   if(!req) return true;
+
   const tok = safeNum(req.token, 0);
   if(tok > 0 && safeNum(state.habitQuest.tokens,0) < tok) return false;
+
   if(req.flag && !hqHasFlag(req.flag)) return false;
+
+  if(req.notFlag && hqHasFlag(req.notFlag)) return false;
+
+  const minW = safeNum(req.minWisdom, 0);
+  if(minW > 0 && safeNum(state.habitQuest.wisdom,0) < minW) return false;
+
   return true;
 }
+
 
 // NODE GRAPH (same as your current demo; phase 3 adds save slots + map, not more nodes)
 const HQ_NODES = {
@@ -1640,8 +1782,8 @@ const HQ_NODES = {
       { text:"2‑minute tidy reset.",                    good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"tidyReset", value:true } }, why:"Small wins add up.", next:"hq_forest_boss" },
       { text:"Write 1 helpful thought about yourself.", good:true, effects:{ wisdom:+1, xp:+10, flag:{ key:"kindThought", value:true } }, why:"Kind self-talk matters.", next:"hq_forest_boss" },
       { text:"Stop at a rest spot (spend tokens to recover).", good:true, effects:{ xp:+5 }, why:"Resting is part of winning.", next:"hq_campfire_rest" },
+      {next:"hq_campfire"}
     ]
-
   },
   hq_forest_boss: {
     chapter: "Chapter 2: The Focus Forest",
@@ -1652,6 +1794,16 @@ const HQ_NODES = {
     choices: [
       { text:"Say: “No thanks. I’m heading out.”", good:true,  effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit.", next:"hq_bridge" },
       { text:"Say yes so nobody laughs.",          good:false, effects:{ hearts:-1 },        why:"Real friends don’t demand proof.", next:"hq_bridge" },
+      // add this extra choice inside hq_forest_boss choices array
+      {
+        text:"Step up as a leader and pull a friend away (mini ending).",
+        require:{ minWisdom:4 }, // or require:{ flag:"helpedKid" } if you prefer
+        good:true,
+        effects:{ xp:+18, flag:{ key:"leaderMove", value:true } },
+        why:"Leadership is choosing safety for yourself and others.",
+        next:"hq_mini_end_friend"
+      },
+
     ]
   },
   hq_bridge: {
@@ -1809,6 +1961,86 @@ const HQ_NODES = {
       { text:"Finish (for now).", good:true, effects:{ xp:+20 }, why:"A plan beats pressure.", end:true },
     ]
   },
+
+    hq_campfire: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: (ctx) => {
+      const p = ctx.flags?.practicedNo ? "Because you practiced your ‘No,’ you feel steadier." : "You feel tired, but you can still choose wisely.";
+      return `You find a quiet campfire. ${p} A traveler offers a “shortcut” that could become a bad habit.`;
+    },
+    choices: [
+      // Flag-gated stronger option
+      { text:"Use your practiced script: Pause → No → Switch (strong).",
+        require:{ flag:"practicedNo" },
+        good:true,
+        effects:{ wisdom:+2, xp:+22, flag:{ key:"usedScriptStrong", value:true } },
+        why:"Practice turns into real skill.",
+        next:"hq_bonus_vendor"
+      },
+      { text:"Say no and step away (basic).",
+        good:true,
+        effects:{ wisdom:+1, xp:+12 },
+        why:"Still a solid boundary.",
+        next:"hq_bonus_vendor"
+      },
+      { text:"Take the shortcut to impress them.",
+        good:false,
+        effects:{ hearts:-1 },
+        why:"Shortcuts can become traps.",
+        next:"hq_bonus_vendor"
+      },
+    ]
+  },
+
+  hq_bonus_vendor: {
+    chapter: "Chapter 2: The Focus Forest",
+    text: () => `A friendly vendor whispers: “Want a bonus scene? It costs 2 tokens, but it gives you a real boost.”`,
+    choices: [
+      { text:"Spend 2 tokens: Unlock Bonus Scene ✨",
+        require:{ token:2, notFlag:"bonusSceneDone" },
+        good:true,
+        effects:{ tokens:-2, xp:+25, wisdom:+1, flag:{ key:"bonusSceneDone", value:true } },
+        why:"Worth it: extra XP + wisdom, one-time unlock.",
+        next:"hq_bonus_scene"
+      },
+      { text:"Save my tokens for later.",
+        good:true,
+        effects:{ xp:+5 },
+        why:"Saving is a strategy.",
+        next:"hq_forest_boss"
+      },
+    ]
+  },
+
+  hq_bonus_scene: {
+    chapter: "Bonus Scene",
+    text: () => `Bonus scene: You learn a “tiny reset” you can use anywhere: water + 4 breaths + one kind thought. You feel stronger.`,
+    choices: [
+      { text:"Lock it in and move on.",
+        good:true,
+        effects:{ xp:+10, wisdom:+1, flag:{ key:"learnedTinyReset", value:true } },
+        why:"Small tools win big moments.",
+        next:"hq_forest_boss"
+      },
+    ]
+  },
+
+  hq_mini_end_friend: {
+    chapter: "Mini Ending",
+    text: (ctx) => {
+      const extra = ctx.flags?.helpedKid ? "The kid you helped earlier smiles and says thanks." : "You notice someone else struggling, and you feel more aware now.";
+      return `Mini ending: You choose to be a leader today. ${extra} You leave the forest proud of your choices.`;
+    },
+    choices: [
+      { text:"Finish this run (mini ending).",
+        good:true,
+        effects:{ xp:+30 },
+        why:"Strong ending — you practiced leadership.",
+        end:true
+      },
+    ]
+  },
+
 
 };
 
