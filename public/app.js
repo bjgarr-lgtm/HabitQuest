@@ -2849,3 +2849,250 @@ function init(){
 }
 
 init();
+
+/* =========================================================
+   DEV PANEL (drop-in) — paste AFTER init();
+   Toggle: Ctrl+Shift+D (or Cmd+Shift+D on Mac)
+========================================================= */
+(function devPanel(){
+  const DEV_KEY = "__htaa_devpanel_v1";
+  if (window[DEV_KEY]) return; // prevent double-inject
+  window[DEV_KEY] = true;
+
+  // ------- helpers -------
+  const h = (tag, attrs={}, children=[]) => {
+    const el = document.createElement(tag);
+    for(const [k,v] of Object.entries(attrs)){
+      if(k === "style") Object.assign(el.style, v);
+      else if(k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, String(v));
+    }
+    (Array.isArray(children) ? children : [children]).forEach(c => {
+      if(c == null) return;
+      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return el;
+  };
+  const toast = (msg) => {
+    let t = document.getElementById("dev-toast");
+    if(!t){
+      t = h("div",{ id:"dev-toast", style:{
+        position:"fixed", left:"50%", bottom:"18px", transform:"translateX(-50%)",
+        background:"rgba(0,0,0,0.75)", color:"#fff", padding:"10px 12px",
+        border:"1px solid rgba(255,255,255,0.18)", borderRadius:"10px",
+        fontWeight:"800", zIndex:100000, maxWidth:"92vw", textAlign:"center"
+      }});
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t.__tid);
+    t.__tid = setTimeout(()=>{ t.style.display="none"; }, 1600);
+  };
+
+  // ------- UI shell -------
+  const root = h("div", { id:"dev-panel", style:{
+    position:"fixed", right:"12px", bottom:"12px", width:"360px",
+    maxWidth:"92vw", maxHeight:"78vh", overflow:"auto",
+    background:"rgba(15,15,22,0.94)", color:"rgba(255,255,255,0.92)",
+    border:"1px solid rgba(255,255,255,0.18)", borderRadius:"14px",
+    padding:"12px", zIndex:99999, display:"none",
+    boxShadow:"0 18px 60px rgba(0,0,0,0.45)", backdropFilter:"blur(10px)"
+  }});
+
+  const title = h("div", { style:{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px" }}, [
+    h("div", { style:{ fontWeight:"900" }}, "Dev Panel"),
+    h("button", { style:{
+      border:"1px solid rgba(255,255,255,0.18)", background:"rgba(255,255,255,0.08)",
+      color:"#fff", borderRadius:"10px", padding:"6px 10px", cursor:"pointer",
+      fontWeight:"900"
+    }, onclick: () => toggle(false) }, "✕")
+  ]);
+
+  const stats = h("pre", { id:"dev-stats", style:{
+    whiteSpace:"pre-wrap", margin:"10px 0 0", padding:"10px",
+    borderRadius:"12px", border:"1px solid rgba(255,255,255,0.14)",
+    background:"rgba(255,255,255,0.06)", fontSize:"12px", lineHeight:"1.25"
+  }});
+
+  const btnStyle = {
+    border:"1px solid rgba(255,255,255,0.18)",
+    background:"rgba(255,255,255,0.08)",
+    color:"#fff", borderRadius:"10px", padding:"8px 10px",
+    cursor:"pointer", fontWeight:"900"
+  };
+  const row = (...kids) => h("div", { style:{ display:"flex", gap:"8px", flexWrap:"wrap", marginTop:"10px" }}, kids);
+
+  // ------- actions -------
+  function refresh(){
+    try{
+      const lessonsTotal = Array.isArray(LESSONS) ? LESSONS.length : 0;
+      const activeTotal = (typeof getActiveLessons === "function") ? getActiveLessons().length : 0;
+      const track = state?.selectedTrack || "general";
+      stats.textContent =
+`STORAGE_KEY: ${typeof STORAGE_KEY === "string" ? STORAGE_KEY : "(missing)"}
+Track: ${track} (${TRACKS?.[track]?.name || "?"})
+Lessons total: ${lessonsTotal}
+Active lessons: ${activeTotal}
+
+XP: ${state?.xp ?? "?"}   Level: ${state?.level ?? "?"}
+Streak: ${state?.streak ?? "?"}   Completed: ${state?.completedDays?.length ?? "?"}
+Current index: ${state?.currentLessonIndex ?? "?"}
+Current day (active list): ${(() => {
+  try {
+    const ls = getActiveLessons();
+    const idx = Math.max(0, Math.min(ls.length-1, state.currentLessonIndex||0));
+    return ls[idx]?.day ?? "?";
+  } catch { return "?"; }
+})()}
+
+HQ: node=${state?.habitQuest?.nodeId ?? "?"} hearts=${state?.habitQuest?.hearts ?? "?"} tokens=${state?.habitQuest?.tokens ?? "?"}
+`;
+    }catch(e){
+      stats.textContent = "Dev panel refresh failed: " + String(e?.message || e);
+    }
+  }
+
+  function setDay(day){
+    const d = Number(day);
+    if(!Number.isFinite(d)) return;
+    goToLessonDay(Math.max(1, Math.min(30, d)));
+    toast("Jumped to Day " + d);
+    refresh();
+  }
+
+  function completeAll(){
+    const ls = Array.isArray(LESSONS) ? LESSONS : [];
+    state.completedDays = ls.map(x => x.day);
+    state.currentLessonIndex = 0;
+    state.lastCompletedISO = isoDate(new Date());
+    state.streak = Math.max(1, state.streak||0);
+    addXP(1); // forces renders + save
+    saveState();
+    toast("Marked all lessons complete");
+    refresh();
+  }
+
+  function unlockEverything(){
+    state.xp = 99999;
+    recalcLevel();
+    state.habitQuest.tokens = 99;
+    state.habitQuest.hearts = 5;
+    saveState();
+    updateHomeStats();
+    renderProfile();
+    renderShop();
+    renderGamesCatalog();
+    renderHomeRecommendation();
+    toast("Unlocked XP/tokens/hearts");
+    refresh();
+  }
+
+  function exportSave(){
+    const raw = localStorage.getItem(STORAGE_KEY) || "";
+    navigator.clipboard?.writeText(raw).then(
+      () => toast("Save copied to clipboard"),
+      () => { prompt("Copy this save JSON:", raw); }
+    );
+  }
+
+  function importSave(){
+    const raw = prompt("Paste save JSON here:");
+    if(!raw) return;
+    try{
+      JSON.parse(raw);
+      localStorage.setItem(STORAGE_KEY, raw);
+      state = normalizeState(loadState());
+      recalcLevel();
+      saveState();
+      updateHomeStats();
+      renderLesson();
+      renderProfile();
+      renderShop();
+      renderRate();
+      renderGamesCatalog();
+      renderTrackUI();
+      renderHomeRecommendation();
+      showView("home");
+      toast("Imported save");
+      refresh();
+    }catch(e){
+      alert("Invalid JSON: " + String(e?.message || e));
+    }
+  }
+
+  // ------- quiz validator / auto-fix -------
+  function normalizeQ(s){
+    return String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+  }
+
+  function validateAndFixQuizDuplicates({ autoFix=true } = {}){
+    const seen = new Map(); // normQ -> {day, title}
+    const dups = [];
+    for(const lesson of (Array.isArray(LESSONS)?LESSONS:[])){
+      if(!Array.isArray(lesson.quiz)) continue;
+      for(const item of lesson.quiz){
+        const k = normalizeQ(item?.q);
+        if(!k) continue;
+        if(seen.has(k)){
+          const first = seen.get(k);
+          dups.push({ day: lesson.day, firstDay: first.day, q: item.q });
+          if(autoFix){
+            // Prefix with day/title to force uniqueness (safe + simple)
+            item.q = `Day ${lesson.day} (“${lesson.title}”): ${item.q}`;
+          }
+        }else{
+          seen.set(k, { day: lesson.day, title: lesson.title });
+        }
+      }
+    }
+    if(autoFix && dups.length){
+      saveState();
+      toast(`Fixed ${dups.length} duplicate quiz question(s)`);
+    }else if(!dups.length){
+      toast("No duplicate quiz questions found");
+    }else{
+      toast(`Found ${dups.length} duplicates (not fixed)`);
+    }
+    console.log("[DevPanel] quiz duplicates:", dups);
+    return dups;
+  }
+
+  // ------- build + bind -------
+  root.appendChild(title);
+  root.appendChild(stats);
+  root.appendChild(row(
+    h("button",{style:btnStyle, onclick:()=>{ refresh(); toast("Refreshed"); }}, "Refresh"),
+    h("button",{style:btnStyle, onclick:()=>{ unlockEverything(); }}, "Unlock all"),
+    h("button",{style:btnStyle, onclick:()=>{ completeAll(); }}, "Complete all"),
+  ));
+  root.appendChild(row(
+    h("button",{style:btnStyle, onclick:()=>{ const d = prompt("Jump to Day (1-30):","1"); if(d) setDay(d); }}, "Jump day"),
+    h("button",{style:btnStyle, onclick:()=>{ addXP(200); toast("+200 XP"); refresh(); }}, "+200 XP"),
+    h("button",{style:btnStyle, onclick:()=>{ state.selectedTrack="general"; state.currentLessonIndex=0; saveState(); renderTrackUI(); renderLesson(); toast("Track: General"); refresh(); }}, "Track: General")
+  ));
+  root.appendChild(row(
+    h("button",{style:btnStyle, onclick:()=>{ exportSave(); }}, "Export save"),
+    h("button",{style:btnStyle, onclick:()=>{ importSave(); }}, "Import save"),
+    h("button",{style:btnStyle, onclick:()=>{ validateAndFixQuizDuplicates({autoFix:true}); }}, "Fix quiz duplicates")
+  ));
+  root.appendChild(h("div",{ style:{ marginTop:"10px", opacity:"0.85", fontSize:"12px" } },
+    "Toggle: Ctrl+Shift+D • Logs: console"
+  ));
+  document.body.appendChild(root);
+
+  function toggle(force){
+    const show = (typeof force === "boolean") ? force : (root.style.display === "none");
+    root.style.display = show ? "block" : "none";
+    if(show) refresh();
+  }
+
+  window.addEventListener("keydown", (e) => {
+    const key = (e.key || "").toLowerCase();
+    const hot = (key === "d") && (e.ctrlKey || e.metaKey) && e.shiftKey;
+    if(hot){
+      e.preventDefault();
+      toggle();
+    }
+  });
+})();
