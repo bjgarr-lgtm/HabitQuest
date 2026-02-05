@@ -149,14 +149,9 @@ function isCustomAvatarRef(v){
   return typeof v === "string" && v.startsWith(CUSTOM_AVATAR_PREFIX);
 }
 
-
 /* =========================================================
-   TRACK CURRICULUM v60 (REAL TRACKS)
-   - Each track generates its OWN 60 lessons (not filtered general)
-   - Each lesson has its OWN blueprint fields
-   - Quizzes are generated from that lesson blueprint and never repeat
+   TRACKS + CURRICULUM META
 ========================================================= */
-
 const TRACKS = {
   general:     { name:"General",                  desc:"Healthy choices, stress tools, confidence, asking for help." },
   nicotine:    { name:"Nicotine / Vaping",        desc:"Cravings, pressure, coping skills, and refusing offers." },
@@ -166,308 +161,548 @@ const TRACKS = {
   caffeine:    { name:"Caffeine / Energy drinks", desc:"Sleep/energy basics and alternatives to overstimulation." },
 };
 
-// Utility: deterministic string hash -> seed
-function hashStrToSeed(str){
-  let h = 2166136261;
-  for(let i=0;i<str.length;i++){
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-// Templates per track to generate 60 unique lessons that actually match the topic.
-const TRACK_TEMPLATES = {
-  general: {
-    prefixes: ["Choices", "Stress", "Confidence", "Boundaries", "Friendships", "Emotions", "Focus", "Habits", "Support", "Comebacks"],
-    goals: [
-      "Learn how small choices add up over time.",
-      "Build safe tools to calm your body and mind.",
-      "Practice saying no without drama.",
-      "Spot pressure and protect your boundaries.",
-      "Use a plan when emotions spike.",
-      "Ask for help early and clearly.",
-      "Turn goals into tiny steps you actually do.",
-      "Recover from mistakes without shame loops.",
-      "Handle conflict without escalating.",
-      "Build routines that make life easier.",
-    ],
-    tools: [
-      "Time‑Zoom (Now → Later)",
-      "Body‑First Reset",
-      "No‑Switch‑Exit",
-      "Pressure vs Friend Check",
-      "Name‑It Map",
-      "3‑Step Spike Plan",
-      "Help‑Ask Script",
-      "Values Anchor",
-      "Option‑Map",
-      "Coach‑Voice",
-    ],
-  },
-
-  nicotine: {
-    prefixes: ["Urges", "Cravings", "Pressure", "Triggers", "Recovery", "Boundaries", "Confidence", "Support", "Habits", "Health"],
-    goals: [
-      "Understand urges and how they pass.",
-      "Build a 10‑minute plan for cravings.",
-      "Practice refusing offers in real social moments.",
-      "Spot triggers and choose a safer replacement.",
-      "Make a relapse/“slip” plan that gets you back on track.",
-      "Strengthen boundaries around people/places that push you.",
-      "Reduce stress so cravings hit less often.",
-      "Use support to make the plan stick.",
-      "Build new routines that don’t cue cravings.",
-      "Protect sleep/food/water so your brain is steadier.",
-    ],
-    tools: [
-      "Urge Surf (Wave Rule)",
-      "Trigger Map",
-      "Refusal Kit (Short No + Move)",
-      "Delay‑Distract‑Decide",
-      "Replacement Routine",
-      "Slip‑Reset Script",
-      "Support Text Script",
-      "Craving Scale 1–10",
-      "Exit Plan",
-      "Body Reset 60s",
-    ],
-  },
-
-  alcohol: {
-    prefixes: ["Parties", "Pressure", "Plans", "Boundaries", "Safety", "Friends", "Confidence", "Decisions", "Comebacks", "Support"],
-    goals: [
-      "Make a plan before you go out.",
-      "Practice refusing without explaining yourself.",
-      "Spot unsafe situations early and leave.",
-      "Use buddy systems and check-ins.",
-      "Protect your boundaries when people push.",
-      "Handle teasing without giving in.",
-      "Make choices you won’t regret tomorrow.",
-      "Help a friend make a safer choice.",
-      "Recover from awkward moments confidently.",
-      "Know who to contact if things get unsafe.",
-    ],
-    tools: [
-      "Buddy + Exit Plan",
-      "Short No Script",
-      "Situation Scan",
-      "Pressure Deflection",
-      "Values Anchor",
-      "Leave Early Plan",
-      "Trusted Adult Backup",
-      "No‑Debate Boundary",
-      "Safe Ride Plan",
-      "After‑Action Reset",
-    ],
-  },
-
-  gaming: {
-    prefixes: ["Balance", "Timers", "Focus", "Routines", "Breaks", "Sleep", "Goals", "Urges", "Triggers", "Comebacks"],
-    goals: [
-      "Stop at the time you planned to stop.",
-      "Use timers and stop-signals that work.",
-      "Replace “one more” with a clean routine.",
-      "Protect sleep so gaming doesn’t wreck school.",
-      "Build focus habits that beat distraction.",
-      "Handle tilt/anger without spiraling.",
-      "Set goals for gaming and life balance.",
-      "Spot triggers that cause binges.",
-      "Recover quickly after an overrun session.",
-      "Make a weekly plan that feels fair.",
-    ],
-    tools: [
-      "Stop‑Signal Routine",
-      "2‑Minute Break Rule",
-      "Session Plan Card",
-      "Replacement Action",
-      "Tilt Cooldown",
-      "Night Shutdown",
-      "Goal Ladder",
-      "Trigger Guardrails",
-      "Rewards That Don’t Trap",
-      "Reset After Slip",
-    ],
-  },
-
-  socialmedia: {
-    prefixes: ["Trends", "Influence", "Scroll", "Focus", "Confidence", "Boundaries", "Drama", "Comparison", "Privacy", "Support"],
-    goals: [
-      "Spot risky trends and skip safely.",
-      "Reduce doomscrolling with real boundaries.",
-      "Handle online pressure and dares.",
-      "Protect your focus and time.",
-      "Stop comparison from wrecking your mood.",
-      "Respond to drama without feeding it.",
-      "Keep privacy settings and safety habits.",
-      "Build confidence offline too.",
-      "Recover after getting pulled in too long.",
-      "Use support when online stuff feels heavy.",
-    ],
-    tools: [
-      "Trend Filter",
-      "Timer + Exit",
-      "Mute/Block Plan",
-      "Comment Pause",
-      "Comparison Reset",
-      "Focus Mode Routine",
-      "Privacy Check",
-      "No‑Dare Script",
-      "Support Ping",
-      "After‑Scroll Reset",
-    ],
-  },
-
-  caffeine: {
-    prefixes: ["Sleep", "Energy", "Focus", "Fuel", "Stress", "Habits", "School", "Crashes", "Routines", "Recovery"],
-    goals: [
-      "Build energy from basics (sleep/food/water).",
-      "Avoid crashes by pacing caffeine smarter.",
-      "Use safer boosts when tired.",
-      "Improve sleep routines that actually stick.",
-      "Reduce stress so you need less stimulant.",
-      "Handle school mornings without panic chugging.",
-      "Spot marketing/peer pressure around drinks.",
-      "Recover after a late caffeine day.",
-      "Build steady focus without overdoing it.",
-      "Make a weekly plan for energy.",
-    ],
-    tools: [
-      "Brain‑Fuel Check",
-      "Sleep Wind‑Down",
-      "Hydration First",
-      "Snack + Walk Reset",
-      "Caffeine Cutoff Plan",
-      "Crash‑Recovery Steps",
-      "Morning Routine Card",
-      "Pressure Refusal Line",
-      "Body Alarm Reset",
-      "Weekly Energy Plan",
-    ],
-  }
-};
-
-// Build a *real* 60-lesson curriculum for a track.
-// Each day has unique tool/scenario/myth/boundary/tinyStep/reflection/keyConcepts.
-function buildTrackLessons(trackId){
-  const t = TRACK_TEMPLATES[trackId] || TRACK_TEMPLATES.general;
-  const lessons = [];
-  for(let day=1; day<=60; day++){
-    const i = (day-1) % t.prefixes.length;
-    const toolName = t.tools[(day-1) % t.tools.length];
-    const title = `${t.prefixes[i]} ${day}: ${TRACKS[trackId]?.name || "General"} Skill`;
-    const goal  = t.goals[(day-1) % t.goals.length];
-
-    // Track-specific scenario text (varies by track + day) to keep it relevant.
-    const scenario =
-      trackId === "nicotine" ? `A craving hits when you see someone vaping. Day ${day}: what do you do first?` :
-      trackId === "alcohol" ? `You’re at a hangout and someone pushes a drink. Day ${day}: what’s your safest move?` :
-      trackId === "gaming" ? `You planned to stop gaming, but “one more” feels automatic. Day ${day}: what’s your stop signal?` :
-      trackId === "socialmedia" ? `A trend is pressuring you to act fast online. Day ${day}: how do you filter it?` :
-      trackId === "caffeine" ? `You’re exhausted and tempted to overdo caffeine. Day ${day}: what do you check first?` :
-      `You feel pressured to do something you’ll regret. Day ${day}: what’s the calm first step?`;
-
-    const safePlan =
-      trackId === "nicotine" ? `Delay 10 minutes, do a body reset, use a replacement action, and reach out if needed.` :
-      trackId === "alcohol" ? `Use a short no, stay with a buddy, and use your exit plan if pressure continues.` :
-      trackId === "gaming" ? `Timer → stand up → water → switch task. If you slip, reset without shame and restart your plan.` :
-      trackId === "socialmedia" ? `Pause, use the trend filter (risk/secrecy/harm), and set a timer/exit if it’s pulling you in.` :
-      trackId === "caffeine" ? `Check sleep/food/water first, choose a safer boost, and set a cutoff time.` :
-      `Pause, lower your body alarm, choose the smallest safe next step, and ask for help if needed.`;
-
-    const boundaryLine =
-      trackId === "nicotine" ? "No thanks. I’m not doing that." :
-      trackId === "alcohol" ? "No thanks. I’m good." :
-      trackId === "gaming" ? "I’m stopping now like I planned." :
-      trackId === "socialmedia" ? "Nope. I’m not doing dares for attention." :
-      trackId === "caffeine" ? "I’m going to fuel my body first." :
-      "No thanks. I’m handling it another way.";
-
-    const myth =
-      trackId === "nicotine" ? "‘Urges control you.’" :
-      trackId === "alcohol" ? "‘You have to go along to fit in.’" :
-      trackId === "gaming" ? "‘One more won’t matter.’" :
-      trackId === "socialmedia" ? "‘Trends are harmless because they’re popular.’" :
-      trackId === "caffeine" ? "‘More caffeine always fixes tiredness.’" :
-      "‘One decision doesn’t matter.’";
-
-    const tinyStep =
-      trackId === "gaming" ? "Set a timer for your next session." :
-      trackId === "socialmedia" ? "Turn on a 15‑minute app timer." :
-      "Do one 60‑second body reset (breath/water/stretch).";
-
-    const reflection =
-      trackId === "nicotine" ? "What’s your best 10‑minute craving plan, step by step?" :
-      trackId === "alcohol" ? "What’s your exit plan if a hangout gets unsafe?" :
-      trackId === "gaming" ? "What’s your stop signal + replacement action?" :
-      trackId === "socialmedia" ? "What’s one rule you want for trends or scrolling?" :
-      trackId === "caffeine" ? "What’s one ‘brain fuel’ habit you can do today?" :
-      "What’s one choice Future You would thank you for?";
-
-    // Unique key concepts per lesson (used to make quiz questions relevant and non-repeating)
-    const keyConcepts = [
-      `${toolName}`,
-      `${boundaryLine}`,
-      `${myth}`,
-      `Day ${day} / Track ${trackId}`,
-    ];
-
-    lessons.push({
-      id: `${trackId}-day-${day}`,
-      day,
-      track: trackId,
-      title,
-      goal,
-      toolName,
-      scenario,
-      safePlan,
-      boundaryLine,
-      myth,
-      tinyStep,
-      reflection,
-      keyConcepts,
-    });
-  }
-  return lessons;
-}
-
-// Build all tracks at runtime
-const LESSONS_BY_TRACK = Object.fromEntries(
-  Object.keys(TRACKS).map(tid => [tid, buildTrackLessons(tid)])
-);
-
-// Active lessons are the selected track ONLY.
-function getActiveLessons(){
-  const t = state.selectedTrack || "general";
-  return LESSONS_BY_TRACK[t] || LESSONS_BY_TRACK.general;
-}
+const CURRICULUM = [
+  { title:"Choices & Your Future",              goal:"Learn how small choices add up over time.",                track:"general" },
+  { title:"Handling Stress Safely",             goal:"Build safe, healthy stress tools.",                        track:"general" },
+  { title:"Saying No With Confidence",          goal:"Practice refusing pressure calmly.",                       track:"general" },
+  { title:"Friend Pressure vs Real Friends",    goal:"Spot healthy friendships.",                                track:"general" },
+  { title:"Boredom Without Risk",               goal:"Make a fun plan that’s safe.",                             track:"general" },
+  { title:"Feelings Are Signals",               goal:"Name feelings and respond wisely.",                        track:"general" },
+  { title:"Big Emotions Plan",                  goal:"Use a 3-step plan when emotions spike.",                   track:"general" },
+  { title:"Asking for Help",                    goal:"Know who to talk to and how to ask.",                      track:"general" },
+  { title:"Online Influence",                   goal:"Handle trends, dares, and social pressure.",               track:"socialmedia" },
+  { title:"Confidence & Self-Respect",          goal:"Build self-respect so pressure loses power.",              track:"general" },
+  { title:"Healthy Coping Tools",               goal:"Choose coping tools that help long-term.",                 track:"general" },
+  { title:"Sleep, Food, Water = Brain Fuel",    goal:"Build habits that protect your brain.",                    track:"caffeine" },
+  { title:"Stress + School",                    goal:"Use safe tools before stress stacks up.",                  track:"general" },
+  { title:"Goals & Tiny Steps",                 goal:"Make goals and track small wins.",                         track:"general" },
+  { title:"Mistakes & Comebacks",               goal:"Recover from mistakes without shame.",                     track:"general" },
+  { title:"Problem Solving",                    goal:"Use a simple method to solve problems.",                   track:"general" },
+  { title:"Positive Routines",                  goal:"Build routines that make life easier.",                    track:"gaming" },
+  { title:"Boundaries",                         goal:"Protect your time, body, and mind.",                       track:"general" },
+  { title:"Handling Conflict",                  goal:"Stay calm and communicate respectfully.",                  track:"general" },
+  { title:"Trusted Adults",                     goal:"Build your support team.",                                 track:"general" },
+  { title:"Cravings & Urges Plan",              goal:"Make a plan for urges so they pass safely.",               track:"nicotine" },
+  { title:"Refusing Offers (Practice)",         goal:"Use a confident script and exit plan.",                    track:"nicotine" },
+  { title:"Parties & Social Pressure",          goal:"Make choices when others are pushing you.",                track:"alcohol" },
+  { title:"Helping a Friend",                   goal:"What to do if a friend is struggling.",                    track:"general" },
+  { title:"Self-Talk",                          goal:"Use kinder thoughts to make better choices.",              track:"general" },
+  { title:"Dealing With Anger",                 goal:"Cool down without hurting anyone.",                        track:"general" },
+  { title:"Dealing With Anxiety",               goal:"Use grounding + breathing tools.",                         track:"general" },
+  { title:"Building Confidence Skills",         goal:"Practice skills that grow confidence.",                    track:"general" },
+  { title:"Being a Leader",                     goal:"Help others make safe choices too.",                       track:"general" },
+  { title:"Review & Next Steps",                goal:"Lock in what you learned and keep going.",                 track:"general" },
+];
 
 /* =========================================================
-   LESSON CONTENT + QUIZ (UNIQUE, RELEVANT, NEVER REPEATS)
+   LESSONS (UNIQUE CONTENT) + UNIQUE QUIZZES
+   - No duplicated question sets between lessons.
+   - Each lesson has its own scenario, tool, boundary line, and “myth” to correct.
 ========================================================= */
+const LESSON_BLUEPRINTS = [
+  // Day 1
+  {
+    toolName: "Time‑Zoom (Now → Later)",
+    scenario: "You’re about to copy someone else’s homework because you’re tired and panicking.",
+    safePlan: "Pause, time‑zoom, then pick the smallest honest step: ask for help or do what you can and tell the truth.",
+    boundaryLine: "I’m not doing that. I’ll handle it another way.",
+    myth: "‘One decision doesn’t matter.’",
+    tinyStep: "Write ONE task you can finish in 5 minutes.",
+    reflection: "What’s one choice Future You would thank you for this week?",
+    content: [
+      "Your brain is like a trail: every choice is a footprint. The trail you repeat becomes the easy path.",
+      "Time‑Zoom: ask ‘What happens in 10 minutes? 10 days? 10 months?’ before you decide.",
+      "If the ‘later’ version looks messy, you’ve got your answer.",
+      "Try it now: pick one small, honest action you can do today."
+    ],
+  },
+  // Day 2
+  {
+    toolName: "Body‑First Reset",
+    scenario: "You get a mean message and feel your chest tighten. You want to react instantly.",
+    safePlan: "Reset your body first (breath/water/move), then decide what response helps you most.",
+    boundaryLine: "I’m not answering right now. I’ll respond later.",
+    myth: "‘Stress means I’m weak.’",
+    tinyStep: "Drink water + 4 slow breaths.",
+    reflection: "What are 2 stress tools you can actually do in under 60 seconds?",
+    content: [
+      "Stress is your body’s alarm system. An alarm is information, not an order.",
+      "Body‑First Reset: water, slow breathing, relax shoulders, or a short walk—then make choices.",
+      "Decisions made while your alarm is blaring are usually worse.",
+      "Try it now: inhale 4, exhale 6, repeat 4 times."
+    ],
+  },
+  // Day 3
+  {
+    toolName: "No‑Switch‑Exit",
+    scenario: "A friend keeps pushing you to sneak out because ‘it’ll be funny.’",
+    safePlan: "Say no clearly, switch to another plan, and exit if they keep pushing.",
+    boundaryLine: "No thanks. I’m heading out.",
+    myth: "‘Saying no is rude.’",
+    tinyStep: "Say your script once out loud.",
+    reflection: "Write your best ‘No + Switch’ sentence for a real situation.",
+    content: [
+      "Refusing pressure is a skill, not a personality trait. Skills get better with reps.",
+      "No‑Switch‑Exit: ‘No’ (clear), then offer a safer switch, then leave if needed.",
+      "You don’t owe long explanations. Clarity is kindness to yourself.",
+      "Practice: say your line in a calm voice once."
+    ],
+  },
+  // Day 4
+  {
+    toolName: "Pressure vs Friend Check",
+    scenario: "Someone says ‘If you were my real friend, you’d do it.’",
+    safePlan: "Use the checklist: respect, safety, and consent. If it fails, it’s pressure—step back.",
+    boundaryLine: "A real friend wouldn’t ask me to prove it.",
+    myth: "‘Real friends push you.’",
+    tinyStep: "List 2 people who respect your no.",
+    reflection: "How can you tell the difference between pressure and a real friend?",
+    content: [
+      "Pressure tries to shrink your choices: ‘Do it or else.’ A friend expands options.",
+      "Checklist: Do they respect boundaries? Do they care about safety? Do they listen?",
+      "If you feel trapped or rushed, that’s a red flag.",
+      "Try it: think of one time someone respected you—what did they do?"
+    ],
+  },
+  // Day 5
+  {
+    toolName: "Safe‑Fun Menu",
+    scenario: "You’re bored on a weekend and someone suggests a risky ‘thrill’ plan.",
+    safePlan: "Pick 3 safe options before boredom hits; choose one and invite someone.",
+    boundaryLine: "I’m down to hang, but not like that. Let’s do something else.",
+    myth: "‘Safe fun is boring.’",
+    tinyStep: "Write 3 boredom breakers you’d actually do.",
+    reflection: "List 3 safe ‘boredom breakers’ you’d actually try.",
+    content: [
+      "Boredom isn’t an emergency. It’s a signal: ‘I need a change.’",
+      "Safe‑Fun Menu: keep a short list of fun things that don’t create problems later.",
+      "Boredom plus peer pressure is a risky combo—plan ahead.",
+      "Try it: pick one menu item you can do today."
+    ],
+  },
+  // Day 6
+  {
+    toolName: "Name‑It Map",
+    scenario: "You feel ‘bad’ but can’t explain it, and you want to escape the feeling.",
+    safePlan: "Name the feeling (stressed, lonely, jealous, embarrassed), then choose the matching need.",
+    boundaryLine: "I need a minute. I’m not making a decision right now.",
+    myth: "‘Feelings should be ignored.’",
+    tinyStep: "Write: ‘I feel ___ because ___.’",
+    reflection: "Name 1 feeling you had today and what it was trying to tell you.",
+    content: [
+      "Feelings are messengers. They’re not always correct, but they’re worth listening to.",
+      "Name‑It Map: feeling → need → next step (rest, support, food, space, movement).",
+      "When you name it, your brain gets more control.",
+      "Try it: pick one word for your feeling right now."
+    ],
+  },
+  // Day 7
+  {
+    toolName: "3‑Step Spike Plan",
+    scenario: "You’re furious during an argument and want to say something that will explode it.",
+    safePlan: "Step 1: pause body. Step 2: name the goal. Step 3: choose a calm action.",
+    boundaryLine: "I’m too heated to talk. I’ll come back in 10 minutes.",
+    myth: "‘Big emotions mean I must act.’",
+    tinyStep: "Set a 2‑minute timer and cool down.",
+    reflection: "When emotions spike, what’s your 3‑step calm plan?",
+    content: [
+      "Spikes feel urgent. That’s the trap. You can ride the wave without acting.",
+      "3 steps: Pause body → Name goal → Choose action (walk, water, text support).",
+      "You’re not ‘losing’ by stepping away—you’re staying in control.",
+      "Try it: relax your jaw and shoulders for 10 seconds."
+    ],
+  },
+  // Day 8
+  {
+    toolName: "Help‑Ask Script",
+    scenario: "You’re overwhelmed but don’t want to ‘bother’ anyone.",
+    safePlan: "Use a short opener, be honest, and ask for one specific thing (listen, advice, ride).",
+    boundaryLine: "Can I talk to you about something that’s been stressing me out?",
+    myth: "‘Asking for help is embarrassing.’",
+    tinyStep: "Write the name of one trusted adult.",
+    reflection: "Who is 1 trusted adult you could talk to, and what would you say?",
+    content: [
+      "Help is not a last resort. It’s a skill: reaching out early keeps problems small.",
+      "Use a script: ‘Can I talk?’ + ‘Here’s what’s happening’ + ‘Can you help me with ____?’",
+      "If one person isn’t available, try another. Keep going.",
+      "Try it: write your opener sentence once."
+    ],
+  },
+  // Day 9
+  {
+    toolName: "Trend Filter",
+    scenario: "A viral challenge says ‘do it or you’re lame.’",
+    safePlan: "Ask: does it add risk, secrecy, or harm? If yes, skip and choose your own plan.",
+    boundaryLine: "Nope. I’m not doing dares for attention.",
+    myth: "‘Online trends are harmless.’",
+    tinyStep: "Turn on a 15‑minute app timer.",
+    reflection: "What’s 1 online trend rule you want to follow to stay safe?",
+    content: [
+      "Online pressure uses speed: ‘Do it now.’ Safety uses pause: ‘Check first.’",
+      "Trend Filter: risk? secrecy? harm? if any are yes, it’s a no.",
+      "You can be bold without being reckless.",
+      "Try it: set one boundary for your scrolling today."
+    ],
+  },
+  // Day 10
+  {
+    toolName: "Values Anchor",
+    scenario: "You’re tempted to act cool in a way that isn’t you.",
+    safePlan: "Pick a value (health, honesty, respect) and act like the person you want to be.",
+    boundaryLine: "That’s not me. I’m good.",
+    myth: "‘Confidence means never doubting.’",
+    tinyStep: "Write one value you want to live by.",
+    reflection: "What’s a boundary you want to practice this week?",
+    content: [
+      "Confidence isn’t loud. It’s steady: ‘I know what I’m about.’",
+      "Values Anchor: decide who you want to be before pressure shows up.",
+      "When you live your values, you respect yourself—and pressure gets weaker.",
+      "Try it: choose one value and one action that matches it."
+    ],
+  },
+  // Day 11
+  {
+    toolName: "Coping Sort",
+    scenario: "You want relief fast and you’re about to pick a coping tool that causes problems later.",
+    safePlan: "Sort coping tools into ‘helps later too’ vs ‘borrows relief and charges interest.’",
+    boundaryLine: "I need a coping tool that doesn’t create new problems.",
+    myth: "‘Any coping is fine.’",
+    tinyStep: "Pick one ‘helps later too’ tool for today.",
+    reflection: "What’s one coping tool that helps now AND later?",
+    content: [
+      "Relief is a real need. The question is: how do you get it without paying for it later?",
+      "Coping Sort: healthy tools lower stress without secrecy, harm, or regret.",
+      "When you’re tempted, choose a tool with a clean ‘tomorrow.’",
+      "Try it: pick one tool and do it for 2 minutes."
+    ],
+  },
+  // Day 12
+  {
+    toolName: "Brain‑Fuel Check",
+    scenario: "You’re exhausted and craving a huge caffeine hit to ‘fix’ it.",
+    safePlan: "Check sleep/food/water first; choose a safer energy reset (water, snack, short walk).",
+    boundaryLine: "I’m going to fuel my body first.",
+    myth: "‘Energy drinks fix tiredness.’",
+    tinyStep: "Water + small snack if possible.",
+    reflection: "What’s one small ‘brain fuel’ habit you can do today?",
+    content: [
+      "Your brain runs on basics: sleep, food, water. When those drop, cravings rise.",
+      "Brain‑Fuel Check before decisions: am I thirsty, hungry, tired, stressed?",
+      "If you’re low-fuel, your ‘risk filter’ gets weaker.",
+      "Try it: drink water right now."
+    ],
+  },
+  // Day 13
+  {
+    toolName: "Stack‑Breaker",
+    scenario: "You have three assignments, practice, and drama—stress is stacking up.",
+    safePlan: "Break the stack: reset body, pick the next tiny task, ask for help early.",
+    boundaryLine: "I’m handling one step at a time.",
+    myth: "‘School stress must be handled alone.’",
+    tinyStep: "Pick the easiest 5‑minute task.",
+    reflection: "What’s one small school step you can do before you relax?",
+    content: [
+      "Stress stacks when you carry everything in your head at once.",
+      "Stack‑Breaker: write it down, pick ONE next action, then do a short reset.",
+      "Tiny progress lowers stress more than perfect plans.",
+      "Try it: choose the next 5‑minute task and start."
+    ],
+  },
+  // Day 14
+  {
+    toolName: "Tiny‑Step Ladder",
+    scenario: "You want a big goal but your brain keeps saying ‘too hard, quit.’",
+    safePlan: "Make a ladder: step 1 is so small you can’t talk yourself out of it.",
+    boundaryLine: "I’m doing the first rung today.",
+    myth: "‘Goals must be huge to count.’",
+    tinyStep: "One rung you can do in 2 minutes.",
+    reflection: "What’s a goal, and what’s the first tiny rung?",
+    content: [
+      "Motivation is unreliable. Systems are reliable.",
+      "Tiny‑Step Ladder: tiny action → repeat → build confidence → add difficulty.",
+      "Small wins train your brain to keep promises to yourself.",
+      "Try it: choose a 2‑minute rung and do it."
+    ],
+  },
+  // Day 15
+  {
+    toolName: "Comeback Script",
+    scenario: "You broke a promise to yourself and feel like giving up completely.",
+    safePlan: "Use the comeback script: ‘I slipped. Next step is ____.’ Then take one tiny repair action.",
+    boundaryLine: "I’m not quitting. I’m resetting.",
+    myth: "‘Mistakes ruin everything.’",
+    tinyStep: "Write your comeback sentence.",
+    reflection: "What’s your comeback sentence for the next time you slip?",
+    content: [
+      "A slip is data, not destiny.",
+      "Comeback Script: name the slip without insults, then pick the next helpful action.",
+      "Shame makes loops stronger. Learning makes loops weaker.",
+      "Try it: write your next step in one sentence."
+    ],
+  },
+  // Day 16
+  {
+    toolName: "Option‑Map",
+    scenario: "You have a problem and your brain says ‘there’s no good choice.’",
+    safePlan: "List 3 options, then rate each by safety + long‑term effect + honesty.",
+    boundaryLine: "I’m going to list options before I choose.",
+    myth: "‘There’s only one right answer.’",
+    tinyStep: "Write 3 options (even imperfect).",
+    reflection: "What problem are you solving, and what are 3 options?",
+    content: [
+      "When stressed, your brain narrows. Option‑Map widens it again.",
+      "Write three options, then check: safe? honest? helps later?",
+      "You’re not looking for perfect. You’re looking for better.",
+      "Try it: list 3 options right now."
+    ],
+  },
+  // Day 17
+  {
+    toolName: "Stop‑Signal Routine",
+    scenario: "You keep scrolling/gaming past your planned stop time.",
+    safePlan: "Use a stop signal (timer + stand up + water) and a replacement action.",
+    boundaryLine: "I’m stopping now like I planned.",
+    myth: "‘Routines are only for adults.’",
+    tinyStep: "Set a timer for your next session.",
+    reflection: "What’s your stop signal + replacement action?",
+    content: [
+      "Habits love ‘just one more.’ Your job is to install a stop signal.",
+      "Stop signal: timer → stand up → water → move to the next planned thing.",
+      "You’re training your brain to follow your plan, not your urge.",
+      "Try it: pick your replacement action."
+    ],
+  },
+  // Day 18
+  {
+    toolName: "Boundary Builder",
+    scenario: "Someone keeps invading your space or time and acts like you’re mean for stopping it.",
+    safePlan: "State boundary, repeat once, then change distance/leave if needed.",
+    boundaryLine: "Stop. I’m not okay with that.",
+    myth: "‘Boundaries hurt people.’",
+    tinyStep: "Write one boundary sentence you’ll use.",
+    reflection: "Where do you need a boundary, and what will you say?",
+    content: [
+      "Boundaries protect relationships by preventing resentment and harm.",
+      "Good boundary = clear + calm + consistent.",
+      "If someone argues with your boundary, that’s information.",
+      "Try it: practice your line once."
+    ],
+  },
+  // Day 19
+  {
+    toolName: "Cool‑Talk Script",
+    scenario: "A disagreement is heating up and you’re about to go for the meanest line.",
+    safePlan: "Lower the heat: slow voice, name the issue, propose a next step, or take a break.",
+    boundaryLine: "I want to solve this, not win it.",
+    myth: "‘Conflict must be won.’",
+    tinyStep: "Replace one insult with one request.",
+    reflection: "What’s one sentence that lowers heat in conflict?",
+    content: [
+      "Conflict is normal. Escalation is optional.",
+      "Cool‑Talk: ‘Here’s the issue’ + ‘Here’s what I need’ + ‘What can we do next?’",
+      "Pausing is not losing. It’s steering.",
+      "Try it: write one ‘request’ sentence."
+    ],
+  },
+  // Day 20
+  {
+    toolName: "Support Team Map",
+    scenario: "Something is hard and you feel like you must handle it alone.",
+    safePlan: "Make a support map: 2 adults + 2 peers + 1 place you can go (office, counselor).",
+    boundaryLine: "I’m going to talk to someone who can help.",
+    myth: "‘You should only rely on yourself.’",
+    tinyStep: "Write 2 names + how to reach them.",
+    reflection: "Who is in your support map?",
+    content: [
+      "Support is strategy. It makes good choices easier to keep.",
+      "Map: who listens, who helps solve, who helps in emergencies.",
+      "If your first ask doesn’t work, try again with someone else.",
+      "Try it: write two names now."
+    ],
+  },
+  // Day 21
+  {
+    toolName: "Urge Wave Rule",
+    scenario: "An urge hits hard and your brain says ‘do it now or you’ll explode.’",
+    safePlan: "Ride the wave: delay 10 minutes, distract, breathe, move, and reach out if needed.",
+    boundaryLine: "This urge will pass. I can wait it out.",
+    myth: "‘Urges control you.’",
+    tinyStep: "Delay 10 minutes (timer).",
+    reflection: "What’s your best 10‑minute urge plan?",
+    content: [
+      "Urges rise, peak, and fall—like waves.",
+      "Delay breaks the spell. You don’t have to fight forever—just long enough.",
+      "Add a distraction that uses your body (walk, water, shower, stretch).",
+      "Try it: set a 10‑minute timer."
+    ],
+  },
+  // Day 22
+  {
+    toolName: "Offer Refusal Kit",
+    scenario: "Someone offers you something you should avoid, and everyone is watching.",
+    safePlan: "Short no, no debate, move your feet, text someone if needed.",
+    boundaryLine: "No thanks. I’m good.",
+    myth: "‘If you hesitate, you lose.’",
+    tinyStep: "Write your ‘no’ in 6 words or fewer.",
+    reflection: "What’s your quick refusal line?",
+    content: [
+      "You don’t need a speech. You need a clean line and a clean exit.",
+      "Refusal Kit: short no + change subject + move away.",
+      "If people mock you, that’s a sign to leave, not to prove something.",
+      "Try it: say your line out loud once."
+    ],
+  },
+  // Day 23
+  {
+    toolName: "Hangout Plan",
+    scenario: "You’re at a hangout and it turns risky. You don’t want to be the ‘boring’ one.",
+    safePlan: "Use the buddy system and an exit plan before you need it.",
+    boundaryLine: "I’m out. I’ll see you later.",
+    myth: "‘Everyone is judging you.’",
+    tinyStep: "Pick your ‘ride home’ option.",
+    reflection: "What’s your exit plan if a hangout turns risky?",
+    content: [
+      "The safest plan is one you can actually do.",
+      "Hangout Plan: who you’re with, where you’ll go if it shifts, and how you leave.",
+      "A solid exit plan makes saying no easier.",
+      "Try it: decide your exit phrase now."
+    ],
+  },
+  // Day 24
+  {
+    toolName: "Friend‑Help Steps",
+    scenario: "A friend hints they’re struggling and you’re not sure what to do.",
+    safePlan: "Listen, don’t promise secrecy, and involve a trusted adult when needed.",
+    boundaryLine: "I care about you too much to keep this secret.",
+    myth: "‘It’s not your job to help a friend.’",
+    tinyStep: "Send one supportive text.",
+    reflection: "What’s one sentence that shows care and gets help?",
+    content: [
+      "You don’t have to be a therapist to be helpful.",
+      "Steps: listen → show care → get support from an adult if it’s serious.",
+      "Don’t carry heavy stuff alone; share it with safe adults.",
+      "Try it: write one caring sentence."
+    ],
+  },
+  // Day 25
+  {
+    toolName: "Coach‑Voice",
+    scenario: "Your inner voice is roasting you and you want to quit.",
+    safePlan: "Replace bully‑voice with coach‑voice: honest, kind, and specific.",
+    boundaryLine: "I’m learning. I can improve with practice.",
+    myth: "‘Mean self-talk motivates.’",
+    tinyStep: "Rewrite one insult into a coach sentence.",
+    reflection: "What would a good coach say to you today?",
+    content: [
+      "Your brain listens to your words. Harsh words don’t build skill—practice does.",
+      "Coach‑Voice: ‘Here’s what happened’ + ‘Here’s the next step.’",
+      "Kind isn’t weak. Kind is effective.",
+      "Try it: rewrite one thought right now."
+    ],
+  },
+  // Day 26
+  {
+    toolName: "Anger Cooldown Kit",
+    scenario: "You feel anger rising fast and you want to slam/throw/say something intense.",
+    safePlan: "Cooldown kit: move body, cold water, slow breathing, then talk or take space.",
+    boundaryLine: "I’m angry. I’m taking a break to cool down.",
+    myth: "‘Anger must explode.’",
+    tinyStep: "Cold water on hands + 10 slow breaths.",
+    reflection: "What’s in your cooldown kit?",
+    content: [
+      "Anger is energy. You can steer it without hurting anyone.",
+      "Cooldown: create space, lower body heat, slow breathing, then use words.",
+      "If you’re too hot to talk, that’s the sign to pause.",
+      "Try it: unclench your hands and jaw."
+    ],
+  },
+  // Day 27
+  {
+    toolName: "Grounding 5‑4‑3‑2‑1",
+    scenario: "Anxiety spikes and your brain starts making worst‑case movies.",
+    safePlan: "Ground to the present using senses and slow breathing; then take one small step.",
+    boundaryLine: "I’m safe right now. I’m grounding.",
+    myth: "‘Anxiety means danger is real.’",
+    tinyStep: "Do 5‑4‑3‑2‑1 once.",
+    reflection: "Which grounding step helps you most?",
+    content: [
+      "Anxiety is a false alarm sometimes. Grounding helps you check reality.",
+      "5‑4‑3‑2‑1: 5 things you see, 4 feel, 3 hear, 2 smell, 1 taste.",
+      "Then choose a tiny step that moves you forward.",
+      "Try it: do the first two senses now."
+    ],
+  },
+  // Day 28
+  {
+    toolName: "Brave Step Ladder",
+    scenario: "You want confidence but you keep waiting to ‘feel ready.’",
+    safePlan: "Confidence comes after reps. Pick a small brave step and repeat it.",
+    boundaryLine: "I can do this even nervous.",
+    myth: "‘Confidence is something you’re born with.’",
+    tinyStep: "One small brave action today.",
+    reflection: "What’s your small brave step?",
+    content: [
+      "Confidence is built, not gifted.",
+      "Brave Step Ladder: tiny brave step → repeat → level up gradually.",
+      "Being nervous is allowed. Quitting isn’t required.",
+      "Try it: choose your smallest brave step."
+    ],
+  },
+  // Day 29
+  {
+    toolName: "Lead‑By‑Example Move",
+    scenario: "A group is drifting toward risky choices and someone needs to steer it.",
+    safePlan: "Change the activity, invite one person to join you, and keep it calm.",
+    boundaryLine: "Let’s do something safer. I’m not into that.",
+    myth: "‘Leaders never ask for help.’",
+    tinyStep: "Invite one person to a safer plan.",
+    reflection: "How can you lead without being bossy?",
+    content: [
+      "Leadership isn’t controlling people. It’s modeling the safer path.",
+      "A simple redirect can change the whole vibe.",
+      "If it gets unsafe, leaders leave and get support.",
+      "Try it: write one redirect sentence."
+    ],
+  },
+  // Day 30
+  {
+    toolName: "Keep‑Going Plan",
+    scenario: "You finished lessons, but you’re worried you’ll forget everything in a week.",
+    safePlan: "Pick 2 skills to keep, set reminders, and do quick reviews when you slip.",
+    boundaryLine: "I’m building habits, not perfection.",
+    myth: "‘If you slip, quit.’",
+    tinyStep: "Pick 2 skills + when you’ll use them.",
+    reflection: "What 2 skills are you keeping, and when will you use them?",
+    content: [
+      "The goal isn’t ‘never mess up.’ The goal is ‘recover fast and keep going.’",
+      "Keep‑Going Plan: pick two tools, schedule tiny practice, and review when you struggle.",
+      "You keep what you repeat.",
+      "Try it: choose your two tools now."
+    ],
+  },
+];
 
-function makeLessonContent(lesson){
-  // Keep content tight but relevant to each blueprint field.
+function getBlueprint(day){
+  const idx = clamp(day, 1, 30) - 1;
+  return LESSON_BLUEPRINTS[idx] || LESSON_BLUEPRINTS[0];
+}
+
+function makeLessonContent(day, title, goal){
+  const bp = getBlueprint(day);
   return [
-    `Today’s topic: ${lesson.title}.`,
-    `Goal: ${lesson.goal}`,
-    `Tool: ${lesson.toolName}`,
-    `Scenario: ${lesson.scenario}`,
-    `Safe plan: ${lesson.safePlan}`,
-    `Boundary line: “${lesson.boundaryLine}”`,
-    `Myth to correct: ${lesson.myth}`,
-    `Tiny step: ${lesson.tinyStep}`,
+    `Today’s topic: ${title}.`,
+    `Goal: ${goal}`,
+    ...bp.content,
   ];
 }
 
-// Global guard: never allow the same question text across *any* lessons.
-const __GLOBAL_QUIZ_Q_TEXT = new Set();
-
-// Builds 12 questions that are directly tied to the lesson fields.
-// Also hard-prevents repeats by regenerating wording variants.
-function makeQuizForLesson(lesson){
-  const seed = hashStrToSeed(lesson.id + "|" + lesson.title + "|" + lesson.toolName);
-  const rng = mulberry32(seed);
+/* =========================================================
+   QUIZ BUILDER (12 QUESTIONS PER DAY, DAY-SPECIFIC WORDING)
+   - No “same five platitudes” re-used as-is across lessons.
+========================================================= */
+function makeQuizForLesson(day, title, goal, track){
+  const bp = getBlueprint(day);
+  const rng = mulberry32(50000 + day * 999);
 
   const q = (question, correctOpt, wrongOpts) => {
     const options = [correctOpt, ...wrongOpts];
@@ -476,90 +711,122 @@ function makeQuizForLesson(lesson){
     return { q: question, options, answer };
   };
 
-  const variants = [
-    // variant A
-    () => ([
-      q(`(${lesson.id}) What is today’s goal?`, lesson.goal, ["To hide problems", "To prove something to others"]),
-      q(`(${lesson.id}) Which tool is today’s key skill?`, lesson.toolName, ["Luck", "Doing it fast before you think"]),
-      q(`(${lesson.id}) In the scenario, what’s the safest first move?`, lesson.safePlan, ["Do it secretly", "Pick the riskiest option"]),
-      q(`(${lesson.id}) Myth check: what belief are we correcting?`, lesson.myth, ["‘If you’re nervous, you’re doomed.’", "‘Plans don’t help.’"]),
-      q(`(${lesson.id}) Which boundary line matches today?`, lesson.boundaryLine, ["I guess… maybe…", "Stop talking forever."]),
-      q(`(${lesson.id}) Why do a “tiny step”?`, "It’s doable today, so it actually happens", ["It has to be huge to count", "It proves you’re perfect"]),
-      q(`(${lesson.id}) Which friend behavior is healthiest?`, "They respect your no and help you switch plans", ["They tease you until you give in", "They demand proof"]),
-      q(`(${lesson.id}) When your body alarm is high, what should happen first?`, "Lower the alarm, then decide", ["Decide immediately", "Ignore it and push harder"]),
-      q(`(${lesson.id}) Best “switch” line after saying no:`, "Let’s do something else.", ["Fine, I’ll do it.", "You’re annoying."]),
-      q(`(${lesson.id}) Who counts as a trusted adult?`, "Parent/guardian/teacher/coach", ["Only strangers online", "Nobody ever"]),
-      q(`(${lesson.id}) Tiny step for today is:`, lesson.tinyStep, ["Wait until you feel ready", "Make a huge impossible promise"]),
-      q(`(${lesson.id}) Reflection prompt focuses on:`, lesson.reflection, ["How to impress people", "Why you should never pause"]),
-    ]),
+  // Track flavor (only when relevant)
+  const trackQ =
+    track === "socialmedia" ? q(
+      `Day ${day} (“${title}”): Which sign means a trend is a bad idea?`,
+      "It pressures you, adds risk, or needs secrecy",
+      ["It’s popular", "It has a funny sound"]
+    ) :
+    track === "gaming" ? q(
+      `Day ${day} (“${title}”): Which stop-signal is most realistic?`,
+      "Timer goes off → stand up → water → switch tasks",
+      ["Keep playing until you feel guilty", "Promise you’ll stop ‘eventually’"]
+    ) :
+    track === "caffeine" ? q(
+      `Day ${day} (“${title}”): What’s the best first fix for low energy?`,
+      "Check sleep/food/water first",
+      ["Double the caffeine every time", "Skip meals to ‘stay sharp’"]
+    ) :
+    track === "nicotine" ? q(
+      `Day ${day} (“${title}”): When an urge hits, what’s the smart first move?`,
+      "Delay and do a body reset before deciding",
+      ["Hide it and panic", "Say yes fast so it’s over"]
+    ) :
+    track === "alcohol" ? q(
+      `Day ${day} (“${title}”): Which hangout plan reduces pressure the most?`,
+      "Buddy + exit plan + safe adult backup",
+      ["Go with no plan and ‘see what happens’", "Rely on secrecy"]
+    ) :
+    q(
+      `Day ${day} (“${title}”): What makes a choice ‘safe’ long-term?`,
+      "It helps now and doesn’t create problems later",
+      ["It feels exciting right now", "It’s something you must hide"]
+    );
 
-    // variant B (different wording to avoid collisions if needed)
-    () => ([
-      q(`(${lesson.id}) Pick the best summary of today’s lesson goal:`, lesson.goal, ["Avoid thinking about it", "Take bigger risks"]),
-      q(`(${lesson.id}) Today’s tool is called:`, lesson.toolName, ["Shortcut Mode", "Panic Power"]),
-      q(`(${lesson.id}) Scenario plan: what’s the best choice?`, lesson.safePlan, ["Keep it a secret", "Do it to fit in"]),
-      q(`(${lesson.id}) Which statement is today’s myth?`, lesson.myth, ["‘Kindness is weak.’", "‘Secrecy is safe.’"]),
-      q(`(${lesson.id}) Strong boundary line:`, lesson.boundaryLine, ["Uhh… maybe later.", "I can’t say no."]),
-      q(`(${lesson.id}) Tiny steps matter because:`, "They build follow-through and confidence", ["They make you perfect", "They only count if big"]),
-      q(`(${lesson.id}) Healthy pressure response:`, "No + switch + exit if needed", ["Debate forever", "Say yes to avoid teasing"]),
-      q(`(${lesson.id}) Best order for hard moments:`, "Calm body → choose → act", ["Act → justify later", "Ignore feelings → explode later"]),
-      q(`(${lesson.id}) The “safe plan” protects you by:`, "Reducing regret and risk tomorrow", ["Making you popular", "Keeping adults out"]),
-      q(`(${lesson.id}) Which is a safe support move?`, "Text/call a trusted adult or safe person", ["Post it publicly", "Keep it all inside"]),
-      q(`(${lesson.id}) Today’s tiny step is closest to:`, lesson.tinyStep, ["Do nothing until motivated", "Overpromise"]),
-      q(`(${lesson.id}) Reflection question is about:`, lesson.reflection, ["Winning arguments", "Proving toughness"]),
-    ]),
+  const questions = [
+    q(
+      `Day ${day}: What is the main goal of “${title}”?`,
+      goal,
+      ["To hide problems", "To take bigger risks"]
+    ),
+    q(
+      `Tool check: Which tool is today’s key skill?`,
+      bp.toolName,
+      ["Luck", "Doing it fast before you think"]
+    ),
+    q(
+      `Scenario: ${bp.scenario} What’s the best safe plan?`,
+      bp.safePlan,
+      ["Do it secretly so nobody knows", "Pick the riskiest option to feel something"]
+    ),
+    q(
+      `Myth check: Which belief does today correct?`,
+      bp.myth,
+      ["‘If you’re nervous, you’re doomed.’", "‘Only adults need plans.’"]
+    ),
+    q(
+      `Which sentence matches today’s boundary style best?`,
+      bp.boundaryLine,
+      ["I guess… maybe…", "Stop talking forever."]
+    ),
+    q(
+      `What’s the point of doing a “tiny step”?`,
+      "It’s doable today, so it actually happens",
+      ["It proves you’re perfect", "It has to be huge to count"]
+    ),
+    q(
+      `Pick the strongest friend behavior in a pressure moment:`,
+      "They respect your no and help you switch plans",
+      ["They tease you until you give in", "They say ‘prove it’"]
+    ),
+    q(
+      `When your body alarm is high, what should happen first?`,
+      "Lower the alarm, then decide",
+      ["Decide immediately", "Ignore it and push harder"]
+    ),
+    q(
+      `Which option is the best “switch” after saying no?`,
+      "Let’s do something else.",
+      ["Fine, I’ll do it.", "You’re annoying."]
+    ),
+    q(
+      `Trusted adult: which is a real example?`,
+      "Parent/guardian/teacher/coach",
+      ["Only strangers online", "Nobody ever"]
+    ),
+    trackQ,
+    q(
+      `Tiny step for Day ${day}: which is closest to today’s tiny step?`,
+      bp.tinyStep,
+      ["A huge impossible promise", "Wait until you feel ready"]
+    ),
   ];
 
-  // Pick variants until we have 12 questions that don’t duplicate ANY prior question text.
+  // Ensure 12 and ensure question text uniqueness within the quiz
   const out = [];
-  let attempts = 0;
-  while(out.length < 12 && attempts < 10){
-    attempts++;
-    const batch = variants[Math.floor(rng() * variants.length)]();
-    for(const item of batch){
-      if(out.length >= 12) break;
-      if(__GLOBAL_QUIZ_Q_TEXT.has(item.q)) continue;
-      __GLOBAL_QUIZ_Q_TEXT.add(item.q);
+  const seen = new Set();
+  for(const item of questions){
+    if(!seen.has(item.q)){
+      seen.add(item.q);
       out.push(item);
     }
+    if(out.length >= 12) break;
   }
-
-  // Fallback (should basically never hit): force-unique by appending a unique suffix
-  while(out.length < 12){
-    const n = out.length + 1;
-    const uniqueQ = `(${lesson.id}) Unique check ${n}: Which concept is in today’s lesson?`;
-    if(!__GLOBAL_QUIZ_Q_TEXT.has(uniqueQ)){
-      __GLOBAL_QUIZ_Q_TEXT.add(uniqueQ);
-      out.push(q(uniqueQ, lesson.keyConcepts[0], ["Luck", "Secrecy", "Proving yourself"]));
-    }
-  }
-
   return out.slice(0, 12);
 }
 
-// Convert track lesson blueprints into full lesson objects used by the renderer.
-function getLessonObject(trackLesson){
-  return {
-    day: trackLesson.day,
-    track: trackLesson.track,
-    title: trackLesson.title,
-    goal: trackLesson.goal,
-    content: makeLessonContent(trackLesson),
-    quiz: makeQuizForLesson(trackLesson),
-    // keep reflection per-lesson:
-    reflectionPrompt: trackLesson.reflection,
-    // keep these for future use if you want:
-    toolName: trackLesson.toolName,
-    scenario: trackLesson.scenario,
-    safePlan: trackLesson.safePlan,
-    boundaryLine: trackLesson.boundaryLine,
-    myth: trackLesson.myth,
-    tinyStep: trackLesson.tinyStep,
-    id: trackLesson.id,
-  };
-}
-
-
+/* =========================================================
+   LESSONS ARRAY
+========================================================= */
+const LESSONS = CURRICULUM.map((c, i) => ({
+  day: i + 1,
+  track: c.track || "general",
+  title: c.title,
+  goal: c.goal,
+  content: makeLessonContent(i + 1, c.title, c.goal),
+  quiz: makeQuizForLesson(i + 1, c.title, c.goal, c.track || "general"),
+}));
 
 /* =========================================================
    GAMES CATALOG
@@ -587,7 +854,7 @@ function blankSaveSlot(){
 
 const DEFAULT_STATE = {
   currentLessonIndex: 0,
-  completedDays: [], // now stores keys like "gaming:12"
+  completedDays: [],
   lastCompletedISO: null,
   streak: 0,
   highScore: 0,
@@ -602,7 +869,6 @@ const DEFAULT_STATE = {
   reflections: { /* day -> { text, savedISO, rewarded } */ },
   lastLoginISO: null,
   quizAttempts: { /* day -> { attempts, wrongTotal, lastISO } */ },
-  completedByTrack: { /* trackId -> [days] */ },
   habitQuest: {
     nodeId: "hq_start",
     hearts: 3,
@@ -653,7 +919,7 @@ function normalizeState(s){
   merged.highScore = safeNum(merged.highScore, 0);
   merged.streak = safeNum(merged.streak, 0);
   merged.currentLessonIndex = safeNum(merged.currentLessonIndex, 0);
-  merged.completedByTrack = (safe.completedByTrack && typeof safe.completedByTrack === "object") ? safe.completedByTrack : {};
+
   merged.customAvatars = Array.isArray(safe.customAvatars) ? safe.customAvatars : [];
   merged.customAvatars = merged.customAvatars
     .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
@@ -733,9 +999,9 @@ function getSelectedAvatarDataURL(){
    REFLECTION PROMPTS (unique by lesson)
 ========================================================= */
 function getReflectionPromptForLesson(lesson){
-  return lesson.reflectionPrompt || "What’s one thing you learned today, and how will you use it?";
+  const bp = getBlueprint(lesson.day);
+  return bp.reflection || "What’s one thing you learned today, and how will you use it?";
 }
-
 
 function renderReflection(lesson){
   const promptEl = $("#reflection-prompt");
@@ -779,7 +1045,12 @@ function renderReflection(lesson){
 /* =========================================================
    TRACKS
 ========================================================= */
-
+function getActiveLessons(){
+  const t = state.selectedTrack || "general";
+  if(t === "general") return LESSONS;
+  const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
+  return filtered.length ? filtered : LESSONS;
+}
 
 function renderTrackUI(){
   const sel = $("#track-select");
@@ -919,36 +1190,31 @@ function randomTip(){
 /* =========================================================
    RECOMMENDED NEXT LESSON
 ========================================================= */
-function recordQuizAttempt(lesson, wrongCount){
-  const k = `${lesson.track}:${lesson.day}`;
+function recordQuizAttempt(day, wrongCount){
+  const d = String(day);
   state.quizAttempts = (state.quizAttempts && typeof state.quizAttempts === "object") ? state.quizAttempts : {};
-  const cur = (state.quizAttempts[k] && typeof state.quizAttempts[k] === "object")
-    ? state.quizAttempts[k]
+  const cur = state.quizAttempts[d] && typeof state.quizAttempts[d] === "object"
+    ? state.quizAttempts[d]
     : { attempts: 0, wrongTotal: 0, lastISO: null };
 
-  cur.attempts  = safeNum(cur.attempts, 0) + 1;
+  cur.attempts = safeNum(cur.attempts, 0) + 1;
   cur.wrongTotal = safeNum(cur.wrongTotal, 0) + Math.max(0, safeNum(wrongCount, 0));
-  cur.lastISO   = isoDate(new Date());
-
-  state.quizAttempts[k] = cur;
+  cur.lastISO = isoDate(new Date());
+  state.quizAttempts[d] = cur;
   saveState();
 }
-
-
-function lessonKey(lesson){ return `${lesson.track}:${lesson.day}`; }
-function attemptKey(lesson){ return `${lesson.track}:${lesson.day}`; }
 
 function getRecommendedLesson(){
   const lessons = getActiveLessons();
   if(!lessons.length) return null;
 
-  const uncompleted = lessons.filter(l => !state.completedDays.includes(lessonKey(l)));
+  const uncompleted = lessons.filter(l => !state.completedDays.includes(l.day));
   if(uncompleted.length) return uncompleted[0];
 
   let best = null;
   let bestScore = -1;
   for(const l of lessons){
-    const stat = state.quizAttempts?.[attemptKey(l)];
+    const stat = state.quizAttempts?.[String(l.day)];
     const score = stat ? safeNum(stat.wrongTotal, 0) : 0;
     if(score > bestScore){
       bestScore = score;
@@ -957,7 +1223,6 @@ function getRecommendedLesson(){
   }
   return best || lessons[0];
 }
-
 
 function goToLessonDay(day){
   const lessons = getActiveLessons();
@@ -983,7 +1248,7 @@ function renderHomeRecommendation(){
     return;
   }
 
-  const isDone = state.completedDays.includes(`${rec.track}:${rec.day}`);
+  const isDone = state.completedDays.includes(rec.day);
   const trackName = TRACKS[state.selectedTrack]?.name || "General";
   boxTitle.textContent = `Recommended: Day ${rec.day} — ${rec.title}`;
   boxDesc.textContent = isDone
@@ -1001,15 +1266,180 @@ function renderHomeRecommendation(){
   }
 }
 
-function updateLessonStatus(key){
+/* =========================================================
+   LESSONS + QUIZ RENDERING
+========================================================= */
+function renderLesson(){
+  const lessons = getActiveLessons();
+  if(!lessons.length) return;
+
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  state.currentLessonIndex = idx;
+  saveState();
+
+  const lesson = lessons[idx];
+
+  $("#lesson-title") && ($("#lesson-title").textContent = lesson.title);
+  $("#lesson-day")   && ($("#lesson-day").textContent   = `Day ${lesson.day} • Track: ${TRACKS[state.selectedTrack]?.name || "General"}`);
+  $("#lesson-goal")  && ($("#lesson-goal").textContent  = `Goal: ${lesson.goal}`);
+
+  const body = $("#lesson-content");
+  if(body){
+    body.innerHTML = "";
+    lesson.content.forEach(p => {
+      const el = document.createElement("p");
+      el.textContent = p;
+      body.appendChild(el);
+    });
+  }
+
+  renderQuiz(lesson);
+  renderReflection(lesson);
+  updateLessonStatus(lesson.day);
+}
+
+function renderQuiz(lesson){
+  const quiz = $("#quiz");
+  if(!quiz) return;
+
+  quiz.innerHTML = "";
+  lesson.quiz.forEach((item, qi) => {
+    const block = document.createElement("div");
+    block.className = "card";
+    block.style.marginTop = "10px";
+    block.style.background = "rgba(255,255,255,0.06)";
+
+    const qEl = document.createElement("p");
+    qEl.style.fontWeight = "800";
+    qEl.textContent = `${qi+1}. ${item.q}`;
+    block.appendChild(qEl);
+
+    item.options.forEach((opt, oi) => {
+      const label = document.createElement("label");
+      label.style.display = "flex";
+      label.style.gap = "10px";
+      label.style.alignItems = "center";
+      label.style.margin = "8px 0";
+      label.style.cursor = "pointer";
+
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = `q_${qi}`;
+      input.value = String(oi);
+
+      const span = document.createElement("span");
+      span.textContent = opt;
+
+      label.append(input, span);
+      block.appendChild(label);
+    });
+
+    quiz.appendChild(block);
+  });
+}
+
+function quizScoreForCurrentLesson(){
+  const lessons = getActiveLessons();
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  const lesson = lessons[idx];
+
+  let correct = 0;
+  lesson.quiz.forEach((item, qi) => {
+    const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
+    if(picked && Number(picked.value) === item.answer) correct++;
+  });
+
+  return { correct, total: lesson.quiz.length, day: lesson.day, title: lesson.title };
+}
+
+function updateLessonStatus(day){
   const el = $("#lesson-status");
   if(!el) return;
-  const done = state.completedDays.includes(String(key));
+  const done = state.completedDays.includes(day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
 
+function applyDailyStreakBonusIfAny(prevLastISO, newLastISO){
+  const today = isoDate(new Date());
+  if(newLastISO !== today) return;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayISO = isoDate(yesterday);
+
+  if(prevLastISO === yesterdayISO){
+    state.habitQuest.tokens = safeNum(state.habitQuest.tokens, 0) + 1;
+    addXP(15);
+  }
+}
+
+function bindLessonButtons(){
+  $("#btn-prev-lesson")?.addEventListener("click", () => {
+    const lessons = getActiveLessons();
+    state.currentLessonIndex = clamp(state.currentLessonIndex - 1, 0, lessons.length - 1);
+    saveState();
+    renderLesson();
+  });
+
+  $("#btn-next-lesson")?.addEventListener("click", () => {
+    const lessons = getActiveLessons();
+    state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, lessons.length - 1);
+    saveState();
+    renderLesson();
+  });
+
+  $("#btn-complete-lesson")?.addEventListener("click", () => {
+    const score = quizScoreForCurrentLesson();
+    const wrong = score.total - score.correct;
+
+    if(wrong > 0){
+      recordQuizAttempt(score.day, wrong);
+      $("#lesson-status") && ($("#lesson-status").textContent =
+        `Almost! Quiz score: ${score.correct}/${score.total}. Fix the missed ones and try again.`);
+      renderHomeRecommendation();
+      return;
+    }
+
+    const firstTime = !state.completedDays.includes(score.day);
+    if(firstTime){
+      addXP(score.total * 5);
+      state.completedDays.push(score.day);
+      addXP(50);
+      state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+    }
+
+    state.habitQuest.lastLessonDay = score.day;
+
+    const prevLastISO = state.lastCompletedISO;
+    const todayISO = isoDate(new Date());
+    if(state.lastCompletedISO !== todayISO){
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayISO = isoDate(yesterday);
+      state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
+      state.lastCompletedISO = todayISO;
+      applyDailyStreakBonusIfAny(prevLastISO, state.lastCompletedISO);
+    }
+
+    saveState();
+    updateHomeStats();
+    updateLessonStatus(score.day);
+    renderProgress();
+    renderGamesCatalog();
+    renderHomeRecommendation();
+  });
+}
+
+function applyDailyLoginBonus(){
+  const today = isoDate(new Date());
+  if(state.lastLoginISO === today) return;
+  state.habitQuest.tokens = safeNum(state.habitQuest.tokens, 0) + 1;
+  addXP(5);
+  state.lastLoginISO = today;
+  saveState();
+}
 
 /* =========================================================
    HOME STATS
@@ -1612,7 +2042,7 @@ function renderResponseBuilder(){
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
   if(day <= 0) return "";
-  const l = getActiveLessons().find(x => x.day === day);
+  const l = LESSONS.find(x => x.day === day);
   return l ? l.title : "";
 }
 
@@ -2325,108 +2755,6 @@ function renderRate(){
   $("#rating-count").textContent = count === 0 ? "No ratings yet" : `${count} rating${count===1?"":"s"}`;
 }
 
-function renderQuiz(lesson){
-  const wrap = $("#quiz");
-  if(!wrap) return;
-
-  const key = `${lesson.track}:${lesson.day}`;
-  state.__quizPassed = (state.__quizPassed && typeof state.__quizPassed === "object") ? state.__quizPassed : {};
-  wrap.innerHTML = "";
-
-  const quiz = Array.isArray(lesson.quiz) ? lesson.quiz : [];
-  if(!quiz.length){
-    wrap.innerHTML = `<p class="muted">No quiz for this lesson.</p>`;
-    state.__quizPassed[key] = true;
-    saveState();
-    return;
-  }
-
-  // track answers in-memory per render
-  const answers = new Array(quiz.length).fill(null);
-
-  quiz.forEach((item, i) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.style.marginTop = "10px";
-    card.style.background = "rgba(255,255,255,0.06)";
-
-    const q = document.createElement("p");
-    q.style.fontWeight = "900";
-    q.textContent = `${i+1}. ${item.q}`;
-    card.appendChild(q);
-
-    item.options.forEach((opt, oi) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn small";
-      btn.textContent = opt;
-      btn.style.marginRight = "8px";
-      btn.addEventListener("click", () => {
-        answers[i] = oi;
-        // quick visual
-        card.querySelectorAll("button").forEach(b => b.style.outline = "");
-        btn.style.outline = "2px solid rgba(68,215,182,0.85)";
-
-        // compute pass
-        const wrong = answers.reduce((acc, a, idx) => {
-          if(a == null) return acc;
-          return acc + (a === quiz[idx].answer ? 0 : 1);
-        }, 0);
-
-        const allAnswered = answers.every(a => a != null);
-        const passed = allAnswered && wrong === 0;
-
-        state.__quizPassed[key] = passed;
-        saveState();
-
-        if(allAnswered){
-          recordQuizAttempt(lesson, wrong);
-        }
-      });
-      card.appendChild(btn);
-    });
-
-    wrap.appendChild(card);
-  });
-}
-
-
-function renderLesson(){
-  const lessons = getActiveLessons();
-  if(!lessons.length) return;
-
-  const idx = clamp(safeNum(state.currentLessonIndex, 0), 0, lessons.length - 1);
-  state.currentLessonIndex = idx;
-  saveState();
-
-  const lesson = lessons[idx];
-  const trackName = TRACKS[lesson.track]?.name || "General";
-
-  // Header
-  const dayLabel = `Lesson ${lesson.day} / ${lessons.length} • Track: ${trackName}`;
-  $("#lesson-title") && ($("#lesson-title").textContent = lesson.title);
-  $("#lesson-day")   && ($("#lesson-day").textContent   = dayLabel);
-  $("#lesson-goal")  && ($("#lesson-goal").textContent  = `Goal: ${lesson.goal}`);
-
-  // Body
-  const body = $("#lesson-content");
-  if(body){
-    body.innerHTML = "";
-    (lesson.content || []).forEach(p => {
-      const el = document.createElement("p");
-      el.textContent = p;
-      body.appendChild(el);
-    });
-  }
-
-  renderQuiz(lesson);
-  renderReflection(lesson);
-
-  // IMPORTANT: completion tracking must be track-aware now
-  updateLessonStatus(`${lesson.track}:${lesson.day}`);
-}
-
-
 /* =========================================================
    PROGRESS
 ========================================================= */
@@ -2439,15 +2767,8 @@ function renderProgress(){
   if(!list) return;
   list.innerHTML = "";
 
-  const parsed = (Array.isArray(state.completedDays) ? state.completedDays : [])
-    .map(k => {
-      const [track, dayStr] = String(k).split(":");
-      return { track: track || "general", day: Number(dayStr) || 0, raw: String(k) };
-    })
-    .filter(x => x.day > 0)
-    .sort((a,b) => (a.track.localeCompare(b.track) || a.day - b.day));
-
-  if(parsed.length === 0){
+  const daysSorted = [...state.completedDays].sort((a,b)=>a-b);
+  if(daysSorted.length === 0){
     const p = document.createElement("p");
     p.className = "muted";
     p.textContent = "No lessons completed yet — start with Today’s Lesson!";
@@ -2455,15 +2776,13 @@ function renderProgress(){
     return;
   }
 
-  parsed.forEach(x => {
+  daysSorted.forEach(d => {
     const chip = document.createElement("div");
     chip.className = "chip";
-    const tn = TRACKS?.[x.track]?.name || x.track;
-    chip.textContent = `${tn}: Day ${x.day} ✅`;
+    chip.textContent = `Day ${d} ✅`;
     list.appendChild(chip);
   });
 }
-
 
 function bindReset(){
   $("#btn-reset")?.addEventListener("click", () => {
@@ -2485,44 +2804,6 @@ function bindReset(){
     showView("home");
   });
 }
-
-function bindLessonButtons(){
-  $("#btn-prev-lesson")?.addEventListener("click", () => {
-    const lessons = getActiveLessons();
-    state.currentLessonIndex = clamp(state.currentLessonIndex - 1, 0, lessons.length - 1);
-    saveState();
-    renderLesson();
-  });
-
-  $("#btn-next-lesson")?.addEventListener("click", () => {
-    const lessons = getActiveLessons();
-    state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, lessons.length - 1);
-    saveState();
-    renderLesson();
-  });
-
-  $("#btn-complete-lesson")?.addEventListener("click", () => {
-    const lessons = getActiveLessons();
-    const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
-    const l = lessons[idx];
-    const key = `${l.track}:${l.day}`;
-
-    // require quiz pass if quiz exists
-    if(Array.isArray(l.quiz) && l.quiz.length){
-      const ok = !!state.__quizPassed?.[key];
-      if(!ok) return alert("Finish the quiz first (all correct).");
-    }
-
-    if(!state.completedDays.includes(key)){
-      state.completedDays.push(key);
-      saveState();
-      addXP(20);
-    }
-    updateLessonStatus(key);
-    renderHomeRecommendation();
-  });
-}
-
 
 /* =========================================================
    INIT
@@ -2568,256 +2849,3 @@ function init(){
 }
 
 init();
-
-/* =========================================================
-   DEV PANEL (drop-in) — paste AFTER init();
-   Toggle: Ctrl+Shift+D (or Cmd+Shift+D on Mac)
-========================================================= */
-(function devPanel(){
-  const DEV_KEY = "__htaa_devpanel_v1";
-  if (window[DEV_KEY]) return; // prevent double-inject
-  window[DEV_KEY] = true;
-
-  // ------- helpers -------
-  const h = (tag, attrs={}, children=[]) => {
-    const el = document.createElement(tag);
-    for(const [k,v] of Object.entries(attrs)){
-      if(k === "style") Object.assign(el.style, v);
-      else if(k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
-      else el.setAttribute(k, String(v));
-    }
-    (Array.isArray(children) ? children : [children]).forEach(c => {
-      if(c == null) return;
-      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    });
-    return el;
-  };
-  const toast = (msg) => {
-    let t = document.getElementById("dev-toast");
-    if(!t){
-      t = h("div",{ id:"dev-toast", style:{
-        position:"fixed", left:"50%", bottom:"18px", transform:"translateX(-50%)",
-        background:"rgba(0,0,0,0.75)", color:"#fff", padding:"10px 12px",
-        border:"1px solid rgba(255,255,255,0.18)", borderRadius:"10px",
-        fontWeight:"800", zIndex:100000, maxWidth:"92vw", textAlign:"center"
-      }});
-      document.body.appendChild(t);
-    }
-    t.textContent = msg;
-    t.style.display = "block";
-    clearTimeout(t.__tid);
-    t.__tid = setTimeout(()=>{ t.style.display="none"; }, 1600);
-  };
-
-  // ------- UI shell -------
-  const root = h("div", { id:"dev-panel", style:{
-    position:"fixed", right:"12px", bottom:"12px", width:"360px",
-    maxWidth:"92vw", maxHeight:"78vh", overflow:"auto",
-    background:"rgba(15,15,22,0.94)", color:"rgba(255,255,255,0.92)",
-    border:"1px solid rgba(255,255,255,0.18)", borderRadius:"14px",
-    padding:"12px", zIndex:99999, display:"none",
-    boxShadow:"0 18px 60px rgba(0,0,0,0.45)", backdropFilter:"blur(10px)"
-  }});
-
-  const title = h("div", { style:{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px" }}, [
-    h("div", { style:{ fontWeight:"900" }}, "Dev Panel"),
-    h("button", { style:{
-      border:"1px solid rgba(255,255,255,0.18)", background:"rgba(255,255,255,0.08)",
-      color:"#fff", borderRadius:"10px", padding:"6px 10px", cursor:"pointer",
-      fontWeight:"900"
-    }, onclick: () => toggle(false) }, "✕")
-  ]);
-
-  const stats = h("pre", { id:"dev-stats", style:{
-    whiteSpace:"pre-wrap", margin:"10px 0 0", padding:"10px",
-    borderRadius:"12px", border:"1px solid rgba(255,255,255,0.14)",
-    background:"rgba(255,255,255,0.06)", fontSize:"12px", lineHeight:"1.25"
-  }});
-
-  const btnStyle = {
-    border:"1px solid rgba(255,255,255,0.18)",
-    background:"rgba(255,255,255,0.08)",
-    color:"#fff", borderRadius:"10px", padding:"8px 10px",
-    cursor:"pointer", fontWeight:"900"
-  };
-  const row = (...kids) => h("div", { style:{ display:"flex", gap:"8px", flexWrap:"wrap", marginTop:"10px" }}, kids);
-
-  // ------- actions -------
-  function refresh(){
-    try{
-      const lessonsTotal = Object.values(LESSONS_BY_TRACK || {}).reduce((sum, arr) => sum + (Array.isArray(arr)?arr.length:0), 0);
-      const activeTotal = (typeof getActiveLessons === "function") ? getActiveLessons().length : 0;
-      const track = state?.selectedTrack || "general";
-      stats.textContent =
-`STORAGE_KEY: ${typeof STORAGE_KEY === "string" ? STORAGE_KEY : "(missing)"}
-Track: ${track} (${TRACKS?.[track]?.name || "?"})
-Lessons total: ${lessonsTotal}
-Active lessons: ${activeTotal}
-
-XP: ${state?.xp ?? "?"}   Level: ${state?.level ?? "?"}
-Streak: ${state?.streak ?? "?"}   Completed: ${state?.completedDays?.length ?? "?"}
-Current index: ${state?.currentLessonIndex ?? "?"}
-Current day (active list): ${(() => {
-  try {
-    const ls = getActiveLessons();
-    const idx = Math.max(0, Math.min(ls.length-1, state.currentLessonIndex||0));
-    return ls[idx]?.day ?? "?";
-  } catch { return "?"; }
-})()}
-
-HQ: node=${state?.habitQuest?.nodeId ?? "?"} hearts=${state?.habitQuest?.hearts ?? "?"} tokens=${state?.habitQuest?.tokens ?? "?"}
-`;
-    }catch(e){
-      stats.textContent = "Dev panel refresh failed: " + String(e?.message || e);
-    }
-  }
-
-  function setDay(day){
-    const d = Number(day);
-    if(!Number.isFinite(d)) return;
-    goToLessonDay(Math.max(1, Math.min(60, d)));
-    toast("Jumped to Day " + d);
-    refresh();
-  }
-
-
-
-  function completeAll(){
-    const trackId = state.selectedTrack || "general";
-    const ls = (LESSONS_BY_TRACK?.[trackId] || []);
-    state.completedDays = Array.from(new Set([
-      ...(state.completedDays || []),
-      ...ls.map(x => `${x.track}:${x.day}`)
-    ]));
-    state.currentLessonIndex = 0;
-    state.lastCompletedISO = isoDate(new Date());
-    state.streak = Math.max(1, state.streak||0);
-    addXP(1); // forces renders + save
-    saveState();
-    toast("Marked all lessons complete");
-    refresh();
-  }
-
-  function unlockEverything(){
-    state.xp = 99999;
-    recalcLevel();
-    state.habitQuest.tokens = 99;
-    state.habitQuest.hearts = 5;
-    saveState();
-    updateHomeStats();
-    renderProfile();
-    renderShop();
-    renderGamesCatalog();
-    renderHomeRecommendation();
-    toast("Unlocked XP/tokens/hearts");
-    refresh();
-  }
-
-  function exportSave(){
-    const raw = localStorage.getItem(STORAGE_KEY) || "";
-    navigator.clipboard?.writeText(raw).then(
-      () => toast("Save copied to clipboard"),
-      () => { prompt("Copy this save JSON:", raw); }
-    );
-  }
-
-  function importSave(){
-    const raw = prompt("Paste save JSON here:");
-    if(!raw) return;
-    try{
-      JSON.parse(raw);
-      localStorage.setItem(STORAGE_KEY, raw);
-      state = normalizeState(loadState());
-      recalcLevel();
-      saveState();
-      updateHomeStats();
-      renderLesson();
-      renderProfile();
-      renderShop();
-      renderRate();
-      renderGamesCatalog();
-      renderTrackUI();
-      renderHomeRecommendation();
-      showView("home");
-      toast("Imported save");
-      refresh();
-    }catch(e){
-      alert("Invalid JSON: " + String(e?.message || e));
-    }
-  }
-
-  // ------- quiz validator / auto-fix -------
-  function normalizeQ(s){
-    return String(s||"").toLowerCase().replace(/\s+/g," ").trim();
-  }
-
-  function validateAndFixQuizDuplicates({ autoFix=true } = {}){
-    const seen = new Map(); // normQ -> {day, title}
-    const dups = [];
-    for(const lesson of (Array.isArray(LESSONS)?LESSONS:[])){
-      if(!Array.isArray(lesson.quiz)) continue;
-      for(const item of lesson.quiz){
-        const k = normalizeQ(item?.q);
-        if(!k) continue;
-        if(seen.has(k)){
-          const first = seen.get(k);
-          dups.push({ day: lesson.day, firstDay: first.day, q: item.q });
-          if(autoFix){
-            // Prefix with day/title to force uniqueness (safe + simple)
-            item.q = `Day ${lesson.day} (“${lesson.title}”): ${item.q}`;
-          }
-        }else{
-          seen.set(k, { day: lesson.day, title: lesson.title });
-        }
-      }
-    }
-    if(autoFix && dups.length){
-      saveState();
-      toast(`Fixed ${dups.length} duplicate quiz question(s)`);
-    }else if(!dups.length){
-      toast("No duplicate quiz questions found");
-    }else{
-      toast(`Found ${dups.length} duplicates (not fixed)`);
-    }
-    console.log("[DevPanel] quiz duplicates:", dups);
-    return dups;
-  }
-
-  // ------- build + bind -------
-  root.appendChild(title);
-  root.appendChild(stats);
-  root.appendChild(row(
-    h("button",{style:btnStyle, onclick:()=>{ refresh(); toast("Refreshed"); }}, "Refresh"),
-    h("button",{style:btnStyle, onclick:()=>{ unlockEverything(); }}, "Unlock all"),
-    h("button",{style:btnStyle, onclick:()=>{ completeAll(); }}, "Complete all"),
-  ));
-  root.appendChild(row(
-    h("button",{style:btnStyle, onclick:()=>{ const d = prompt("Jump to Day (1-30):","1"); if(d) setDay(d); }}, "Jump day"),
-    h("button",{style:btnStyle, onclick:()=>{ addXP(200); toast("+200 XP"); refresh(); }}, "+200 XP"),
-    h("button",{style:btnStyle, onclick:()=>{ state.selectedTrack="general"; state.currentLessonIndex=0; saveState(); renderTrackUI(); renderLesson(); toast("Track: General"); refresh(); }}, "Track: General")
-  ));
-  root.appendChild(row(
-    h("button",{style:btnStyle, onclick:()=>{ exportSave(); }}, "Export save"),
-    h("button",{style:btnStyle, onclick:()=>{ importSave(); }}, "Import save"),
-    h("button",{style:btnStyle, onclick:()=>{ validateAndFixQuizDuplicates({autoFix:true}); }}, "Fix quiz duplicates")
-  ));
-  root.appendChild(h("div",{ style:{ marginTop:"10px", opacity:"0.85", fontSize:"12px" } },
-    "Toggle: Ctrl+Shift+D • Logs: console"
-  ));
-  document.body.appendChild(root);
-
-  function toggle(force){
-    const show = (typeof force === "boolean") ? force : (root.style.display === "none");
-    root.style.display = show ? "block" : "none";
-    if(show) refresh();
-  }
-
-  window.addEventListener("keydown", (e) => {
-    const key = (e.key || "").toLowerCase();
-    const hot = (key === "d") && (e.ctrlKey || e.metaKey) && e.shiftKey;
-    if(hot){
-      e.preventDefault();
-      toggle();
-    }
-  });
-})();
