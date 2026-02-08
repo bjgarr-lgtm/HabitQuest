@@ -1047,10 +1047,11 @@ function renderReflection(lesson){
 ========================================================= */
 function getActiveLessons(){
   const t = state.selectedTrack || "general";
-  if(t === "general") return LESSONS;
-  const filtered = LESSONS.filter(l => (l.track === t) || (l.track === "general"));
-  return filtered.length ? filtered : LESSONS;
+  const list = LESSONS_BY_TRACK[t] || LESSONS_BY_TRACK.general;
+  // Convert blueprints -> renderable lessons (with content + quiz)
+  return list.map(getLessonObject);
 }
+
 
 function renderTrackUI(){
   const sel = $("#track-select");
@@ -1208,7 +1209,7 @@ function getRecommendedLesson(){
   const lessons = getActiveLessons();
   if(!lessons.length) return null;
 
-  const uncompleted = lessons.filter(l => !state.completedDays.includes(l.day));
+  const uncompleted = lessons.filter(l => !state.completedDays.includes(`${l.track}:${l.day}`));
   if(uncompleted.length) return uncompleted[0];
 
   let best = null;
@@ -2042,8 +2043,11 @@ function renderResponseBuilder(){
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
   if(day <= 0) return "";
-  const l = LESSONS.find(x => x.day === day);
+  const track = state.selectedTrack || "general";
+  const list = (LESSONS_BY_TRACK[track] || LESSONS_BY_TRACK.general) || [];
+  const l = list.find(x => x.day === day);
   return l ? l.title : "";
+
 }
 
 function hqCtx(){
@@ -2767,7 +2771,12 @@ function renderProgress(){
   if(!list) return;
   list.innerHTML = "";
 
-  const daysSorted = [...state.completedDays].sort((a,b)=>a-b);
+  const daysSorted = [...state.completedDays].sort((a,b)=>{
+    const [ta, da] = String(a).split(":");
+    const [tb, db] = String(b).split(":");
+    if(ta !== tb) return ta.localeCompare(tb);
+    return (Number(da)||0) - (Number(db)||0);
+  });
   if(daysSorted.length === 0){
     const p = document.createElement("p");
     p.className = "muted";
