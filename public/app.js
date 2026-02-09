@@ -765,19 +765,19 @@ function randomTip(){
 /* =========================================================
    RECOMMENDED NEXT LESSON
 ========================================================= */
-function recordQuizAttempt(trackId, day, wrongCount){
-  const k = lessonKey(trackId, day);
+function recordQuizAttempt(track, day, wrongCount){
+  const key = lessonKey(track, day); // track:day
   state.quizAttempts = (state.quizAttempts && typeof state.quizAttempts === "object") ? state.quizAttempts : {};
-  const cur = state.quizAttempts[k] && typeof state.quizAttempts[k] === "object"
-    ? state.quizAttempts[k]
+  const cur = state.quizAttempts[key] && typeof state.quizAttempts[key] === "object"
+    ? state.quizAttempts[key]
     : { attempts: 0, wrongTotal: 0, lastISO: null };
-
   cur.attempts = safeNum(cur.attempts, 0) + 1;
   cur.wrongTotal = safeNum(cur.wrongTotal, 0) + Math.max(0, safeNum(wrongCount, 0));
   cur.lastISO = isoDate(new Date());
-  state.quizAttempts[k] = cur;
+  state.quizAttempts[key] = cur;
   saveState();
 }
+
 
 
 
@@ -1190,19 +1190,15 @@ function getWrongItemsForCurrentLesson(){
 }
 
 
-function updateLessonStatus(day){
+function updateLessonStatus(trackId, day){
   const el = $("#lesson-status");
   if(!el) return;
-
-  const lessons = getActiveLessons();
-  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
-  const lesson = lessons[idx];
-
-  const done = isLessonComplete(lesson.track, day);
+  const done = isLessonComplete(trackId, day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
+
 
 
 
@@ -1241,11 +1237,23 @@ function bindLessonButtons(){
 
   if(wrong > 0){
     // 1) record attempts keyed by track/day
-    const lessons = getActiveLessons();
-    const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
-    const lesson = lessons[idx];
+    recordQuizAttempt(lesson.track, score.day, wrong);
 
-    recordQuizAttempt(state.selectedTrack || "general", score.day, wrong);
+    const miss = getWrongItemsForCurrentLesson();
+    miss.wrong.forEach((w, qi) => {
+      // rebuild item shape for logger (needs q/options/answer)
+      const lessons = getActiveLessons();
+      const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+      const lesson = lessons[idx];
+      const item = lesson.quiz[qi];
+      if(item){
+        // if they were wrong, log it
+        const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
+        const pickedIndex = picked ? Number(picked.value) : null;
+        if(pickedIndex !== item.answer) logQuizMistake(lesson, qi, item);
+      }
+    });
+
 
     // 2) log each wrong question into the Mistake Review bank
     lesson.quiz.forEach((item, qi) => {
@@ -1256,19 +1264,14 @@ function bindLessonButtons(){
       }
     });
 
-    // 3) optional: store lesson-level summary for later “concept review”
-    const miss = getWrongItemsForCurrentLesson();
-    if(miss.wrong.length) recordMistakesForLesson(miss);
-
-    $("#lesson-status") && ($("#lesson-status").textContent =
-      `Almost! Quiz score: ${score.correct}/${score.total}. I saved missed questions for review.`);
-    renderHomeRecommendation();
-    return;
-  }
 
 
 
     const trackId = state.selectedTrack || "general";
+    const lessons = getActiveLessons();
+    const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+    const lesson = lessons[idx];
+
     const firstTime = !isLessonComplete(lesson.track, score.day);
     if(firstTime){
       addXP(score.total * 5);
@@ -1276,6 +1279,7 @@ function bindLessonButtons(){
       addXP(50);
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
+
 
     state.habitQuest.lastLessonDay = score.day;
 
@@ -1296,6 +1300,7 @@ function bindLessonButtons(){
     renderProgress();
     renderGamesCatalog();
     renderHomeRecommendation();
+    }
   });
 
   document.getElementById("btn-review-mistakes")?.addEventListener("click", () => {
