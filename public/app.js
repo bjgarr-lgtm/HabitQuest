@@ -67,6 +67,18 @@ function shuffleInPlace(arr, rng){
   return arr;
 }
 
+function lessonKey(trackId, day){
+  return `${trackId}:${Number(day)}`;
+}
+function isLessonComplete(trackId, day){
+  return state.completedDays.includes(lessonKey(trackId, day));
+}
+function markLessonComplete(trackId, day){
+  const key = lessonKey(trackId, day);
+  if(!state.completedDays.includes(key)) state.completedDays.push(key);
+}
+
+
 /* =========================================================
    CONTENT: TIPS
 ========================================================= */
@@ -682,10 +694,13 @@ const LESSON_BLUEPRINTS = [
   },
 ];
 
-function getBlueprint(day){
-  const idx = clamp(day, 1, 30) - 1;
-  return LESSON_BLUEPRINTS[idx] || LESSON_BLUEPRINTS[0];
+function getBlueprint(day, track){
+  const t = track || state.selectedTrack || "general";
+  const list = window.CURR?.BLUEPRINTS_BY_TRACK?.[t] || window.CURR?.BLUEPRINTS_BY_TRACK?.general || [];
+  const idx = clamp(day, 1, 60) - 1;
+  return list[idx] || list[0];
 }
+
 
 function makeLessonContent(day, title, goal){
   const bp = getBlueprint(day);
@@ -868,7 +883,25 @@ const DEFAULT_STATE = {
   selectedTrack: "general",
   reflections: { /* day -> { text, savedISO, rewarded } */ },
   lastLoginISO: null,
-  quizAttempts: { /* day -> { attempts, wrongTotal, lastISO } */ },
+  quizAttempts: { /* dayKey -> { attempts, wrongTotal, lastISO } */ },
+
+  // Mistake Review mode
+  mistakes: {
+    /* qKey -> {
+        qKey, track, day, lessonId,
+        q, options, answer,
+        wrongCount, lastWrongISO, firstWrongISO
+    } */
+  },
+  mistakeMeta: { byLesson: {}, byConcept: {} },
+  mistakeStats: { byLesson:{}, byConcept:{} },
+  
+  reviewMode: {
+    active: false,
+    queue: [],   // array of qKey
+    idx: 0,
+    lastBuiltISO: null
+  },
   habitQuest: {
     nodeId: "hq_start",
     hearts: 3,
@@ -905,6 +938,9 @@ function normalizeState(s){
     },
     quizAttempts: (safe.quizAttempts && typeof safe.quizAttempts === "object") ? safe.quizAttempts : {},
     reflections: (safe.reflections && typeof safe.reflections === "object") ? safe.reflections : {},
+    mistakes: (safe.mistakes && typeof safe.mistakes === "object") ? safe.mistakes : {},
+    reviewMode: (safe.reviewMode && typeof safe.reviewMode === "object") ? safe.reviewMode : { active:false, queue:[], idx:0, lastBuiltISO:null },
+
     habitQuest: {
       ...DEFAULT_STATE.habitQuest,
       ...(safe.habitQuest && typeof safe.habitQuest === "object" ? safe.habitQuest : {})
@@ -924,6 +960,13 @@ function normalizeState(s){
   merged.customAvatars = merged.customAvatars
     .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
     .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
+  merged.mistakes = (merged.mistakes && typeof merged.mistakes === "object") ? merged.mistakes : {};
+  mistakeStats: (safe.mistakeStats && typeof safe.mistakeStats === "object") ? safe.mistakeStats : { byLesson:{}, byConcept:{} },
+  merged.reviewMode = (merged.reviewMode && typeof merged.reviewMode === "object") ? merged.reviewMode : { active:false, queue:[], idx:0, lastBuiltISO:null };
+  merged.reviewMode.active = !!merged.reviewMode.active;
+  merged.reviewMode.queue = Array.isArray(merged.reviewMode.queue) ? merged.reviewMode.queue : [];
+  merged.reviewMode.idx = Math.max(0, safeNum(merged.reviewMode.idx, 0));
+  merged.reviewMode.lastBuiltISO = safeStr(merged.reviewMode.lastBuiltISO, null);
 
   if(typeof safe.customAvatar === "string" && safe.customAvatar.startsWith("data:image/")){
     const exists = merged.customAvatars.some(a => a.dataURL === safe.customAvatar);
@@ -1145,7 +1188,10 @@ function showView(name){
   $$(".tab").forEach(t => t.classList.remove("active"));
   $(`.tab[data-view="${name}"]`)?.classList.add("active");
 
-  if(name === "lesson")   renderLesson();
+  if(name === "lesson"){
+    if(state.reviewMode?.active) renderMistakeReview();
+    else renderLesson();
+  }
   if(name === "games")    renderGamesCatalog();
   if(name === "profile"){
     renderProfile();
@@ -1191,31 +1237,34 @@ function randomTip(){
 /* =========================================================
    RECOMMENDED NEXT LESSON
 ========================================================= */
-function recordQuizAttempt(day, wrongCount){
-  const d = String(day);
+function recordQuizAttempt(trackId, day, wrongCount){
+  const k = lessonKey(trackId, day);
   state.quizAttempts = (state.quizAttempts && typeof state.quizAttempts === "object") ? state.quizAttempts : {};
-  const cur = state.quizAttempts[d] && typeof state.quizAttempts[d] === "object"
-    ? state.quizAttempts[d]
+  const cur = state.quizAttempts[k] && typeof state.quizAttempts[k] === "object"
+    ? state.quizAttempts[k]
     : { attempts: 0, wrongTotal: 0, lastISO: null };
 
   cur.attempts = safeNum(cur.attempts, 0) + 1;
   cur.wrongTotal = safeNum(cur.wrongTotal, 0) + Math.max(0, safeNum(wrongCount, 0));
   cur.lastISO = isoDate(new Date());
-  state.quizAttempts[d] = cur;
+  state.quizAttempts[k] = cur;
   saveState();
 }
+
+
+
 
 function getRecommendedLesson(){
   const lessons = getActiveLessons();
   if(!lessons.length) return null;
 
-  const uncompleted = lessons.filter(l => !state.completedDays.includes(`${l.track}:${l.day}`));
+  const uncompleted = lessons.filter(l => !isLessonComplete(l.track, l.day));
   if(uncompleted.length) return uncompleted[0];
 
   let best = null;
   let bestScore = -1;
   for(const l of lessons){
-    const stat = state.quizAttempts?.[String(l.day)];
+    const stat = state.quizAttempts?.[lessonKey(l.track,l.day)];
     const score = stat ? safeNum(stat.wrongTotal, 0) : 0;
     if(score > bestScore){
       bestScore = score;
@@ -1249,7 +1298,7 @@ function renderHomeRecommendation(){
     return;
   }
 
-  const isDone = state.completedDays.includes(rec.day);
+  const isDone = isLessonComplete(rec.track, rec.day);
   const trackName = TRACKS[state.selectedTrack]?.name || "General";
   boxTitle.textContent = `Recommended: Day ${rec.day} — ${rec.title}`;
   boxDesc.textContent = isDone
@@ -1266,6 +1315,80 @@ function renderHomeRecommendation(){
     });
   }
 }
+
+function makeQKey(lesson, qIndex, item){
+  // stable key: track/day + normalized question text
+  const track = lesson.track || state.selectedTrack || "general";
+  const day = safeNum(lesson.day, 0);
+  const qt = String(item?.q || "").trim().slice(0, 240);
+  const base = `${track}:${day}:${qIndex}:${qt}`;
+  return "q_" + hashStrToSeed(base).toString(16);
+}
+
+function logQuizMistake(lesson, qIndex, item){
+  if(!lesson || !item) return;
+  const nowISO = isoDate(new Date());
+  const qKey = makeQKey(lesson, qIndex, item);
+
+  state.mistakes = (state.mistakes && typeof state.mistakes === "object") ? state.mistakes : {};
+  const prev = state.mistakes[qKey];
+
+  state.mistakes[qKey] = {
+    qKey,
+    track: lesson.track || state.selectedTrack || "general",
+    day: safeNum(lesson.day, 0),
+    lessonId: safeStr(lesson.id, `${lesson.track || "general"}-day-${lesson.day}`),
+    q: String(item.q || ""),
+    options: Array.isArray(item.options) ? item.options.slice(0, 8) : [],
+    answer: safeNum(item.answer, 0),
+
+    wrongCount: safeNum(prev?.wrongCount, 0) + 1,
+    lastWrongISO: nowISO,
+    firstWrongISO: prev?.firstWrongISO || nowISO,
+  };
+
+  saveState();
+}
+
+// Build a daily review queue from stored mistakes (track-aware)
+function buildMistakeReviewQueue({ max=10 } = {}){
+  const track = state.selectedTrack || "general";
+  const all = Object.values(state.mistakes || {})
+    .filter(m => m && m.track === track && String(m.q||"").trim().length);
+
+  // Sort: most wrong first, then most recent wrong
+  all.sort((a,b) => {
+    const wc = safeNum(b.wrongCount,0) - safeNum(a.wrongCount,0);
+    if(wc) return wc;
+    return String(b.lastWrongISO||"").localeCompare(String(a.lastWrongISO||""));
+  });
+
+  const picked = all.slice(0, Math.max(0, safeNum(max,10))).map(m => m.qKey);
+
+  state.reviewMode = (state.reviewMode && typeof state.reviewMode === "object") ? state.reviewMode : {};
+  state.reviewMode.active = true;
+  state.reviewMode.queue = picked;
+  state.reviewMode.idx = 0;
+  state.reviewMode.lastBuiltISO = isoDate(new Date());
+  saveState();
+  return picked;
+}
+
+function exitMistakeReview(){
+  state.reviewMode = (state.reviewMode && typeof state.reviewMode === "object") ? state.reviewMode : {};
+  state.reviewMode.active = false;
+  state.reviewMode.queue = [];
+  state.reviewMode.idx = 0;
+  saveState();
+}
+
+function getCurrentReviewItem(){
+  if(!state.reviewMode?.active) return null;
+  const qKey = state.reviewMode.queue?.[state.reviewMode.idx];
+  if(!qKey) return null;
+  return state.mistakes?.[qKey] || null;
+}
+
 
 /* =========================================================
    LESSONS + QUIZ RENDERING
@@ -1296,8 +1419,169 @@ function renderLesson(){
 
   renderQuiz(lesson);
   renderReflection(lesson);
-  updateLessonStatus(lesson.day);
+  updateLessonStatus(lesson.track, lesson.day);
 }
+
+function renderMistakeReviewForCurrentLesson(){
+  const miss = getWrongItemsForCurrentLesson();
+  const box = document.getElementById("quiz");
+  if(!box) return;
+
+  if(!miss.wrong.length){
+    box.insertAdjacentHTML("beforeend", `<p class="muted">No mistakes to review ✅</p>`);
+    return;
+  }
+
+  const items = miss.wrong.slice(0, 6); // keep it short; feels good
+  const html = `
+    <div class="card" style="margin-top:12px; background: rgba(255,255,255,0.06);">
+      <h3 style="margin-top:0;">Mistake Review 🔁</h3>
+      <p class="muted">Here are the ones you missed. Read the correct answer + why, then retry.</p>
+      ${items.map((w,i)=>`
+        <div class="divider"></div>
+        <p style="font-weight:900; margin:0 0 6px;">${escapeHtml(w.q)}</p>
+        <p class="muted" style="margin:0;">You picked: <strong>${escapeHtml(w.picked ?? "(no answer)")}</strong></p>
+        <p class="muted" style="margin:6px 0 0;">Correct: <strong>${escapeHtml(w.correct)}</strong></p>
+        <p class="muted" style="margin:6px 0 0;">Concept: <strong>${escapeHtml(w.concept)}</strong></p>
+      `).join("")}
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn small" id="btn-mr-close" type="button">Hide</button>
+      </div>
+    </div>
+  `;
+  box.insertAdjacentHTML("beforeend", html);
+  document.getElementById("btn-mr-close")?.addEventListener("click", () => renderLesson());
+}
+
+
+function renderMistakeReview(){
+  const item = getCurrentReviewItem();
+  const trackName = TRACKS[state.selectedTrack]?.name || "General";
+
+  $("#lesson-title") && ($("#lesson-title").textContent = item ? "Mistake Review" : "Mistake Review");
+  $("#lesson-day") && ($("#lesson-day").textContent = `Track: ${trackName} • Review`);
+  $("#lesson-goal") && ($("#lesson-goal").textContent =
+    item ? "Fix missed concepts: answer correctly to clear items." : "No mistakes saved yet — do a quiz first."
+  );
+
+  const body = $("#lesson-content");
+  if(body){
+    body.innerHTML = "";
+    const p = document.createElement("p");
+    p.textContent = item
+      ? "You previously missed this question. Answer it correctly to move on."
+      : "Do some lessons + quizzes. Any wrong answers get saved here automatically.";
+    body.appendChild(p);
+
+    if(item){
+      const meta = document.createElement("p");
+      meta.className = "muted";
+      meta.textContent = `From Day ${item.day} • Missed ${item.wrongCount} time${item.wrongCount===1?"":"s"}`;
+      body.appendChild(meta);
+    }
+  }
+
+  const quizWrap = $("#quiz");
+  if(!quizWrap) return;
+  quizWrap.innerHTML = "";
+
+  if(!item){
+    quizWrap.innerHTML = `
+      <div class="actions">
+        <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
+      </div>
+    `;
+    $("#btn-exit-review")?.addEventListener("click", () => {
+      exitMistakeReview();
+      showView("home");
+    });
+    return;
+  }
+
+  // Build a mini "lesson" object so your normal UI stays consistent
+  const reviewQuestion = { q: item.q, options: item.options, answer: item.answer };
+
+  const qEl = document.createElement("p");
+  qEl.style.fontWeight = "900";
+  qEl.textContent = reviewQuestion.q;
+  quizWrap.appendChild(qEl);
+
+  reviewQuestion.options.forEach((optText, optIndex) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choiceBtn";
+    btn.textContent = optText;
+    btn.addEventListener("click", () => {
+      // lock buttons
+      quizWrap.querySelectorAll("button.choiceBtn").forEach(b => b.disabled = true);
+
+      const correct = (optIndex === reviewQuestion.answer);
+      if(correct){
+        btn.classList.add("choiceGood");
+
+        // remove this mistake entirely (cleared)
+        const qKey = item.qKey;
+        delete state.mistakes[qKey];
+
+        // advance
+        state.reviewMode.idx += 1;
+
+        // if finished, exit
+        if(state.reviewMode.idx >= state.reviewMode.queue.length){
+          exitMistakeReview();
+          saveState();
+          $("#lesson-status") && ($("#lesson-status").textContent = "✅ Review complete! Nice work.");
+          addXP(15);
+          renderHomeRecommendation();
+          showView("home");
+          return;
+        }
+
+        saveState();
+        addXP(2);
+
+        // next question
+        renderMistakeReview();
+      }else{
+        btn.classList.add("choiceBad");
+        // count it again (keep it in bank)
+        state.mistakes[item.qKey].wrongCount = safeNum(state.mistakes[item.qKey].wrongCount,0) + 1;
+        state.mistakes[item.qKey].lastWrongISO = isoDate(new Date());
+        saveState();
+
+        const msg = document.createElement("p");
+        msg.className = "muted";
+        msg.style.marginTop = "10px";
+        msg.textContent = "Not yet — try again tomorrow or revisit the original lesson.";
+        quizWrap.appendChild(msg);
+      }
+    });
+    quizWrap.appendChild(btn);
+  });
+
+  // Replace lesson action buttons with review controls
+  const actions = document.querySelector("#view-lesson .actions");
+  if(actions){
+    actions.innerHTML = `
+      <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
+      <button class="btn primary" id="btn-next-review" type="button">Skip</button>
+    `;
+    $("#btn-exit-review")?.addEventListener("click", () => {
+      exitMistakeReview();
+      showView("home");
+    });
+    $("#btn-next-review")?.addEventListener("click", () => {
+      state.reviewMode.idx = Math.min(state.reviewMode.idx + 1, (state.reviewMode.queue?.length || 1) - 1);
+      saveState();
+      renderMistakeReview();
+    });
+  }
+
+  $("#lesson-status") && ($("#lesson-status").textContent =
+    `Review item ${state.reviewMode.idx + 1} / ${state.reviewMode.queue.length}`
+  );
+}
+
 
 function renderQuiz(lesson){
   const quiz = $("#quiz");
@@ -1353,14 +1637,40 @@ function quizScoreForCurrentLesson(){
   return { correct, total: lesson.quiz.length, day: lesson.day, title: lesson.title };
 }
 
-function updateLessonStatus(day){
+function getWrongItemsForCurrentLesson(){
+  const lessons = getActiveLessons();
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  const lesson = lessons[idx];
+
+  const wrong = [];
+  lesson.quiz.forEach((item, qi) => {
+    const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
+    const pickedIndex = picked ? Number(picked.value) : null;
+
+    if(pickedIndex !== item.answer){
+      wrong.push({
+        q: item.q,
+        picked: (pickedIndex == null) ? null : item.options[pickedIndex],
+        correct: item.options[item.answer],
+        // concept is optional; fallback keeps it useful even if you don’t tag concepts yet
+        concept: item.concept || lesson.title || "General",
+      });
+    }
+  });
+
+  return { wrong, total: lesson.quiz.length, day: lesson.day, track: lesson.track, title: lesson.title };
+}
+
+
+function updateLessonStatus(trackId, day){
   const el = $("#lesson-status");
   if(!el) return;
-  const done = state.completedDays.includes(day);
+  const done = isLessonComplete(state.selectedTrack || "general", day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
+
 
 function applyDailyStreakBonusIfAny(prevLastISO, newLastISO){
   const today = isoDate(new Date());
@@ -1395,18 +1705,39 @@ function bindLessonButtons(){
     const score = quizScoreForCurrentLesson();
     const wrong = score.total - score.correct;
 
-    if(wrong > 0){
-      recordQuizAttempt(score.day, wrong);
-      $("#lesson-status") && ($("#lesson-status").textContent =
-        `Almost! Quiz score: ${score.correct}/${score.total}. Fix the missed ones and try again.`);
-      renderHomeRecommendation();
-      return;
-    }
+  if(wrong > 0){
+    // 1) record attempts keyed by track/day
+    const lessons = getActiveLessons();
+    const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+    const lesson = lessons[idx];
 
-    const firstTime = !state.completedDays.includes(score.day);
-    if(firstTime){
+    recordQuizAttempt(state.selectedTrack || "general", score.day, wrong);
+
+    // 2) log each wrong question into the Mistake Review bank
+    lesson.quiz.forEach((item, qi) => {
+      const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
+      const pickedIndex = picked ? Number(picked.value) : null;
+      if(pickedIndex !== item.answer){
+        logQuizMistake(lesson, qi, item);
+      }
+    });
+
+    // 3) optional: store lesson-level summary for later “concept review”
+    const miss = getWrongItemsForCurrentLesson();
+    if(miss.wrong.length) recordMistakesForLesson(miss);
+
+    $("#lesson-status") && ($("#lesson-status").textContent =
+      `Almost! Quiz score: ${score.correct}/${score.total}. I saved missed questions for review.`);
+    renderHomeRecommendation();
+    return;
+  }
+
+
+
+    const trackId = state.selectedTrack || "general";
+    const firstTime = !isLessonComplete(trackId, score.day);    if(firstTime){
       addXP(score.total * 5);
-      state.completedDays.push(score.day);
+      markLessonComplete(trackId, score.day);
       addXP(50);
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
@@ -1431,6 +1762,18 @@ function bindLessonButtons(){
     renderGamesCatalog();
     renderHomeRecommendation();
   });
+
+  document.getElementById("btn-review-mistakes")?.addEventListener("click", () => {
+    // Save the lesson summary (optional)
+    const miss = getWrongItemsForCurrentLesson();
+    if(miss.wrong.length) recordMistakesForLesson(miss);
+
+    // Build the real review queue from the qKey mistake bank
+    buildMistakeReviewQueue({ max: 10 });
+    showView("lesson"); // renderMistakeReview() will take over because reviewMode.active
+  });
+
+
 }
 
 function applyDailyLoginBonus(){
@@ -1441,6 +1784,34 @@ function applyDailyLoginBonus(){
   state.lastLoginISO = today;
   saveState();
 }
+
+function recordMistakesForLesson({ track, day, wrong }){
+  const key = `${track}:${day}`;
+  const iso = isoDate(new Date());
+
+  state.mistakeStats = (state.mistakeStats && typeof state.mistakeStats === "object") ? state.mistakeStats : {};
+  state.mistakeStats.byLesson = (state.mistakeStats.byLesson && typeof state.mistakeStats.byLesson === "object") ? state.mistakeStats.byLesson : {};
+  state.mistakeStats.byConcept = (state.mistakeStats.byConcept && typeof state.mistakeStats.byConcept === "object") ? state.mistakeStats.byConcept : {};
+
+  state.mistakeStats.byLesson[key] = { updatedISO: iso, items: wrong.slice(0, 50) };
+
+  for(const w of wrong){
+    const c = safeStr(w.concept, "General");
+    const prev = state.mistakeStats.byConcept[c] || { count: 0, lastISO: null };
+    state.mistakeStats.byConcept[c] = { count: safeNum(prev.count,0) + 1, lastISO: iso };
+  }
+saveState();
+
+  for(const w of wrong){
+    const c = safeStr(w.concept, "General");
+    const prev = state.mistakeStats.byConcept[c] || { count: 0, lastISO: null };
+    state.mistakeStats.byConcept[c] = { count: safeNum(prev.count,0) + 1, lastISO: iso };
+  }
+  saveState();
+}
+
+
+
 
 /* =========================================================
    HOME STATS
@@ -2771,13 +3142,15 @@ function renderProgress(){
   if(!list) return;
   list.innerHTML = "";
 
-  const daysSorted = [...state.completedDays].sort((a,b)=>{
-    const [ta, da] = String(a).split(":");
-    const [tb, db] = String(b).split(":");
-    if(ta !== tb) return ta.localeCompare(tb);
-    return (Number(da)||0) - (Number(db)||0);
-  });
-  if(daysSorted.length === 0){
+  const items = [...state.completedDays]
+    .map(k => {
+      const [track, dayStr] = String(k).split(":");
+      const day = Number(dayStr);
+      return { key:k, track, day: Number.isFinite(day) ? day : 0 };
+    })
+    .sort((a,b) => (a.track.localeCompare(b.track) || a.day - b.day));
+
+  if(items.length === 0){
     const p = document.createElement("p");
     p.className = "muted";
     p.textContent = "No lessons completed yet — start with Today’s Lesson!";
@@ -2785,13 +3158,15 @@ function renderProgress(){
     return;
   }
 
-  daysSorted.forEach(d => {
+  items.forEach(it => {
     const chip = document.createElement("div");
     chip.className = "chip";
-    chip.textContent = `Day ${d} ✅`;
+    const trackName = TRACKS?.[it.track]?.name || it.track;
+    chip.textContent = `${trackName} • Day ${it.day} ✅`;
     list.appendChild(chip);
   });
 }
+
 
 function bindReset(){
   $("#btn-reset")?.addEventListener("click", () => {
@@ -2835,6 +3210,12 @@ function init(){
   bindAvatarUpload();
   bindProfileNameEditor();
 
+  $("#btn-start-review")?.addEventListener("click", () => {
+  buildMistakeReviewQueue({ max: 10 });
+  showView("lesson");
+  });
+
+  
   $("#btn-new-tip")?.addEventListener("click", randomTip);
 
   randomTip();

@@ -39,6 +39,7 @@
           <p class="muted" id="rec-desc">Loading…</p>
           <div class="actions" style="margin-top:10px;">
             <button class="btn small primary" id="btn-go-recommended" type="button">Go</button>
+            <button class="btn small" id="btn-start-review" type="button">Mistake Review</button>
           </div>
         </div>
 
@@ -79,7 +80,10 @@
         <div class="actions">
           <button class="btn" id="btn-prev-lesson">Previous</button>
           <button class="btn" id="btn-next-lesson">Next</button>
-          <button class="btn primary" id="btn-complete-lesson">Mark Lesson Complete ✅</button>
+          <button class="btn" id="btn-review-mistakes" type="button">Review Mistakes</button>
+          <button class="btn primary" id="btn-complete-lesson" type="button">
+            Mark Lesson Complete
+          </button>
         </div>
 
         <p class="muted" id="lesson-status"></p>
@@ -325,6 +329,7 @@
     <button class="link" id="btn-open-rate">Rate this app</button>
   </footer>
 
+  <script src="curriculum.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
