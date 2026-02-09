@@ -1,5 +1,6 @@
 /* curriculum.js — 60/day per track (hardcoded, unique) */
 "use strict";
+console.log("curriculum.js starting...");
 
 window.CURR = (() => {
   const TRACKS = {
@@ -891,6 +892,7 @@ const BLUEPRINTS_BY_TRACK = {
   alcohol:     ALCOHOL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
   caffeine:    CAFFEINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
 };
+console.log("curriculum.js finished OK", window.CURR);
 
   return {
     TRACKS,
