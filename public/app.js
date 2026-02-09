@@ -274,30 +274,27 @@ function getHardcodedQuiz(day, track){
   const byTrack = CURR?.QUIZZES_BY_TRACK?.[track];
   if(!byTrack) return null;
 
-  // support either {1:[...],2:[...]} OR [{day:1,questions:[...]}, ...]
+  // supports either array indexed by day-1 or array of {day, questions}
   if(Array.isArray(byTrack)){
-    const entry = byTrack.find(x => x.day === day);
-    return entry?.questions || entry?.q || entry || null;
-  }
-  return byTrack[day] || null;
-}
+    // If it's [ [q12], [q12], ... ]:
+    if(Array.isArray(byTrack[day-1])) return byTrack[day-1];
 
-
-function getQuizForLesson(day, track){
-  const CURR = window.CURR;
-  if(!CURR) throw new Error("CURR missing");
-
-  // 1) Prefer hardcoded quizzes if present
-  const byTrack = CURR.QUIZZES_BY_TRACK && CURR.QUIZZES_BY_TRACK[track];
-  if(Array.isArray(byTrack) && byTrack[day - 1] && Array.isArray(byTrack[day - 1].questions)){
-    return byTrack[day - 1].questions;
+    // If it's [ {day:1, questions:[...]}, ... ]:
+    const found = byTrack.find(x => x && x.day === day);
+    if(found?.questions) return found.questions;
   }
 
-  // 2) Fallback: generate (BUT DO NOT CALL getQuizForLesson AGAIN)
-  const lesson = getLesson(day, track); // or however you fetch the lesson object
-  if(!lesson) throw new Error(`No lesson for day=${day} track=${track}`);
-  return makeQuizForLesson(lesson.day, lesson.title, lesson.goal, lesson.track);
+  return null;
 }
+
+function getQuizForLesson(day, title, goal, track){
+  const hard = getHardcodedQuiz(day, track);
+  if(hard && hard.length) return hard;
+
+  // fallback: generate (or return [] if you don't want fallback)
+  return makeQuizForLesson(day, title, goal, track);
+}
+
 
 
 
