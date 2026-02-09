@@ -892,8 +892,9 @@ const CAFFEINE = [
     alcohol:     ALCOHOL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
     caffeine:    CAFFEINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
   };
+  const QUIZZES_BY_TRACK = window.QUIZZES || {};
 
-  const out = { TRACKS, CURRICULUM_BY_TRACK, BLUEPRINTS_BY_TRACK };
+  const out = { TRACKS, CURRICULUM_BY_TRACK, BLUEPRINTS_BY_TRACK, QUIZZES_BY_TRACK };
   console.log("curriculum.js finished OK", out);
   return out;
 })();
