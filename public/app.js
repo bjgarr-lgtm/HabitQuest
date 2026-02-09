@@ -1171,6 +1171,8 @@ function getWrongItemsForCurrentLesson(){
   const lesson = lessons[idx];
 
   const wrong = [];
+  const wrongMeta = []; // for saving into mistake bank (needs original item)
+
   lesson.quiz.forEach((item, qi) => {
     const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
     const pickedIndex = picked ? Number(picked.value) : null;
@@ -1180,20 +1182,21 @@ function getWrongItemsForCurrentLesson(){
         q: item.q,
         picked: (pickedIndex == null) ? null : item.options[pickedIndex],
         correct: item.options[item.answer],
-        // concept is optional; fallback keeps it useful even if you don’t tag concepts yet
-        concept: item.concept || lesson.title || "General",
+        concept: item.concept || lesson.toolName || lesson.title || "General",
       });
+      wrongMeta.push({ qIndex: qi, item });
     }
   });
 
-  return { wrong, total: lesson.quiz.length, day: lesson.day, track: lesson.track, title: lesson.title };
+  return { lesson, wrong, wrongMeta, total: lesson.quiz.length, day: lesson.day, track: lesson.track, title: lesson.title };
 }
+
 
 
 function updateLessonStatus(trackId, day){
   const el = $("#lesson-status");
   if(!el) return;
-  const done = isLessonComplete(trackId, day);
+  const done = isLessonComplete(state.selectedTrack || "general", day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
@@ -1281,14 +1284,21 @@ function bindLessonButtons(){
 
 
   document.getElementById("btn-review-mistakes")?.addEventListener("click", () => {
-    // Save the lesson summary (optional)
     const miss = getWrongItemsForCurrentLesson();
-    if(miss.wrong.length) recordMistakesForLesson(miss);
 
-    // Build the real review queue from the qKey mistake bank
+    if(!miss.wrong.length){
+      renderMistakeReviewForCurrentLesson();
+      return;
+    }
+
+    // Save the missed questions into the mistake bank (qKey -> item)
+    recordMistakesForLesson({ lesson: miss.lesson, wrongMeta: miss.wrongMeta });
+
+    // Build queue + enter review mode UI
     buildMistakeReviewQueue({ max: 10 });
-    showView("lesson"); // renderMistakeReview() will take over because reviewMode.active
+    showView("lesson"); // will call renderMistakeReview() because reviewMode.active = true
   });
+
 
 
 }
@@ -1302,32 +1312,14 @@ function applyDailyLoginBonus(){
   saveState();
 }
 
-function recordMistakesForLesson({ track, day, wrong }){
-  const key = `${track}:${day}`;
-  const iso = isoDate(new Date());
-
-  state.mistakeStats = (state.mistakeStats && typeof state.mistakeStats === "object") ? state.mistakeStats : {};
-  state.mistakeStats.byLesson = (state.mistakeStats.byLesson && typeof state.mistakeStats.byLesson === "object") ? state.mistakeStats.byLesson : {};
-  state.mistakeStats.byConcept = (state.mistakeStats.byConcept && typeof state.mistakeStats.byConcept === "object") ? state.mistakeStats.byConcept : {};
-
-  state.mistakeStats.byLesson[key] = { updatedISO: iso, items: wrong.slice(0, 50) };
-
-  for(const w of wrong){
-    const c = safeStr(w.concept, "General");
-    const prev = state.mistakeStats.byConcept[c] || { count: 0, lastISO: null };
-    state.mistakeStats.byConcept[c] = { count: safeNum(prev.count,0) + 1, lastISO: iso };
-  }
-saveState();
-
-  for(const w of wrong){
-    const c = safeStr(w.concept, "General");
-    const prev = state.mistakeStats.byConcept[c] || { count: 0, lastISO: null };
-    state.mistakeStats.byConcept[c] = { count: safeNum(prev.count,0) + 1, lastISO: iso };
-  }
-  saveState();
+function recordMistakesForLesson({ lesson, wrongMeta }){
+  // Save mistakes in the format Mistake Review expects (qKey -> mistake object)
+  if(!lesson || !Array.isArray(wrongMeta)) return;
+  wrongMeta.forEach(w => {
+    // w.qIndex + w.item are required
+    logQuizMistake(lesson, w.qIndex, w.item);
+  });
 }
-
-
 
 
 /* =========================================================
