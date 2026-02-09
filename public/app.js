@@ -1232,60 +1232,37 @@ function bindLessonButtons(){
   });
 
   $("#btn-complete-lesson")?.addEventListener("click", () => {
-    const score = quizScoreForCurrentLesson();
-    const wrong = score.total - score.correct;
-
-  if(wrong > 0){
-    // 1) record attempts keyed by track/day
-    recordQuizAttempt(lesson.track, score.day, wrong);
-
-    const miss = getWrongItemsForCurrentLesson();
-    miss.wrong.forEach((w, qi) => {
-      // rebuild item shape for logger (needs q/options/answer)
-      const lessons = getActiveLessons();
-      const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
-      const lesson = lessons[idx];
-      const item = lesson.quiz[qi];
-      if(item){
-        // if they were wrong, log it
-        const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
-        const pickedIndex = picked ? Number(picked.value) : null;
-        if(pickedIndex !== item.answer) logQuizMistake(lesson, qi, item);
-      }
-    });
-
-
-    // 2) log each wrong question into the Mistake Review bank
-    lesson.quiz.forEach((item, qi) => {
-      const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
-      const pickedIndex = picked ? Number(picked.value) : null;
-      if(pickedIndex !== item.answer){
-        logQuizMistake(lesson, qi, item);
-      }
-    });
-
-
-
-
-    const trackId = state.selectedTrack || "general";
+    // ✅ define the current lesson FIRST (prevents "Cannot access 'lesson' before initialization")
     const lessons = getActiveLessons();
     const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
     const lesson = lessons[idx];
 
-    const firstTime = !isLessonComplete(lesson.track, score.day);
-    if(firstTime){
-      addXP(score.total * 5);
-      markLessonComplete(lesson.track, score.day);
-      addXP(50);
-      state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
+    const score = quizScoreForCurrentLesson();
+    const wrong = score.total - score.correct;
+
+    if (wrong > 0) {
+      // ✅ track-aware stats key
+      recordQuizAttempt(lessonKey(lesson.track, lesson.day), wrong);
+
+      $("#lesson-status") && ($("#lesson-status").textContent =
+        `Almost! Quiz score: ${score.correct}/${score.total}. Fix the missed ones and try again.`);
+      renderHomeRecommendation();
+      return;
     }
 
+    const firstTime = !isLessonComplete(lesson.track, lesson.day);
+    if (firstTime) {
+      addXP(score.total * 5);
+      markLessonComplete(lesson.track, lesson.day);
+      addXP(50);
+      state.habitQuest.tokens = safeNum(state.habitQuest.tokens, 0) + 1;
+    }
 
-    state.habitQuest.lastLessonDay = score.day;
+    state.habitQuest.lastLessonDay = lesson.day;
 
     const prevLastISO = state.lastCompletedISO;
     const todayISO = isoDate(new Date());
-    if(state.lastCompletedISO !== todayISO){
+    if (state.lastCompletedISO !== todayISO) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayISO = isoDate(yesterday);
@@ -1296,12 +1273,12 @@ function bindLessonButtons(){
 
     saveState();
     updateHomeStats();
-    updateLessonStatus(score.day);
+    updateLessonStatus(lesson.day);   // see note below
     renderProgress();
     renderGamesCatalog();
     renderHomeRecommendation();
-    }
   });
+
 
   document.getElementById("btn-review-mistakes")?.addEventListener("click", () => {
     // Save the lesson summary (optional)
