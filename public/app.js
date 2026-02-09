@@ -162,29 +162,21 @@ function isCustomAvatarRef(v){
 }
 
 /* =========================================================
-   TRACKS + CURRICULUM (loaded from curriculum.js)
-   curriculum.js must define: window.CURR = { TRACKS, CURRICULUM_BY_TRACK, BLUEPRINTS_BY_TRACK }
+   TRACKS + CURRICULUM SOURCE (from curriculum.js)
 ========================================================= */
 const CURR = window.CURR;
-if(!CURR) throw new Error("CURR is missing. Make sure curriculum.js loads before app.js.");
-const TRACKS = CURR.TRACKS;
-
-
-function getBlueprint(day, track){
-  const t = track || state.selectedTrack || "general";
-  const list = window.CURR?.BLUEPRINTS_BY_TRACK?.[t] || window.CURR?.BLUEPRINTS_BY_TRACK?.general || [];
-  const idx = clamp(day, 1, 60) - 1;
-  return list[idx] || list[0];
+if(!CURR || !CURR.TRACKS){
+  throw new Error("curriculum.js not loaded. Make sure <script src='curriculum.js'></script> comes BEFORE app.js");
 }
 
+const TRACKS = CURR.TRACKS;
 
-function makeLessonContent(day, title, goal, track){
-  const bp = getBlueprint(day, track);
-  return [
-    `Today’s topic: ${title}.`,
-    `Goal: ${goal}`,
-    ...bp.content,
-  ];
+// blueprint lookup by (day, track)
+function getBlueprint(day, track){
+  const t = (track && CURR.BLUEPRINTS_BY_TRACK[track]) ? track : "general";
+  const arr = CURR.BLUEPRINTS_BY_TRACK[t] || CURR.BLUEPRINTS_BY_TRACK.general;
+  const idx = clamp(safeNum(day, 1), 1, arr.length) - 1;
+  return arr[idx] || arr[0];
 }
 
 
@@ -331,6 +323,26 @@ Object.keys(TRACKS).forEach((trackId) => {
     };
   });
 });
+
+function makeLessonContent(day, title, goal, track){
+  const bp = getBlueprint(day, track);
+
+  // If curriculum.js doesn't provide bp.content[], build a safe fallback
+  const extra = Array.isArray(bp.content) && bp.content.length
+    ? bp.content
+    : [
+        `Tool: ${bp.toolName || "—"}`,
+        `Scenario: ${bp.scenario || "—"}`,
+        `Safe plan: ${bp.safePlan || "—"}`,
+        `Try this: ${bp.tinyStep || "—"}`
+      ];
+
+  return [
+    `Today’s topic: ${title}.`,
+    `Goal: ${goal}`,
+    ...extra
+  ];
+}
 
 
 /* =========================================================
@@ -578,6 +590,32 @@ function renderReflection(lesson){
 /* =========================================================
    TRACKS
 ========================================================= */
+function getLessonObject(meta){
+  const day = safeNum(meta.day, 1);
+  const track = safeStr(meta.track, "general");
+  const bp = getBlueprint(day, track);
+
+  return {
+    id: `${track}-day-${day}`,
+    day,
+    track,
+    title: safeStr(meta.title, `Day ${day}`),
+    goal: safeStr(meta.goal, ""),
+    // blueprint fields (so other code can use them)
+    toolName: bp.toolName,
+    scenario: bp.scenario,
+    safePlan: bp.safePlan,
+    boundaryLine: bp.boundaryLine,
+    myth: bp.myth,
+    tinyStep: bp.tinyStep,
+    reflection: bp.reflection,
+    // renderables
+    content: makeLessonContent(day, meta.title, meta.goal, track),
+    quiz: makeQuizForLesson(day, meta.title, meta.goal, track),
+  };
+}
+
+
 function getActiveLessons(){
   const t = state.selectedTrack || "general";
   return (LESSONS_BY_TRACK[t] || LESSONS_BY_TRACK.general || []);
@@ -1151,14 +1189,20 @@ function getWrongItemsForCurrentLesson(){
 }
 
 
-function updateLessonStatus(trackId, day){
+function updateLessonStatus(day){
   const el = $("#lesson-status");
   if(!el) return;
-  const done = isLessonComplete(state.selectedTrack || "general", day);
+
+  const lessons = getActiveLessons();
+  const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
+  const lesson = lessons[idx];
+
+  const done = isLessonComplete(lesson.track, day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
 }
+
 
 
 function applyDailyStreakBonusIfAny(prevLastISO, newLastISO){
@@ -1224,9 +1268,10 @@ function bindLessonButtons(){
 
 
     const trackId = state.selectedTrack || "general";
-    const firstTime = !isLessonComplete(trackId, score.day);    if(firstTime){
+    const firstTime = !isLessonComplete(lesson.track, score.day);
+    if(firstTime){
       addXP(score.total * 5);
-      markLessonComplete(trackId, score.day);
+      markLessonComplete(lesson.track, score.day);
       addXP(50);
       state.habitQuest.tokens = safeNum(state.habitQuest.tokens,0) + 1;
     }
