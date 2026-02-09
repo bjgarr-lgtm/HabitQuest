@@ -283,13 +283,22 @@ function getHardcodedQuiz(day, track){
 }
 
 
-function getQuizForLesson(day, title, goal, track){
-  const hard = getHardcodedQuiz(day, track);
-  if(hard && hard.length) return hard;
+function getQuizForLesson(day, track){
+  const CURR = window.CURR;
+  if(!CURR) throw new Error("CURR missing");
 
-  // fallback (optional) if you still want generator as backup
-  return getQuizForLesson(day, title, goal, track);
+  // 1) Prefer hardcoded quizzes if present
+  const byTrack = CURR.QUIZZES_BY_TRACK && CURR.QUIZZES_BY_TRACK[track];
+  if(Array.isArray(byTrack) && byTrack[day - 1] && Array.isArray(byTrack[day - 1].questions)){
+    return byTrack[day - 1].questions;
+  }
+
+  // 2) Fallback: generate (BUT DO NOT CALL getQuizForLesson AGAIN)
+  const lesson = getLesson(day, track); // or however you fetch the lesson object
+  if(!lesson) throw new Error(`No lesson for day=${day} track=${track}`);
+  return makeQuizForLesson(lesson.day, lesson.title, lesson.goal, lesson.track);
 }
+
 
 
 /* =========================================================
