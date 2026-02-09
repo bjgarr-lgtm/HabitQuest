@@ -289,11 +289,9 @@ function getHardcodedQuiz(day, track){
 
 function getQuizForLesson(day, title, goal, track){
   const hard = getHardcodedQuiz(day, track);
-  if(hard && hard.length) return hard;
-
-  // fallback: generate (or return [] if you don't want fallback)
-  return makeQuizForLesson(day, title, goal, track);
+  return (hard && hard.length) ? hard : [];
 }
+
 
 
 
