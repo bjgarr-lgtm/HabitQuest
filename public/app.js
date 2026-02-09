@@ -164,9 +164,10 @@ function isCustomAvatarRef(v){
 /* =========================================================
    TRACKS + CURRICULUM SOURCE (from curriculum.js)
 ========================================================= */
-const CURR = window.CURR;
+const CURR = (typeof window.CURR === "function") ? window.CURR() : window.CURR;
+
 if(!CURR || !CURR.TRACKS){
-  throw new Error("curriculum.js not loaded. Make sure <script src='curriculum.js'></script> comes BEFORE app.js");
+  throw new Error("curriculum.js not loaded (or failed). Check console for curriculum.js errors and ensure it loads before app.js.");
 }
 
 const TRACKS = CURR.TRACKS;

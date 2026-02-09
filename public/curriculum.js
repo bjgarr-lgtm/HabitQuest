@@ -875,28 +875,25 @@ const CAFFEINE = [
 /* ===========================
    EXPORTS — replace your current export blocks with this
 =========================== */
-const CURRICULUM_BY_TRACK = {
-  general:     GENERAL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-  gaming:      GAMING.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-  socialmedia: SOCIAL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-  nicotine:    NICOTINE.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-  alcohol:     ALCOHOL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-  caffeine:    CAFFEINE.map(({day,track,title,goal}) => ({ day, track, title, goal })),
-};
-
-const BLUEPRINTS_BY_TRACK = {
-  general:     GENERAL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-  gaming:      GAMING.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-  socialmedia: SOCIAL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-  nicotine:    NICOTINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-  alcohol:     ALCOHOL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-  caffeine:    CAFFEINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
-};
-console.log("curriculum.js finished OK", window.CURR);
-
-  return {
-    TRACKS,
-    CURRICULUM_BY_TRACK,
-    BLUEPRINTS_BY_TRACK
+  const CURRICULUM_BY_TRACK = {
+    general:     GENERAL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
+    gaming:      GAMING.map(({day,track,title,goal}) => ({ day, track, title, goal })),
+    socialmedia: SOCIAL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
+    nicotine:    NICOTINE.map(({day,track,title,goal}) => ({ day, track, title, goal })),
+    alcohol:     ALCOHOL.map(({day,track,title,goal}) => ({ day, track, title, goal })),
+    caffeine:    CAFFEINE.map(({day,track,title,goal}) => ({ day, track, title, goal })),
   };
-});
+
+  const BLUEPRINTS_BY_TRACK = {
+    general:     GENERAL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+    gaming:      GAMING.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+    socialmedia: SOCIAL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+    nicotine:    NICOTINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+    alcohol:     ALCOHOL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+    caffeine:    CAFFEINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
+  };
+
+  const out = { TRACKS, CURRICULUM_BY_TRACK, BLUEPRINTS_BY_TRACK };
+  console.log("curriculum.js finished OK", out);
+  return out;
+})();
