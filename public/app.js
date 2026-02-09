@@ -941,7 +941,8 @@ function renderLesson(){
     });
   }
 
-  renderQuiz(lesson);
+  const quizData = getQuizForLesson(day, lesson.title, lesson.goal, track);
+  renderQuiz(quizData, lesson, track, day);
   renderReflection(lesson);
   updateLessonStatus(lesson.track, lesson.day);
 }
@@ -1133,20 +1134,22 @@ function renderMistakeReview(){
 }
 
 
-function renderQuiz(quizData, lesson){
-  if(!Array.isArray(quiz)){
-    console.warn("renderQuiz got non-array quiz:", quiz);
-    quiz = [];
-  }  
-  const quizArr = Array.isArray(quizData) ? quizData : [];
-  if(!quizData) return;
-  quiz.forEach((qq, i) => {
-  const key = makeQKey(track, day, qi);
-    // save key in your answer state / mistake log
-  });
+function renderQuiz(quizData, lesson, track, day){
+  const quizEl = document.getElementById("quiz");
+  if(!quizEl) return;
 
-  quiz.innerHTML = "";
-  lesson.quiz.forEach((item, qi) => {
+  const quizArr = Array.isArray(quizData) ? quizData : [];
+  if(!quizArr.length){
+    quizEl.innerHTML = `<div class="card" style="margin-top:10px;">No quiz for this lesson.</div>`;
+    return;
+  }
+
+  quizEl.innerHTML = "";
+
+  quizArr.forEach((item, qi) => {
+    // optional: key for saving answers
+    // const key = makeQKey(track, day, qi);
+
     const block = document.createElement("div");
     block.className = "card";
     block.style.marginTop = "10px";
@@ -1154,10 +1157,10 @@ function renderQuiz(quizData, lesson){
 
     const qEl = document.createElement("p");
     qEl.style.fontWeight = "800";
-    qEl.textContent = `${qi+1}. ${item.q}`;
+    qEl.textContent = `${qi + 1}. ${item.q}`;
     block.appendChild(qEl);
 
-    item.options.forEach((opt, oi) => {
+    (item.options || []).forEach((opt, oi) => {
       const label = document.createElement("label");
       label.style.display = "flex";
       label.style.gap = "10px";
@@ -1177,9 +1180,10 @@ function renderQuiz(quizData, lesson){
       block.appendChild(label);
     });
 
-    quiz.appendChild(block);
+    quizEl.appendChild(block);
   });
 }
+
 
 function quizScoreForCurrentLesson(){
   const lessons = getActiveLessons();
