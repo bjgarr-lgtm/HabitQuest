@@ -1029,17 +1029,21 @@ function renderMistakeReview(){
   quizWrap.innerHTML = "";
 
   if(!item){
-    quizWrap.innerHTML = `
-      <div class="actions">
-        <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
-      </div>
-    `;
-    $("#btn-exit-review")?.addEventListener("click", () => {
-      exitMistakeReview();
-      showView("home");
-    });
+    quizWrap.innerHTML = `<p class="muted">No mistakes saved yet — do a quiz first.</p>`;
+
+    // make sure the main actions bar has the Exit button
+    const actionsList = Array.from(document.querySelectorAll("#view-lesson .actions"));
+    const actions = actionsList[actionsList.length - 1];
+    if(actions){
+      actions.innerHTML = `<button class="btn" id="btn-exit-review" type="button">Exit Review</button>`;
+      document.getElementById("btn-exit-review")?.addEventListener("click", () => {
+        exitMistakeReview();
+        showView("home");
+      });
+    }
     return;
   }
+
 
   // Build a mini "lesson" object so your normal UI stays consistent
   const reviewQuestion = { q: item.q, options: item.options, answer: item.answer };
@@ -1069,16 +1073,20 @@ function renderMistakeReview(){
         // advance
         state.reviewMode.idx += 1;
 
-        // if finished, exit
         if(state.reviewMode.idx >= state.reviewMode.queue.length){
           exitMistakeReview();
-          saveState();
-          $("#lesson-status") && ($("#lesson-status").textContent = "✅ Review complete! Nice work.");
           addXP(15);
-          renderHomeRecommendation();
-          showView("home");
+
+          // advance to next lesson (same track)
+          const lessons = getActiveLessons();
+          state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, lessons.length - 1);
+
+          saveState();
+          $("#lesson-status") && ($("#lesson-status").textContent = "✅ Review complete! Moving to next lesson…");
+          showView("lesson"); // since reviewMode is off, this renders the next lesson
           return;
         }
+
 
         saveState();
         addXP(2);
@@ -1103,7 +1111,8 @@ function renderMistakeReview(){
   });
 
   // Replace lesson action buttons with review controls
-  const actions = document.querySelector("#view-lesson .actions");
+  const actionsList = Array.from(document.querySelectorAll("#view-lesson .actions"));
+  const actions = actionsList[actionsList.length - 1]; // use the bottom action bar
   if(actions){
     actions.innerHTML = `
       <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
@@ -1114,10 +1123,27 @@ function renderMistakeReview(){
       showView("home");
     });
     $("#btn-next-review")?.addEventListener("click", () => {
-      state.reviewMode.idx = Math.min(state.reviewMode.idx + 1, (state.reviewMode.queue?.length || 1) - 1);
+      state.reviewMode.idx += 1;
+
+      if(state.reviewMode.idx >= (state.reviewMode.queue?.length || 0)){
+        exitMistakeReview();
+
+        // optional small XP for “skipping through” (or remove this line)
+        // addXP(2);
+
+        // advance to next lesson
+        const lessons = getActiveLessons();
+        state.currentLessonIndex = clamp(state.currentLessonIndex + 1, 0, lessons.length - 1);
+
+        saveState();
+        showView("lesson");
+        return;
+      }
+
       saveState();
       renderMistakeReview();
     });
+
   }
 
   $("#lesson-status") && ($("#lesson-status").textContent =
