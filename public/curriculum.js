@@ -398,7 +398,130 @@ window.CURR = (() => {
 /* ===========================
    SOCIAL MEDIA — replace days 41–60 (hardcoded)
 =========================== */
-SOCIAL.splice(40, 20,
+  const SOCIAL = [
+    D(1,"socialmedia","Trend Safety","Pause before trends.",{
+      toolName:"Trend Filter", scenario:"A challenge pressures you to do something risky.", safePlan:"Check risk/secrecy/harm; if any yes → skip.", boundaryLine:"I don’t do dares for attention.", myth:"Trends are harmless.", tinyStep:"Set one app timer.", reflection:"What’s your personal trend rule?"
+    }),
+    D(2,"socialmedia","Attention Economics","Apps are designed to pull.",{
+      toolName:"Design Awareness", scenario:"You open an app and lose 40 minutes instantly.", safePlan:"Name the design; set timer; exit when done.", boundaryLine:"I decide when I’m done.", myth:"I’m weak for scrolling.", tinyStep:"Use a 15-minute timer once.", reflection:"What hook pulls you most?"
+    }),
+    D(3,"socialmedia","Comment Armor","Protect your mood.",{
+      toolName:"Boundary Scroll", scenario:"Comments make you anxious but you keep reading.", safePlan:"Stop at first stress sign; switch task.", boundaryLine:"I don’t feed my stress.", myth:"I have to read it all.", tinyStep:"Exit after 1 stress sign.", reflection:"What’s your stress sign?"
+    }),
+    D(4,"socialmedia","Comparison Detox","Comparison steals joy.",{
+      toolName:"Reality Check", scenario:"You compare your life to highlight reels.", safePlan:"Name it as highlights; focus on real wins.", boundaryLine:"Highlights aren’t the whole story.", myth:"Everyone is happier than me.", tinyStep:"Write 3 real-life wins.", reflection:"When do you compare most?"
+    }),
+    D(5,"socialmedia","DM Pressure","Boundaries in messages.",{
+      toolName:"DM Script", scenario:"Someone pressures you privately.", safePlan:"Short no; don’t debate; block/mute; tell adult if unsafe.", boundaryLine:"Stop messaging me about that.", myth:"Private pressure is less serious.", tinyStep:"Write a DM boundary line.", reflection:"What’s your safest response in DMs?"
+    }),
+    D(6,"socialmedia","Curate Your Feed","Your feed shapes your mind.",{
+      toolName:"Feed Audit", scenario:"Your feed makes you feel worse daily.", safePlan:"Unfollow/mute; follow healthier content.", boundaryLine:"I curate what I consume.", myth:"My feed doesn’t affect me.", tinyStep:"Mute 3 accounts.", reflection:"What content helps you feel better?"
+    }),
+    D(7,"socialmedia","Notification Control","Dings control attention.",{
+      toolName:"Notification Diet", scenario:"Notifications interrupt homework constantly.", safePlan:"Turn off nonessential notifications.", boundaryLine:"Notifications don’t run me.", myth:"I’ll miss everything.", tinyStep:"Turn off 1 notification type.", reflection:"Which notification is worst?"
+    }),
+    D(8,"socialmedia","Posting With Purpose","Post intentionally.",{
+      toolName:"Purpose Check", scenario:"You want to post for validation.", safePlan:"Ask purpose; if it’s only validation, pause.", boundaryLine:"I don’t post to beg for approval.", myth:"Likes equal worth.", tinyStep:"Wait 10 minutes before posting.", reflection:"What’s a healthy reason to post?"
+    }),
+    D(9,"socialmedia","Rumor Safety","Don’t amplify harm.",{
+      toolName:"Before You Share", scenario:"You’re tempted to repost drama.", safePlan:"Ask: true? kind? necessary? safe?", boundaryLine:"I’m not sharing this.", myth:"Sharing is harmless.", tinyStep:"Pause before one share today.", reflection:"What rule protects others most?"
+    }),
+    D(10,"socialmedia","Online Boundaries","Protect your time.",{
+      toolName:"Time Window", scenario:"Scrolling eats your evenings.", safePlan:"Set a window; stop; replace with planned activity.", boundaryLine:"I scroll in my window only.", myth:"I can stop anytime.", tinyStep:"Pick a daily window.", reflection:"When is your best window?"
+    }),
+    // 11–60 (unique, hardcoded)
+    D(11,"socialmedia","Confidence Offline","Build confidence away from screens.",{
+      toolName:"Offline Win", scenario:"You feel invisible without posting.", safePlan:"Do one offline skill/win; log it.", boundaryLine:"My life is real offline.", myth:"If it’s not posted it doesn’t count.", tinyStep:"Do one offline win.", reflection:"What offline win would you like?"
+    }),
+    D(12,"socialmedia","The Algorithm Doesn’t Know You","Don’t obey the feed.",{
+      toolName:"Intent First", scenario:"The feed drags you from your plan.", safePlan:"State intent before opening; leave when done.", boundaryLine:"I open with a purpose.", myth:"The feed shows what I need.", tinyStep:"Say your intent aloud once.", reflection:"What’s your intent phrase?"
+    }),
+    D(13,"socialmedia","Dealing With FOMO","You can miss things safely.",{
+      toolName:"FOMO Reframe", scenario:"You feel anxious when not online.", safePlan:"Reframe: missing noise can be peace.", boundaryLine:"I’m allowed to be offline.", myth:"I’ll be left out forever.", tinyStep:"Take a 30‑minute offline break.", reflection:"What did you gain offline?"
+    }),
+    D(14,"socialmedia","Screenshot Anxiety","Privacy mindset.",{
+      toolName:"Assume Screenshot", scenario:"You’re tempted to send something risky.", safePlan:"Assume it’s saved forever; choose safer message.", boundaryLine:"I’m not sending that.", myth:"Disappearing messages disappear.", tinyStep:"Delete one risky draft.", reflection:"What does “forever” change?"
+    }),
+    D(15,"socialmedia","Online Kindness","Be firm without cruelty.",{
+      toolName:"Kind‑Firm Reply", scenario:"Someone baits you into a fight.", safePlan:"Don’t feed; short reply or disengage.", boundaryLine:"I’m not arguing here.", myth:"I must defend myself publicly.", tinyStep:"Practice one disengage line.", reflection:"What line protects your peace?"
+    }),
+    D(16,"socialmedia","Blocking Isn’t Mean","Safety tools are okay.",{
+      toolName:"Safety Controls", scenario:"Someone keeps bothering you.", safePlan:"Mute/block/report; tell trusted adult if needed.", boundaryLine:"I’m blocking for my safety.", myth:"Blocking is dramatic.", tinyStep:"Learn where block/report is.", reflection:"What safety tool will you use first?"
+    }),
+    D(17,"socialmedia","Group Chat Pressure","Crowds intensify pressure.",{
+      toolName:"Crowd Pause", scenario:"Group chat dares you to do something dumb.", safePlan:"Pause; don’t perform; exit or change subject.", boundaryLine:"Nope. Not doing that.", myth:"You must respond fast.", tinyStep:"Wait 60 seconds before replying once.", reflection:"What happens when you wait?"
+    }),
+    D(18,"socialmedia","Identity vs Persona","Be you.",{
+      toolName:"Persona Check", scenario:"You act different online to get approval.", safePlan:"Notice persona; choose authentic actions.", boundaryLine:"I’m not performing a fake me.", myth:"Fake confidence is required.", tinyStep:"Write 3 real traits you like.", reflection:"What’s one authentic post idea?"
+    }),
+    D(19,"socialmedia","Doomscroll Break","Stop negative loops.",{
+      toolName:"Scroll Stopper", scenario:"Bad news content makes you spiral.", safePlan:"Stop after 2 minutes; do grounding; switch.", boundaryLine:"I’m stopping doomscroll.", myth:"More info will calm me.", tinyStep:"Set a doomscroll limit.", reflection:"What helps you switch?"
+    }),
+    D(20,"socialmedia","Review Week 1","Your attention plan.",{
+      toolName:"Attention Plan", scenario:"You want control over your attention.", safePlan:"Timers + feed audit + intent phrase + windows.", boundaryLine:"My attention is mine.", myth:"Control is impossible.", tinyStep:"Write your plan.", reflection:"Which part is hardest?"
+    }),
+    // 21–60: advanced + leadership
+    D(21,"socialmedia","Self‑Respect Posting","Choose dignity.",{
+      toolName:"Dignity Rule", scenario:"You’re tempted to post something you’d regret.", safePlan:"If you’d hide it from a trusted adult, don’t post.", boundaryLine:"I’m not posting that.", myth:"Shock gets respect.", tinyStep:"Write your dignity rule.", reflection:"What’s your regret warning sign?"
+    }),
+    D(22,"socialmedia","Parasocial Reality","Creators aren’t your friends.",{
+      toolName:"Reality Divider", scenario:"You feel obsessed with a creator’s life.", safePlan:"Limit time; invest in real relationships.", boundaryLine:"My real life comes first.", myth:"Following them fixes loneliness.", tinyStep:"Replace 10 minutes with real message.", reflection:"Who can you message today?"
+    }),
+    D(23,"socialmedia","Confidence Under Likes","Likes ≠ worth.",{
+      toolName:"Worth Statement", scenario:"A post flops and you feel bad.", safePlan:"Say worth statement; do offline win.", boundaryLine:"My worth isn’t likes.", myth:"Likes measure value.", tinyStep:"Write your worth statement.", reflection:"What gives you real worth?"
+    }),
+    D(24,"socialmedia","Content Diet","What you consume becomes you.",{
+      toolName:"Diet Swap", scenario:"Your feed is mostly negativity.", safePlan:"Swap 5 accounts to positive/helpful.", boundaryLine:"I choose better inputs.", myth:"It doesn’t matter.", tinyStep:"Swap 3 accounts today.", reflection:"What content do you want more of?"
+    }),
+    D(25,"socialmedia","Helping Friends Online","Support safely.",{
+      toolName:"Care + Adult", scenario:"A friend posts worrying things.", safePlan:"Reach out privately; involve adult if safety risk.", boundaryLine:"I’m here. Also, let’s get support.", myth:"It’s none of my business.", tinyStep:"Send one caring message.", reflection:"What’s a safe support message?"
+    }),
+    D(26,"socialmedia","Deep Focus Blocks","Protect study time.",{
+      toolName:"Focus Shield", scenario:"Your phone breaks your focus every 3 minutes.", safePlan:"Put phone away; 10–25 min focus blocks.", boundaryLine:"Focus block now.", myth:"Multitasking works.", tinyStep:"Do one 10‑minute block.", reflection:"What breaks focus most?"
+    }),
+    D(27,"socialmedia","Online Arguments","Don’t donate your peace.",{
+      toolName:"Argue‑Exit Rule", scenario:"You’re tempted to fight in comments.", safePlan:"Ask: will this matter tomorrow? If no, exit.", boundaryLine:"Not engaging.", myth:"Winning online matters.", tinyStep:"Exit one argument today.", reflection:"How did exiting feel?"
+    }),
+    D(28,"socialmedia","Privacy Thinking","Protect future you.",{
+      toolName:"Future‑Me Privacy", scenario:"You’re asked to share personal info.", safePlan:"Share less; protect identity; ask adult if unsure.", boundaryLine:"I don’t share that.", myth:"Oversharing builds trust.", tinyStep:"Check your privacy settings.", reflection:"What do you keep private?"
+    }),
+    D(29,"socialmedia","Leadership Online","Set the tone.",{
+      toolName:"Tone Setter", scenario:"A chat becomes mean.", safePlan:"Post a calm redirect or leave; don’t join cruelty.", boundaryLine:"Let’s not be mean.", myth:"Mean is funny.", tinyStep:"Write one tone-setting line.", reflection:"How can you lead online?"
+    }),
+    D(30,"socialmedia","Review Week 2","Combine your strongest tools.",{
+      toolName:"Tool Chain", scenario:"Real life needs combos.", safePlan:"Intent → timer → boundary → exit.", boundaryLine:"I choose my attention.", myth:"One tool is enough.", tinyStep:"Write your chain.", reflection:"What chain works best?"
+    }),
+    // 31–60: long-term mastery
+    D(31,"socialmedia","Replace Scrolling","Build new habits.",{
+      toolName:"Swap Habit", scenario:"You scroll when bored.", safePlan:"Swap boredom trigger to offline menu.", boundaryLine:"I’m swapping the habit.", myth:"Boredom must be filled by scrolling.", tinyStep:"Write 5 swap actions.", reflection:"Which swap action is easiest?"
+    }),
+    D(32,"socialmedia","Night Mode","Protect sleep.",{
+      toolName:"Night Gate", scenario:"Late scrolling wrecks sleep.", safePlan:"Night gate: off at time; charge outside room.", boundaryLine:"Phone sleeps outside.", myth:"I need it at night.", tinyStep:"Move charger outside room.", reflection:"What’s your off time?"
+    }),
+    D(33,"socialmedia","Self‑Image Safety","Be kind to your body/mind.",{
+      toolName:"Body Neutral Talk", scenario:"You compare appearances and feel worse.", safePlan:"Use neutral talk; focus on function/strength/health.", boundaryLine:"I won’t insult my body.", myth:"Insults motivate change.", tinyStep:"Write 3 neutral statements.", reflection:"What neutral statement helps you?"
+    }),
+    D(34,"socialmedia","Boundaries With Friends","Protect time and peace.",{
+      toolName:"Reply Windows", scenario:"Friends expect instant replies.", safePlan:"Set reply windows; communicate.", boundaryLine:"I reply when I can.", myth:"Instant replies prove care.", tinyStep:"Set one reply window.", reflection:"What window is realistic?"
+    }),
+    D(35,"socialmedia","Escapes vs Rest","Rest beats numbing.",{
+      toolName:"Rest Menu", scenario:"You scroll to numb feelings.", safePlan:"Choose true rest: walk, music, shower, talk.", boundaryLine:"I’m choosing real rest.", myth:"Numbing is rest.", tinyStep:"Do one rest action.", reflection:"What rest feels real?"
+    }),
+    D(36,"socialmedia","Hard Conversations Offline","Move important stuff offline.",{
+      toolName:"Offline Switch", scenario:"A conflict is happening in text.", safePlan:"Move to call/in-person with calm boundary.", boundaryLine:"Let’s talk offline.", myth:"Text is best for big issues.", tinyStep:"Use offline switch once.", reflection:"What changes offline?"
+    }),
+    D(37,"socialmedia","Long‑Term Reputation","Future you matters.",{
+      toolName:"Reputation Check", scenario:"You’re tempted to post something cruel.", safePlan:"Ask: would I be proud if my name was attached?", boundaryLine:"I don’t post cruelty.", myth:"Online cruelty has no impact.", tinyStep:"Delete one mean draft.", reflection:"What reputation do you want?"
+    }),
+    D(38,"socialmedia","Community Choice","Choose better corners.",{
+      toolName:"Community Audit", scenario:"A community normalizes harmful behavior.", safePlan:"Leave; join healthier spaces.", boundaryLine:"I choose healthier spaces.", myth:"Everywhere is the same.", tinyStep:"Leave one harmful space.", reflection:"What space feels healthiest?"
+    }),
+    D(39,"socialmedia","Weekly Reset","Keep control long-term.",{
+      toolName:"Weekly Review", scenario:"You drift back into habits.", safePlan:"Weekly review: timers, feed, windows, sleep.", boundaryLine:"I reset weekly.", myth:"If I slip, I’m done.", tinyStep:"Schedule weekly reset.", reflection:"What will you review weekly?"
+    }),
+    D(40,"socialmedia","Graduation Plan","Your attention playbook.",{
+      toolName:"Attention Playbook", scenario:"You want a forever plan.", safePlan:"Windows + timers + feed audit + night gate + scripts.", boundaryLine:"I follow my playbook.", myth:"I need motivation first.", tinyStep:"Write your 5 rules.", reflection:"Which rule is non‑negotiable?"
+    }),
   D(41,"socialmedia","Digital Boundaries","Protect energy with clear limits.",{
     toolName:"Energy Budget", scenario:"You keep checking apps whenever you feel bored for 3 seconds.",
     safePlan:"Name the urge → do 1 minute of real-life action → return only if needed.",
@@ -519,8 +642,7 @@ SOCIAL.splice(40, 20,
     boundaryLine:"I follow my playbook.", myth:"I need motivation first.",
     tinyStep:"Write your 5 rules.", reflection:"Which rule is non‑negotiable?"
   })
-);
-
+  ];
 /* =========================================================
    NICOTINE / VAPING — 60 unique lessons (hardcoded)
 ========================================================= */
@@ -775,4 +897,4 @@ const BLUEPRINTS_BY_TRACK = {
     CURRICULUM_BY_TRACK,
     BLUEPRINTS_BY_TRACK
   };
-})();
+});
