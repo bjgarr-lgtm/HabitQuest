@@ -200,9 +200,97 @@ function getBlueprint(day, track){
    QUIZ BUILDER (12 QUESTIONS PER DAY, DAY-SPECIFIC WORDING)
    - No “same five platitudes” re-used as-is across lessons.
 ========================================================= */
+
+// --- quiz helpers (varied stems + plausible distractors) ---
+function pick(rng, arr){ return arr[Math.floor(rng()*arr.length)]; }
+
+function vary(rng, variants, tokens){
+  // tokens like {DAY, TITLE, GOAL, TOOL, SCENARIO, PLAN, MYTH, BOUNDARY, TINYSTEP}
+  let s = pick(rng, variants);
+  return s.replace(/\{(\w+)\}/g, (_,k)=> (tokens[k] ?? `{${k}}`));
+}
+
+function normalizeText(s){
+  return String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+}
+
+function makeDistractors(rng, correct, pool, count){
+  const c = normalizeText(correct);
+  const out = [];
+  for(const p of pool){
+    if(out.length >= count) break;
+    if(!p) continue;
+    const t = normalizeText(p);
+    if(!t || t === c) continue;
+    // avoid super-close duplicates
+    if(out.some(x => normalizeText(x) === t)) continue;
+    out.push(p);
+  }
+  // if pool was too small, pad with generic but still safe distractors
+  const filler = [
+    "Do it fast so you don’t have to think",
+    "Keep it secret so nobody finds out",
+    "Go all-in and hope it works out",
+    "Argue until you win"
+  ];
+  while(out.length < count) out.push(pick(rng, filler));
+  return out.slice(0, count);
+}
+
+// small banks to keep questions feeling human
+const QUIZ_STEMS = {
+  goal: [
+    "Day {DAY} — what are you trying to achieve in “{TITLE}”?",
+    "In today’s lesson (“{TITLE}”), the real target is:",
+    "What’s the main purpose of Day {DAY} (“{TITLE}”)?"
+  ],
+  tool: [
+    "Which tool are you practicing today?",
+    "Today’s key skill is called:",
+    "Tool check (Day {DAY}): what’s the tool name?"
+  ],
+  scenarioBest: [
+    "Scenario: {SCENARIO}\nWhat’s the safest move?",
+    "In this situation: {SCENARIO}\nWhich plan matches the lesson?",
+    "You’re here: {SCENARIO}\nPick the best next step."
+  ],
+  myth: [
+    "Which belief is today’s lesson pushing back on?",
+    "Myth check: which statement is the *myth*?",
+    "Today corrects this idea:"
+  ],
+  boundary: [
+    "Which line best matches today’s boundary style?",
+    "Pick the strongest boundary line for this lesson:",
+    "Which response fits the lesson’s tone?"
+  ],
+  tinyStep: [
+    "Which tiny step matches today’s lesson?",
+    "Best ‘tiny step’ for Day {DAY}:",
+    "What’s the most doable action from today?"
+  ],
+  apply: [
+    "Which option protects Future You the most here?",
+    "Which choice reduces risk *and* keeps your dignity?",
+    "What’s the most ‘clean tomorrow’ option?"
+  ],
+  sequence: [
+    "Put the plan in order (choose the best sequence):",
+    "Which sequence matches the safe plan steps?",
+    "Pick the best step-by-step order:"
+  ]
+};
+
+
 function makeQuizForLesson(day, title, goal, track){
+  const authored = window.QUIZZES?.[track]?.[day];
+  if (authored && authored.length === 12) return authored;
+  const CURR = window.CURR;  
   const bp = getBlueprint(day, track);
-  const rng = mulberry32(50000 + day * 999);
+
+  // deterministic per day+track so wording feels "written"
+  const seedBase = 90000 + (day * 1337) + (hashStrToSeed ? hashStrToSeed(track) % 10000 : 0);
+  const rng = mulberry32(seedBase);
 
   const q = (question, correctOpt, wrongOpts) => {
     const options = [correctOpt, ...wrongOpts];
@@ -211,110 +299,264 @@ function makeQuizForLesson(day, title, goal, track){
     return { q: question, options, answer };
   };
 
-  // Track flavor (only when relevant)
-  const trackQ =
-    track === "socialmedia" ? q(
-      `Day ${day} (“${title}”): Which sign means a trend is a bad idea?`,
-      "It pressures you, adds risk, or needs secrecy",
-      ["It’s popular", "It has a funny sound"]
-    ) :
-    track === "gaming" ? q(
-      `Day ${day} (“${title}”): Which stop-signal is most realistic?`,
-      "Timer goes off → stand up → water → switch tasks",
-      ["Keep playing until you feel guilty", "Promise you’ll stop ‘eventually’"]
-    ) :
-    track === "caffeine" ? q(
-      `Day ${day} (“${title}”): What’s the best first fix for low energy?`,
-      "Check sleep/food/water first",
-      ["Double the caffeine every time", "Skip meals to ‘stay sharp’"]
-    ) :
-    track === "nicotine" ? q(
-      `Day ${day} (“${title}”): When an urge hits, what’s the smart first move?`,
-      "Delay and do a body reset before deciding",
-      ["Hide it and panic", "Say yes fast so it’s over"]
-    ) :
-    track === "alcohol" ? q(
-      `Day ${day} (“${title}”): Which hangout plan reduces pressure the most?`,
-      "Buddy + exit plan + safe adult backup",
-      ["Go with no plan and ‘see what happens’", "Rely on secrecy"]
-    ) :
-    q(
-      `Day ${day} (“${title}”): What makes a choice ‘safe’ long-term?`,
-      "It helps now and doesn’t create problems later",
-      ["It feels exciting right now", "It’s something you must hide"]
+  const T = {
+    DAY: day,
+    TITLE: title,
+    GOAL: goal,
+    TOOL: bp.toolName,
+    SCENARIO: bp.scenario,
+    PLAN: bp.safePlan,
+    MYTH: bp.myth,
+    BOUNDARY: bp.boundaryLine,
+    TINYSTEP: bp.tinyStep
+  };
+
+  // Pools for plausible distractors (pull from same lesson fields first)
+  const plausiblePool = [
+    bp.safePlan,
+    bp.boundaryLine,
+    bp.tinyStep,
+    bp.myth,
+    "Pause → breathe → decide",
+    "Delay 10 minutes → reset body → choose",
+    "Ask a trusted adult for help",
+    "Switch to a safer plan and exit if needed"
+  ];
+
+  // Track-specific “feels real” application question (not just 1 fixed stem)
+  const trackApply = (() => {
+    if(track === "socialmedia"){
+      return q(
+        vary(rng, [
+          "You see a challenge blowing up. What’s the best red flag?",
+          "Trend check: which sign means ‘skip this’?",
+          "Before copying a trend, what warning sign matters most?"
+        ], T),
+        "It adds risk/pressure or needs secrecy",
+        makeDistractors(rng, "It adds risk/pressure or needs secrecy", [
+          "It has lots of views",
+          "Your friend posted it",
+          "It looks funny",
+          "It’s trending today"
+        ], 3)
+      );
+    }
+    if(track === "gaming"){
+      return q(
+        vary(rng, [
+          "Stopping skill: which stop-signal is most realistic?",
+          "When the session should end, what’s the cleanest stop routine?",
+          "Best stop button (Day {DAY}):"
+        ], T),
+        "Timer → stand up → water → switch tasks",
+        makeDistractors(rng, "Timer → stand up → water → switch tasks", [
+          "Keep playing until you feel guilty",
+          "Say “one more” until you’re tired",
+          "Stop only after a huge win"
+        ], 3)
+      );
+    }
+    if(track === "nicotine"){
+      return q(
+        vary(rng, [
+          "When an urge hits, what’s the smartest first move?",
+          "Craving moment: what comes first?",
+          "Urge management (Day {DAY}):"
+        ], T),
+        "Delay + body reset before deciding",
+        makeDistractors(rng, "Delay + body reset before deciding", [
+          "Panic and act fast so it’s over",
+          "Hide it and pretend nothing happened",
+          "Argue with the urge until you’re exhausted"
+        ], 3)
+      );
+    }
+    if(track === "alcohol"){
+      return q(
+        vary(rng, [
+          "Which hangout plan reduces pressure the most?",
+          "What’s the best ‘stay-safe’ setup before going out?",
+          "Pressure-proof plan (Day {DAY}):"
+        ], T),
+        "Buddy + exit plan + safe adult backup",
+        makeDistractors(rng, "Buddy + exit plan + safe adult backup", [
+          "Go with no plan and see what happens",
+          "Rely on secrecy",
+          "Go alone so nobody can judge you"
+        ], 3)
+      );
+    }
+    if(track === "caffeine"){
+      return q(
+        vary(rng, [
+          "Low energy: what’s the best first fix?",
+          "Before grabbing caffeine, what should you check?",
+          "Energy check (Day {DAY}):"
+        ], T),
+        "Sleep/food/water first",
+        makeDistractors(rng, "Sleep/food/water first", [
+          "Double caffeine every time",
+          "Skip meals to stay sharp",
+          "Ignore sleep and push through"
+        ], 3)
+      );
+    }
+    // general fallback
+    return q(
+      vary(rng, [
+        "What makes a choice ‘safe’ long-term?",
+        "Which option gives you a clean tomorrow?",
+        "Best long-game choice is the one that:"
+      ], T),
+      "Helps now without creating problems later",
+      makeDistractors(rng, "Helps now without creating problems later", [
+        "Feels exciting right now",
+        "Is something you must hide",
+        "Gets approval instantly"
+      ], 3)
     );
+  })();
+
+  // Different question types to break the “template vibe”
+  const sequenceQ = q(
+    vary(rng, QUIZ_STEMS.sequence, T),
+    bp.safePlan,
+    makeDistractors(rng, bp.safePlan, [
+      "Decide fast → deal with it later",
+      "Argue → prove a point → stay stuck",
+      "Do the risky thing → hope it’s fine",
+      "Hide it → avoid consequences"
+    ], 3)
+  );
 
   const questions = [
-    q(
-      `Day ${day}: What is the main goal of “${title}”?`,
-      goal,
-      ["To hide problems", "To take bigger risks"]
+    q(vary(rng, QUIZ_STEMS.goal, T), goal,
+      makeDistractors(rng, goal, [
+        "To hide problems",
+        "To take bigger risks",
+        "To impress people quickly",
+        "To avoid asking for help"
+      ], 3)
     ),
-    q(
-      `Tool check: Which tool is today’s key skill?`,
-      bp.toolName,
-      ["Luck", "Doing it fast before you think"]
+
+    q(vary(rng, QUIZ_STEMS.tool, T), bp.toolName,
+      makeDistractors(rng, bp.toolName, [
+        "Willpower Only",
+        "Do It Fast",
+        "Luck",
+        "Ignore It"
+      ], 3)
     ),
-    q(
-      `Scenario: ${bp.scenario} What’s the best safe plan?`,
-      bp.safePlan,
-      ["Do it secretly so nobody knows", "Pick the riskiest option to feel something"]
+
+    q(vary(rng, QUIZ_STEMS.scenarioBest, T), bp.safePlan,
+      makeDistractors(rng, bp.safePlan, [
+        "Do it secretly so nobody knows",
+        "Pick the riskiest option to feel something",
+        "Argue until you get your way",
+        "Pretend you don’t care and stay"
+      ], 3)
     ),
-    q(
-      `Myth check: Which belief does today correct?`,
-      bp.myth,
-      ["‘If you’re nervous, you’re doomed.’", "‘Only adults need plans.’"]
+
+    q(vary(rng, QUIZ_STEMS.myth, T), bp.myth,
+      makeDistractors(rng, bp.myth, [
+        "If you’re nervous, you’re doomed",
+        "Only adults need plans",
+        "If it’s popular, it’s safe",
+        "If you start, you must finish"
+      ], 3)
     ),
-    q(
-      `Which sentence matches today’s boundary style best?`,
-      bp.boundaryLine,
-      ["I guess… maybe…", "Stop talking forever."]
+
+    q(vary(rng, QUIZ_STEMS.boundary, T), bp.boundaryLine,
+      makeDistractors(rng, bp.boundaryLine, [
+        "I guess… maybe…",
+        "Stop talking forever.",
+        "Fine, whatever, I don’t care.",
+        "You’re annoying."
+      ], 3)
     ),
-    q(
-      `What’s the point of doing a “tiny step”?`,
-      "It’s doable today, so it actually happens",
-      ["It proves you’re perfect", "It has to be huge to count"]
+
+    q(vary(rng, QUIZ_STEMS.tinyStep, T), bp.tinyStep,
+      makeDistractors(rng, bp.tinyStep, [
+        "A huge impossible promise",
+        "Wait until you feel ready",
+        "Do nothing and hope it changes",
+        "Prove you’re perfect"
+      ], 3)
     ),
-    q(
-      `Pick the strongest friend behavior in a pressure moment:`,
-      "They respect your no and help you switch plans",
-      ["They tease you until you give in", "They say ‘prove it’"]
+
+    q(vary(rng, QUIZ_STEMS.apply, T),
+      "Lower the body alarm, then decide",
+      makeDistractors(rng, "Lower the body alarm, then decide", [
+        "Decide immediately",
+        "Ignore it and push harder",
+        "Make it worse to feel something",
+        "Let pressure pick for you"
+      ], 3)
     ),
+
     q(
-      `When your body alarm is high, what should happen first?`,
-      "Lower the alarm, then decide",
-      ["Decide immediately", "Ignore it and push harder"]
+      vary(rng, [
+        "Which friend behavior is strongest under pressure?",
+        "In a pressure moment, the best friend is the one who:",
+        "Pick the healthiest friend move:"
+      ], T),
+      "Respects your no and helps you switch plans",
+      makeDistractors(rng, "Respects your no and helps you switch plans", [
+        "Teases you until you give in",
+        "Says “prove it”",
+        "Gets mad when you set a boundary",
+        "Pushes you to hide it"
+      ], 3)
     ),
+
+    sequenceQ,
+    trackApply,
+
     q(
-      `Which option is the best “switch” after saying no?`,
-      "Let’s do something else.",
-      ["Fine, I’ll do it.", "You’re annoying."]
-    ),
-    q(
-      `Trusted adult: which is a real example?`,
+      vary(rng, [
+        "Which is a real example of ‘trusted adult’ support?",
+        "Support check: who counts as a trusted adult?",
+        "Who is a safe person to involve if you need backup?"
+      ], T),
       "Parent/guardian/teacher/coach",
-      ["Only strangers online", "Nobody ever"]
+      makeDistractors(rng, "Parent/guardian/teacher/coach", [
+        "Only strangers online",
+        "Nobody ever",
+        "People who pressure you",
+        "Anyone who wants drama"
+      ], 3)
     ),
-    trackQ,
+
     q(
-      `Tiny step for Day ${day}: which is closest to today’s tiny step?`,
-      bp.tinyStep,
-      ["A huge impossible promise", "Wait until you feel ready"]
+      vary(rng, [
+        "If you slip, what’s the best next step?",
+        "Mistake recovery: what should happen next?",
+        "After a setback, the smartest move is:"
+      ], T),
+      "Reset and take the next helpful step",
+      makeDistractors(rng, "Reset and take the next helpful step", [
+        "Quit entirely",
+        "Hide it forever",
+        "Double down to ‘make up for it’",
+        "Punish yourself"
+      ], 3)
     ),
   ];
 
-  // Ensure 12 and ensure question text uniqueness within the quiz
+  // Ensure 12 unique question texts
   const out = [];
   const seen = new Set();
   for(const item of questions){
-    if(!seen.has(item.q)){
-      seen.add(item.q);
+    const key = normalizeText(item.q);
+    if(!seen.has(key)){
+      seen.add(key);
       out.push(item);
     }
     if(out.length >= 12) break;
   }
   return out.slice(0, 12);
 }
+
 
 /* =========================================================
    LESSONS BY TRACK (from curriculum.js)
