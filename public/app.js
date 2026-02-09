@@ -270,25 +270,33 @@ const QUIZ_STEMS = {
 };
 
 function getHardcodedQuiz(day, track){
-  const qb = window.CURR && window.CURR.QUIZZES_BY_TRACK;
-  const byTrack = qb && qb[track];
-  if(!byTrack) return null;
+  const QB = window.CURR?.QUIZZES_BY_TRACK?.[track];
+  if(!QB) return null;
 
-  // support either array[day-1] or object[day]
-  const raw = Array.isArray(byTrack) ? byTrack[day - 1] : byTrack[day];
+  // If QB is [ day1Quiz, day2Quiz, ... ] (array of 60)
+  if(Array.isArray(QB)){
+    const q = QB[day - 1];
+    return Array.isArray(q) ? q : null;
+  }
 
-  // raw might already be an array, OR an object wrapper
-  if(Array.isArray(raw)) return raw;
-  if(raw && Array.isArray(raw.questions)) return raw.questions;
-  if(raw && Array.isArray(raw.quiz)) return raw.quiz;
-
-  return null;
+  // If QB is { "1": [...], "2": [...] } (object map)
+  const q = QB[String(day)] ?? QB[day];
+  return Array.isArray(q) ? q : null;
 }
+
 
 function getQuizForLesson(day, title, goal, track){
   const hard = getHardcodedQuiz(day, track);
-  return (hard && hard.length) ? hard : [];
+  if(hard) return hard;
+
+  // fallback only if you still have generator available
+  if(typeof makeQuizForLesson === "function"){
+    return makeQuizForLesson(day, title, goal, track);
+  }
+
+  return []; // never crash renderQuiz
 }
+
 
 
 
@@ -1125,14 +1133,14 @@ function renderMistakeReview(){
 }
 
 
-function renderQuiz(lesson){
+function renderQuiz(quizData, lesson){
   if(!Array.isArray(quiz)){
     console.warn("renderQuiz got non-array quiz:", quiz);
     quiz = [];
   }  
-  const quiz = $("#quiz");
-  if(!quiz) return;
-  quiz.forEach((qq, qi) => {
+  const quizArr = Array.isArray(quizData) ? quizData : [];
+  if(!quizData) return;
+  quiz.forEach((qq, i) => {
   const key = makeQKey(track, day, qi);
     // save key in your answer state / mistake log
   });
