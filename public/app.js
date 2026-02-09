@@ -941,11 +941,20 @@ function renderLesson(){
     });
   }
 
+  // ✅ define these so "day is not defined" never happens
+  const day = lesson.day;
+  const track = lesson.track || state.selectedTrack || "general";
+
   const quizData = getQuizForLesson(day, lesson.title, lesson.goal, track);
-  renderQuiz(quizData, lesson, track, day);
+
+  // ✅ make your existing scoring/mistake functions work (they read lesson.quiz)
+  lesson.quiz = Array.isArray(quizData) ? quizData : [];
+
+  renderQuiz(lesson.quiz, lesson, track, day);
   renderReflection(lesson);
-  updateLessonStatus(lesson.track, lesson.day);
+  updateLessonStatus(track, day);
 }
+
 
 function renderMistakeReviewForCurrentLesson(){
   const miss = getWrongItemsForCurrentLesson();
@@ -1310,7 +1319,7 @@ function bindLessonButtons(){
 
     saveState();
     updateHomeStats();
-    updateLessonStatus(lesson.day);   // see note below
+    updateLessonStatus(lesson.track, lesson.day);
     renderProgress();
     renderGamesCatalog();
     renderHomeRecommendation();
