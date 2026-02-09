@@ -270,19 +270,17 @@ const QUIZ_STEMS = {
 };
 
 function getHardcodedQuiz(day, track){
-  const CURR = window.CURR;
-  const byTrack = CURR?.QUIZZES_BY_TRACK?.[track];
+  const qb = window.CURR && window.CURR.QUIZZES_BY_TRACK;
+  const byTrack = qb && qb[track];
   if(!byTrack) return null;
 
-  // supports either array indexed by day-1 or array of {day, questions}
-  if(Array.isArray(byTrack)){
-    // If it's [ [q12], [q12], ... ]:
-    if(Array.isArray(byTrack[day-1])) return byTrack[day-1];
+  // support either array[day-1] or object[day]
+  const raw = Array.isArray(byTrack) ? byTrack[day - 1] : byTrack[day];
 
-    // If it's [ {day:1, questions:[...]}, ... ]:
-    const found = byTrack.find(x => x && x.day === day);
-    if(found?.questions) return found.questions;
-  }
+  // raw might already be an array, OR an object wrapper
+  if(Array.isArray(raw)) return raw;
+  if(raw && Array.isArray(raw.questions)) return raw.questions;
+  if(raw && Array.isArray(raw.quiz)) return raw.quiz;
 
   return null;
 }
@@ -1128,6 +1126,10 @@ function renderMistakeReview(){
 
 
 function renderQuiz(lesson){
+  if(!Array.isArray(quiz)){
+    console.warn("renderQuiz got non-array quiz:", quiz);
+    quiz = [];
+  }  
   const quiz = $("#quiz");
   if(!quiz) return;
   quiz.forEach((qq, qi) => {
