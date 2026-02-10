@@ -941,18 +941,20 @@ function renderLesson(){
     });
   }
 
-  // ✅ define these so "day is not defined" never happens
+  // ✅ define these from the lesson you are actually rendering
   const day = lesson.day;
   const track = lesson.track || state.selectedTrack || "general";
 
+  // ✅ always fetch quiz for this lesson
   const quizData = getQuizForLesson(day, lesson.title, lesson.goal, track);
 
-  // ✅ make your existing scoring/mistake functions work (they read lesson.quiz)
+  // ✅ IMPORTANT: make the rest of the app (scoring/mistakes) consistent
   lesson.quiz = Array.isArray(quizData) ? quizData : [];
 
   renderQuiz(lesson.quiz, lesson, track, day);
   renderReflection(lesson);
   updateLessonStatus(track, day);
+
 }
 
 
@@ -1199,13 +1201,20 @@ function quizScoreForCurrentLesson(){
   const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
   const lesson = lessons[idx];
 
+  // ✅ ensure quiz exists even if lesson objects don’t ship with quiz embedded
+  const quiz = Array.isArray(lesson.quiz) ? lesson.quiz : getQuizForLesson(lesson.day, lesson.title, lesson.goal, lesson.track || state.selectedTrack || "general");
+
   let correct = 0;
-  lesson.quiz.forEach((item, qi) => {
-    const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
-    if(picked && Number(picked.value) === item.answer) correct++;
+  quiz.forEach((item, qi) => {
+    const sel = document.querySelector(`input[name="q_${qi}"]:checked`);
+    const val = sel ? Number(sel.value) : null;
+    const answerIndex = safeNum(item.answer, 0);
+    if(Number.isFinite(val) && val === answerIndex){
+      correct += 1;
+    }
   });
 
-  return { correct, total: lesson.quiz.length, day: lesson.day, title: lesson.title };
+  return { correct, total: quiz.length, day: lesson.day, title: lesson.title };
 }
 
 function getWrongItemsForCurrentLesson(){
@@ -1213,25 +1222,29 @@ function getWrongItemsForCurrentLesson(){
   const idx = clamp(state.currentLessonIndex, 0, lessons.length - 1);
   const lesson = lessons[idx];
 
+  const quiz = Array.isArray(lesson.quiz) ? lesson.quiz : getQuizForLesson(lesson.day, lesson.title, lesson.goal, lesson.track || state.selectedTrack || "general");
+
   const wrong = [];
   const wrongMeta = []; // for saving into mistake bank (needs original item)
 
-  lesson.quiz.forEach((item, qi) => {
-    const picked = document.querySelector(`input[name="q_${qi}"]:checked`);
-    const pickedIndex = picked ? Number(picked.value) : null;
+  quiz.forEach((item, qi) => {
+    const sel = document.querySelector(`input[name="q_${qi}"]:checked`);
+    const val = sel ? Number(sel.value) : null;
+    const answerIndex = safeNum(item.answer, 0);
 
-    if(pickedIndex !== item.answer){
+    if(!Number.isFinite(val) || val !== answerIndex){
+      const pickedText = (Number.isFinite(val) && Array.isArray(item.options) && item.options[val]) ? item.options[val] : null;
       wrong.push({
-        q: item.q,
-        picked: (pickedIndex == null) ? null : item.options[pickedIndex],
-        correct: item.options[item.answer],
-        concept: item.concept || lesson.toolName || lesson.title || "General",
+        q: String(item.q || ""),
+        picked: pickedText,
+        correct: (Array.isArray(item.options) && item.options[answerIndex]) ? item.options[answerIndex] : "",
+        concept: item.concept || item.conceptName || ""
       });
       wrongMeta.push({ qIndex: qi, item });
     }
   });
 
-  return { lesson, wrong, wrongMeta, total: lesson.quiz.length, day: lesson.day, track: lesson.track, title: lesson.title };
+  return { lesson, wrong, wrongMeta, total: quiz.length, day: lesson.day, track: lesson.track, title: lesson.title };
 }
 
 
