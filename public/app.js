@@ -2572,6 +2572,15 @@ function hqApplyEffects(eff){
     const k = safeStr(e.flag.key, "");
     if(k) hqSetFlag(k, e.flag.value);
   }
+    // ✅ allow HQ nodes to advance the "day"
+  if(Number.isFinite(Number(e.setLastLessonDay))){
+    const d = Math.max(0, Number(e.setLastLessonDay));
+    state.habitQuest.lastLessonDay = Math.max(
+      Math.max(0, safeNum(state.habitQuest.lastLessonDay, 0)),
+      d
+    );
+  }
+
 }
 
 function hqResetRun(){
