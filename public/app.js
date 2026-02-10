@@ -270,26 +270,51 @@ const QUIZ_STEMS = {
 };
 
 function getHardcodedQuiz(day, track){
+  const byTrack = window.CURR?.QUIZZES_BY_TRACK;
+  if(!byTrack) return null;
+
   const d = Number(day);
+  if(!Number.isFinite(d) || d < 1) return null;
+
   const t = String(track || "general").toLowerCase();
 
-  const ALL = window.CURR?.QUIZZES_BY_TRACK;
-  if(!ALL) return null;
+  // try direct key, then some common fallbacks
+  const tryKeys = [
+    t,
+    t.replace(/\s+/g, "_"),
+    t.replace(/[^a-z0-9_]/g, ""),
+    "general",
+  ];
 
-  // try exact track, then fallback to general
-  const QB = ALL[t] || ALL[track] || ALL.general || ALL["General"];
+  let QB = null;
+  for(const k of tryKeys){
+    if(byTrack[k]){
+      QB = byTrack[k];
+      break;
+    }
+  }
+
+  // last chance: case-insensitive match against existing keys
+  if(!QB){
+    const keys = Object.keys(byTrack);
+    const match = keys.find(k => k.toLowerCase() === t);
+    if(match) QB = byTrack[match];
+  }
+
   if(!QB) return null;
 
-  // If QB is [ day1Quiz, day2Quiz, ... ] (array of 60)
+  // If QB is [ day1Quiz, day2Quiz, ... ]
   if(Array.isArray(QB)){
     const q = QB[d - 1];
     return Array.isArray(q) ? q : null;
   }
 
-  // If QB is { "1": [...], "2": [...] } (object map)
+  // If QB is { "1": [...], "2": [...] }
   const q = QB[String(d)] ?? QB[d];
   return Array.isArray(q) ? q : null;
 }
+
+
 
 
 
@@ -951,11 +976,13 @@ function renderLesson(){
 
   // ✅ define these from the lesson you are actually rendering
   const day = Number(lesson.day);
-  const track = (lesson.track || state.selectedTrack || "general"); // track id key for CURR
+  const track = String(lesson.track || state.selectedTrack || "general").toLowerCase();
+
+  // TEMP DEBUG (leave for now)
+  console.log("[QUIZ] keys", Object.keys(window.CURR?.QUIZZES_BY_TRACK || {}));
+  console.log("[QUIZ] day", day, "track", track);
 
   const quizData = getQuizForLesson(day, lesson.title, lesson.goal, track);
-  console.log("[QUIZ]", { day, track, hasCURR: !!window.CURR, tracks: Object.keys(window.CURR?.QUIZZES_BY_TRACK || {}) });
-
   // ✅ IMPORTANT: make the rest of the app (scoring/mistakes) consistent
   lesson.quiz = Array.isArray(quizData) ? quizData : [];
 
