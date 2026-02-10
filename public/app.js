@@ -270,19 +270,27 @@ const QUIZ_STEMS = {
 };
 
 function getHardcodedQuiz(day, track){
-  const QB = window.CURR?.QUIZZES_BY_TRACK?.[track];
+  const d = Number(day);
+  const t = String(track || "general").toLowerCase();
+
+  const ALL = window.CURR?.QUIZZES_BY_TRACK;
+  if(!ALL) return null;
+
+  // try exact track, then fallback to general
+  const QB = ALL[t] || ALL[track] || ALL.general || ALL["General"];
   if(!QB) return null;
 
   // If QB is [ day1Quiz, day2Quiz, ... ] (array of 60)
   if(Array.isArray(QB)){
-    const q = QB[day - 1];
+    const q = QB[d - 1];
     return Array.isArray(q) ? q : null;
   }
 
   // If QB is { "1": [...], "2": [...] } (object map)
-  const q = QB[String(day)] ?? QB[day];
+  const q = QB[String(d)] ?? QB[d];
   return Array.isArray(q) ? q : null;
 }
+
 
 
 function getQuizForLesson(day, title, goal, track){
@@ -942,16 +950,16 @@ function renderLesson(){
   }
 
   // ✅ define these from the lesson you are actually rendering
-  const day = lesson.day;
-  const track = lesson.track || state.selectedTrack || "general";
+  const day = Number(lesson.day);
+  const track = (lesson.track || state.selectedTrack || "general"); // track id key for CURR
 
-  // ✅ always fetch quiz for this lesson
   const quizData = getQuizForLesson(day, lesson.title, lesson.goal, track);
+  console.log("[QUIZ]", { day, track, hasCURR: !!window.CURR, tracks: Object.keys(window.CURR?.QUIZZES_BY_TRACK || {}) });
 
   // ✅ IMPORTANT: make the rest of the app (scoring/mistakes) consistent
   lesson.quiz = Array.isArray(quizData) ? quizData : [];
 
-  renderQuiz(lesson.quiz, lesson, track, day);
+  renderQuiz(quizData, lesson, track, day);
   renderReflection(lesson);
   updateLessonStatus(track, day);
 
