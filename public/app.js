@@ -756,9 +756,9 @@ function showView(name){
   $(`.tab[data-view="${name}"]`)?.classList.add("active");
 
   if(name === "lesson"){
-    if(state.reviewMode?.active) renderMistakeReview();
-    else renderLesson();
+    renderLesson(); // always render the lesson screen
   }
+
   if(name === "games")    renderGamesCatalog();
   if(name === "profile"){
     renderProfile();
@@ -767,7 +767,6 @@ function showView(name){
   if(name === "progress") name = "home";
   if(name === "shop")     renderShop();
   if(name === "rate")     renderRate();
-  if(name === "tracks")   renderTrackUI();
   if(name === "map")      renderStoryMap();
   if(name === "home")     renderHomeRecommendation();
   if(name === "habitquest"){
@@ -818,6 +817,54 @@ function recordQuizAttempt(track, day, wrongCount){
 }
 
 
+function renderProgressChart(){
+  const c = document.getElementById("progress-chart");
+  if(!c) return;
+  const ctx = c.getContext("2d");
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+
+  const totalDays = (getActiveLessons()?.length || 60);
+  const done = (state.completedDays?.length || 0);
+  const pct = totalDays ? Math.round((done/totalDays)*100) : 0;
+
+  // background
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillRect(0,0,W,H);
+
+  // bar
+  const pad = 24;
+  const barW = W - pad*2;
+  const barH = 26;
+  const x = pad, y = 70;
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(x,y,barW,barH);
+
+  ctx.fillStyle = "rgba(68,215,182,0.9)";
+  ctx.fillRect(x,y,Math.round(barW*(done/Math.max(1,totalDays))),barH);
+
+  // text
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = "bold 20px system-ui, -apple-system, Segoe UI, Roboto";
+  ctx.fillText(`Progress: ${done} / ${totalDays} lessons (${pct}%)`, pad, 40);
+
+  ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
+  ctx.fillStyle = "rgba(255,255,255,0.78)";
+  ctx.fillText(`XP: ${state.xp}   Level: ${state.level}   Streak: ${state.streak} day(s)`, pad, 120);
+
+  // small sparkline-like boxes for last 14 completions
+  const items = [...(state.completedDays||[])].slice(-14);
+  const box = 12, gap = 6;
+  const startX = pad, startY = 150;
+  items.forEach((_,i)=>{
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fillRect(startX + i*(box+gap), startY, box, box);
+    ctx.fillStyle = "rgba(255,220,90,0.95)";
+    ctx.fillRect(startX + i*(box+gap), startY, box, box);
+  });
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillText("Last completions", pad, 190);
+}
 
 
 
@@ -825,13 +872,19 @@ function getRecommendedLesson(){
   const lessons = getActiveLessons();
   if(!lessons.length) return null;
 
+  // ✅ If truly fresh, always recommend Day 1
+  if((state.completedDays?.length || 0) === 0){
+    return lessons[0];
+  }
+
   const uncompleted = lessons.filter(l => !isLessonComplete(l.track, l.day));
   if(uncompleted.length) return uncompleted[0];
 
+  // if all done, recommend the one with most wrong history
   let best = null;
   let bestScore = -1;
   for(const l of lessons){
-    const stat = state.quizAttempts?.[lessonKey(l.track,l.day)];
+    const stat = state.quizAttempts?.[lessonKey(l.track, l.day)];
     const score = stat ? safeNum(stat.wrongTotal, 0) : 0;
     if(score > bestScore){
       bestScore = score;
@@ -840,6 +893,7 @@ function getRecommendedLesson(){
   }
   return best || lessons[0];
 }
+
 
 function goToLessonDay(day){
   const lessons = getActiveLessons();
@@ -947,6 +1001,115 @@ function getCurrentReviewItem(){
   return state.mistakes?.[qKey] || null;
 }
 
+function renderMistakeReviewInQuizPanel(){
+  const item = getCurrentReviewItem();
+  const quizWrap = $("#quiz");
+  if(!quizWrap) return;
+
+  // keep lesson content on screen; only control quiz area
+  quizWrap.innerHTML = "";
+
+  if(!item){
+    quizWrap.innerHTML = `<div class="card" style="margin-top:10px;">
+      <h3 style="margin-top:0;">Mistake Review</h3>
+      <p class="muted">No mistakes saved yet — do a quiz first.</p>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
+      </div>
+    </div>`;
+
+    $("#btn-exit-review")?.addEventListener("click", () => {
+      exitMistakeReview();
+      showView("home");
+    });
+    return;
+  }
+
+  quizWrap.innerHTML = `
+    <div class="card" style="margin-top:10px; background: rgba(255,255,255,0.06);">
+      <h3 style="margin-top:0;">Mistake Review 🔁</h3>
+      <p class="muted">From Day ${item.day} • Missed ${item.wrongCount} time${item.wrongCount===1?"":"s"}</p>
+      <div class="divider"></div>
+      <p style="font-weight:900;">${escapeHtml(item.q)}</p>
+      <div id="mr-opts"></div>
+      <p class="muted" id="mr-msg" style="margin-top:10px;"></p>
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn" id="btn-exit-review" type="button">Exit Review</button>
+        <button class="btn primary" id="btn-skip-review" type="button">Skip</button>
+      </div>
+    </div>
+  `;
+
+  const optsWrap = quizWrap.querySelector("#mr-opts");
+  const msgEl = quizWrap.querySelector("#mr-msg");
+
+  (item.options || []).forEach((optText, optIndex) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choiceBtn";
+    btn.textContent = optText;
+
+    btn.addEventListener("click", () => {
+      // lock
+      optsWrap.querySelectorAll("button.choiceBtn").forEach(b => b.disabled = true);
+
+      const correct = (optIndex === item.answer);
+      if(correct){
+        btn.classList.add("choiceGood");
+        if(msgEl) msgEl.textContent = "✅ Correct! Clearing this mistake.";
+        delete state.mistakes[item.qKey];
+        state.reviewMode.idx += 1;
+
+        if(state.reviewMode.idx >= (state.reviewMode.queue?.length || 0)){
+          exitMistakeReview();
+          addXP(15);
+          saveState();
+          showView("lesson"); // returns to normal lesson render
+          return;
+        }
+
+        saveState();
+        addXP(2);
+        renderMistakeReviewInQuizPanel();
+      }else{
+        btn.classList.add("choiceBad");
+        if(state.mistakes?.[item.qKey]){
+          state.mistakes[item.qKey].wrongCount = safeNum(state.mistakes[item.qKey].wrongCount,0) + 1;
+          state.mistakes[item.qKey].lastWrongISO = isoDate(new Date());
+        }
+        saveState();
+        if(msgEl) msgEl.textContent = "Not yet — you’ve got this. Try again.";
+        // re-enable so they can retry right away
+        optsWrap.querySelectorAll("button.choiceBtn").forEach(b => b.disabled = false);
+      }
+    });
+
+    optsWrap.appendChild(btn);
+  });
+
+  $("#btn-exit-review")?.addEventListener("click", () => {
+    exitMistakeReview();
+    showView("home");
+  });
+
+  $("#btn-skip-review")?.addEventListener("click", () => {
+    state.reviewMode.idx += 1;
+    if(state.reviewMode.idx >= (state.reviewMode.queue?.length || 0)){
+      exitMistakeReview();
+      saveState();
+      showView("lesson");
+      return;
+    }
+    saveState();
+    renderMistakeReviewInQuizPanel();
+  });
+
+  $("#lesson-status") && ($("#lesson-status").textContent =
+    `Review item ${state.reviewMode.idx + 1} / ${state.reviewMode.queue.length}`
+  );
+}
+
+
 
 /* =========================================================
    LESSONS + QUIZ RENDERING
@@ -988,41 +1151,36 @@ function renderLesson(){
   lesson.quiz = Array.isArray(quizData) ? quizData : [];
 
   renderQuiz(quizData, lesson, track, day);
+  // If review mode is active, draw the review question UI in the quiz area
+  if(state.reviewMode?.active){
+    renderMistakeReviewInQuizPanel();
+  } else {
+    // Optional: show inline “what you missed” after a failed attempt
+    // renderMistakeReviewForCurrentLesson();
+  }
+
   renderReflection(lesson);
   updateLessonStatus(track, day);
 
 }
 
 
-function renderMistakeReviewForCurrentLesson(){
-  const miss = getWrongItemsForCurrentLesson();
-  const box = document.getElementById("quiz");
-  if(!box) return;
+function renderLessonHeaderAndContent(lesson){
+  $("#lesson-title") && ($("#lesson-title").textContent = lesson.title);
+  $("#lesson-day")   && ($("#lesson-day").textContent   =
+    `Day ${lesson.day} • Track: ${TRACKS[state.selectedTrack]?.name || "General"}`
+  );
+  $("#lesson-goal")  && ($("#lesson-goal").textContent  = `Goal: ${lesson.goal}`);
 
-  if(!miss.wrong.length){
-    box.insertAdjacentHTML("beforeend", `<p class="muted">No mistakes to review ✅</p>`);
-    return;
+  const body = $("#lesson-content");
+  if(body){
+    body.innerHTML = "";
+    lesson.content.forEach(p => {
+      const el = document.createElement("p");
+      el.textContent = p;
+      body.appendChild(el);
+    });
   }
-
-  const items = miss.wrong.slice(0, 6); // keep it short; feels good
-  const html = `
-    <div class="card" style="margin-top:12px; background: rgba(255,255,255,0.06);">
-      <h3 style="margin-top:0;">Mistake Review 🔁</h3>
-      <p class="muted">Here are the ones you missed. Read the correct answer + why, then retry.</p>
-      ${items.map((w,i)=>`
-        <div class="divider"></div>
-        <p style="font-weight:900; margin:0 0 6px;">${escapeHtml(w.q)}</p>
-        <p class="muted" style="margin:0;">You picked: <strong>${escapeHtml(w.picked ?? "(no answer)")}</strong></p>
-        <p class="muted" style="margin:6px 0 0;">Correct: <strong>${escapeHtml(w.correct)}</strong></p>
-        <p class="muted" style="margin:6px 0 0;">Concept: <strong>${escapeHtml(w.concept)}</strong></p>
-      `).join("")}
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn small" id="btn-mr-close" type="button">Hide</button>
-      </div>
-    </div>
-  `;
-  box.insertAdjacentHTML("beforeend", html);
-  document.getElementById("btn-mr-close")?.addEventListener("click", () => renderLesson());
 }
 
 
@@ -1435,6 +1593,7 @@ let gameMode = null;
 let gameIndex = 0;
 let gameScore = 0;
 let breathingTimerId = null;
+let gameRestartFn = null;
 
 function overlayEl(){ return document.getElementById("game-overlay"); }
 
@@ -1562,14 +1721,9 @@ function ensureGameOverlay(){
 
   overlay.querySelector("#go-restart")?.addEventListener("click", (e) => {
     e.preventDefault();
-    if(gameMode === "breathing") startBreathing();
-    if(gameMode === "habitquest"){
-      if(typeof hqResetRun === "function") hqResetRun();
-      startHabitQuest();
-    }
-    if(gameMode === "responsebuilder") startResponseBuilder();
-    if(gameMode === "pressuremeter") startPressureMeter();
+    if(typeof gameRestartFn === "function") gameRestartFn();
   });
+
 
   overlay.addEventListener("click", (e) => {
     if(e.target === overlay) closeGameOverlay();
@@ -1616,6 +1770,8 @@ function closeGameOverlay(){
   }
 
   gameMode = null;
+  gameRestartFn = null;
+
 }
 
 /* =========================================================
@@ -1704,60 +1860,79 @@ function launchGame(id){
 function startMemoryMatch(){
   gameMode = "memory";
   gameScore = 0;
-  openGameOverlay("Memory Match", "Match coping tools. Finish all pairs to earn XP.");
+  openGameOverlay("Memory Match", "Beat levels 1–10. More cards + less time each level.");
+  // store level in state session (not saved)
+  window.__mmLevel = window.__mmLevel || 1;
   renderMemoryMatch();
 }
+
 function renderMemoryMatch(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  const pairs = [
-    ["🫁 Breathing","🫁 Breathing"],
-    ["💧 Water","💧 Water"],
-    ["🚪 Exit Plan","🚪 Exit Plan"],
-    ["🔁 Switch Plan","🔁 Switch Plan"],
-    ["🧠 Time‑Zoom","🧠 Time‑Zoom"],
-    ["🤝 Ask for Help","🤝 Ask for Help"],
+  let level = clamp(safeNum(window.__mmLevel, 1), 1, 10);
+
+  const pool = [
+    "🫁 Breathing","💧 Water","🚪 Exit Plan","🔁 Switch Plan","🧠 Time‑Zoom",
+    "🤝 Ask for Help","📝 Write it down","🎧 Music break","🚶 Walk","🥪 Snack",
+    "🧊 Cold splash","🛡️ Boundary line","📵 Phone away","🌙 Sleep plan",
   ];
-  const cards = pairs.flat().map((t,i)=>({ id:i, text:t, matched:false }));
-  const rng = mulberry32(4242 + state.xp);
-  shuffleInPlace(cards, rng);
+
+  const pairsCount = 3 + level;              // level 1 => 4 pairs (8 cards), level 10 => 13 pairs (26 cards)
+  const timeLimit = Math.max(20, 55 - level*3); // shrinks as level rises
+
+  const rng = mulberry32(4242 + state.xp + level*999);
+  const chosen = shuffleInPlace(pool.slice(), rng).slice(0, pairsCount);
+  const cards = shuffleInPlace(chosen.flatMap((t, i) => ([
+    { id:`${i}-a`, text:t, matched:false },
+    { id:`${i}-b`, text:t, matched:false },
+  ])), rng);
 
   let first = null;
   let lock = false;
   let matches = 0;
+  let t = timeLimit;
+  let loopId = null;
+  let alive = true;
+
+  const cols = (pairsCount <= 6) ? 4 : (pairsCount <= 10) ? 5 : 6;
 
   const draw = (msg="") => {
+    const won = matches >= pairsCount;
     area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Matches: <strong>${matches}</strong> / 6</p>
-      <div style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px; margin-top:10px;">
+      <p class="muted" style="margin-top:0;">
+        Level <strong>${level}</strong> / 10 • Time: <strong>${t}s</strong> • Matches: <strong>${matches}</strong> / ${pairsCount}
+      </p>
+      <div style="display:grid; grid-template-columns: repeat(${cols}, minmax(0,1fr)); gap:10px; margin-top:10px;">
         ${cards.map(c => `
           <button class="choiceBtn" type="button"
-            data-id="${c.id}"
-            style="text-align:center; min-height:64px; font-weight:900;"
-            ${c.matched ? "disabled" : ""}>
-            ${c.matched ? c.text : "❓"}
+            data-id="${escapeHtml(c.id)}"
+            style="text-align:center; min-height:62px; font-weight:900;"
+            ${(!alive || c.matched) ? "disabled" : ""}>
+            ${c.matched ? escapeHtml(c.text) : "❓"}
           </button>
         `).join("")}
       </div>
       <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+      ${won ? `<p class="big">✅ Level Clear!</p>` : ""}
     `;
+
     area.querySelectorAll("button[data-id]").forEach(btn => {
       btn.addEventListener("click", () => {
-        if(lock) return;
-        const id = Number(btn.getAttribute("data-id"));
+        if(!alive || lock) return;
+        const id = btn.getAttribute("data-id");
         const c = cards.find(x => x.id === id);
         if(!c || c.matched) return;
 
-        // reveal temporarily
+        // reveal
         btn.textContent = c.text;
 
         if(!first){
           first = c;
           return;
         }
-        // second pick
+
         lock = true;
         const second = c;
         const same = first.text === second.text && first.id !== second.id;
@@ -1767,37 +1942,75 @@ function renderMemoryMatch(){
             first.matched = true;
             second.matched = true;
             matches += 1;
-            gameScore += 10;
-            if(matches >= 6){
-              addXP(25);
-              overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+            gameScore += 12;
+            overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+
+            if(matches >= pairsCount){
+              alive = false;
+              if(loopId) clearInterval(loopId);
+
+              // XP scales with level + remaining time
+              const xp = 10 + level*3 + Math.max(0, t);
+              addXP(xp);
+
+              area.innerHTML += `
+                <p class="muted">XP earned: <strong>${xp}</strong></p>
+                <div class="actions" style="margin-top:12px;">
+                  <button class="btn primary" id="mm-next" type="button">${level < 10 ? "Next Level" : "Finish"}</button>
+                </div>
+              `;
+              area.querySelector("#mm-next")?.addEventListener("click", () => {
+                window.__mmLevel = (level < 10) ? (level + 1) : 1;
+                renderMemoryMatch();
+              });
+
               const restartBtn = overlay.querySelector("#go-restart");
               if(restartBtn) restartBtn.style.display = "inline-block";
-              area.innerHTML += `<p class="big">✅ Complete!</p><p class="muted">You matched every tool.</p>`;
-              lock = false;
-              first = null;
-              return;
+            }else{
+              draw("Nice match ✅");
             }
-            draw("Nice match ✅");
           }else{
+            gameScore = Math.max(0, gameScore - 2);
+            overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
             draw("Not a match — try again.");
           }
-          overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
           first = null;
           lock = false;
-        }, 550);
+        }, 520);
       });
     });
   };
 
-  draw("Pick two cards to find a match.");
+  draw("Match pairs before time runs out.");
+
+  loopId = setInterval(() => {
+    if(!alive) return;
+    t--;
+    if(t <= 0){
+      alive = false;
+      clearInterval(loopId);
+      draw("⏰ Time! Restart to retry this level.");
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+    }else{
+      draw();
+    }
+  }, 1000);
+
+  setGameCleanup(() => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+  });
 }
+
 
 /* =========================================================
    GAME: COPING SORT
 ========================================================= */
 function startCopingSort(){
   gameMode = "coping-sort";
+  gameRestartFn = startStressLab;   // ✅ add this
+
   gameScore = 0;
   openGameOverlay("Coping Sort", "Sort choices: helps now & later vs costs later.");
   renderCopingSort();
@@ -1877,23 +2090,81 @@ function renderCopingSort(){
 function startStreakRun(){
   gameMode = "streak-run";
   gameScore = 0;
-  openGameOverlay("Streak Run", "Tap FAST when ‘GO!’ appears. 12 rounds.");
+  openGameOverlay("Streak Run", "Wait for GO! Click fast. Don’t click on red.");
   renderStreakRun();
 }
+
 function renderStreakRun(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  const total = 12;
+  let alive = true;
   let round = 0;
+  const total = 14;
   let waiting = true;
   let startAt = 0;
+
+  // tiny confetti (emoji burst)
+  const confetti = () => {
+    const el = document.createElement("div");
+    el.style.position = "relative";
+    el.style.marginTop = "8px";
+    el.innerHTML = "🎉✨🎉✨🎉";
+    area.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  };
+
+  const draw = (stateMsg="", mode="wait") => {
+    const color = mode === "go" ? "rgba(68,215,182,0.9)" : mode === "bad" ? "rgba(255,85,119,0.9)" : "rgba(255,220,90,0.9)";
+    const label = mode === "go" ? "GO!" : mode === "bad" ? "NO!" : "WAIT…";
+    const disabled = (mode !== "go");
+
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Round <strong>${round}</strong> / ${total}</p>
+      <div class="card" style="background: rgba(255,255,255,0.06); text-align:center;">
+        <div style="font-weight:900; font-size:22px; margin:6px 0; color:${color}; text-shadow: 0 0 12px ${color};">
+          ${label}
+        </div>
+        <button class="btn primary" id="sr-btn" type="button" ${disabled ? "disabled" : ""} style="
+          font-weight:900;
+          padding:12px 16px;
+          border-radius:14px;
+          box-shadow: 0 0 18px rgba(255,255,255,0.10);
+          animation: ${mode==="go" ? "pulseGo 0.35s infinite alternate" : "none"};
+        ">CLICK</button>
+      </div>
+      <p class="muted" id="sr-msg" style="margin-top:10px;">${escapeHtml(stateMsg || "Don’t click early.")}</p>
+      <style>
+        @keyframes pulseGo { from { transform: scale(1); } to { transform: scale(1.08); } }
+      </style>
+    `;
+
+    area.querySelector("#sr-btn")?.addEventListener("click", () => {
+      if(!alive) return;
+      if(waiting){
+        // early click penalty
+        gameScore = Math.max(0, gameScore - 6);
+        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+        draw("Too early 😅", "bad");
+        return;
+      }
+      // valid click
+      const rt = Math.max(1, Math.floor(performance.now() - startAt));
+      const gain = rt < 220 ? 25 : rt < 350 ? 18 : rt < 520 ? 12 : 7;
+      gameScore += gain;
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      confetti();
+      setTimeout(nextRound, 450);
+      draw(`Reaction: ${rt}ms (+${gain})`, "wait");
+    });
+  };
 
   const nextRound = () => {
     round++;
     if(round > total){
-      const xp = 10 + Math.floor(gameScore / 10);
+      alive = false;
+      const xp = 12 + Math.floor(gameScore / 25);
       addXP(xp);
       area.innerHTML = `
         <p class="big">✅ Done!</p>
@@ -1904,49 +2175,25 @@ function renderStreakRun(){
       if(restartBtn) restartBtn.style.display = "inline-block";
       return;
     }
+
     waiting = true;
-    area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Round ${round} / ${total}</p>
-      <div class="card" style="background: rgba(255,255,255,0.06); text-align:center;">
-        <p style="font-weight:900; font-size:22px; margin:6px 0;">Wait…</p>
-        <button class="btn primary" id="sr-btn" type="button" disabled>GO!</button>
-      </div>
-      <p class="muted" id="sr-msg" style="margin-top:10px;">Don’t click early.</p>
-    `;
-    const btn = area.querySelector("#sr-btn");
-    const msg = area.querySelector("#sr-msg");
-    const delay = 700 + Math.floor(Math.random()*1400);
+    draw("Wait…", "wait");
+
+    const delay = 650 + Math.floor(Math.random()*1400);
     setTimeout(() => {
-      if(!btn) return;
+      if(!alive) return;
       waiting = false;
       startAt = performance.now();
-      btn.disabled = false;
-      msg.textContent = "GO!";
+      draw("GO GO GO!", "go");
     }, delay);
-
-    // early clicks penalty
-    area.querySelector(".card")?.addEventListener("click", () => {
-      if(waiting){
-        gameScore = Math.max(0, gameScore - 5);
-        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-        if(msg) msg.textContent = "Too early 😅";
-      }
-    });
-
-    btn?.addEventListener("click", () => {
-      if(waiting) return;
-      btn.disabled = true;
-      const rt = Math.max(1, Math.floor(performance.now() - startAt));
-      const gain = rt < 250 ? 20 : rt < 400 ? 15 : rt < 650 ? 10 : 6;
-      gameScore += gain;
-      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-      if(msg) msg.textContent = `Reaction: ${rt}ms (+${gain})`;
-      setTimeout(nextRound, 550);
-    });
   };
 
+  overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
   nextRound();
+
+  setGameCleanup(() => { alive = false; });
 }
+
 
 /* =========================================================
    GAME: FOCUS DODGE
@@ -1954,54 +2201,146 @@ function renderStreakRun(){
 function startFocusDodge(){
   gameMode = "focus-dodge";
   gameScore = 0;
-  openGameOverlay("Focus Dodge", "Tap ✅ Focus. Avoid ❌ Distraction. 20 taps.");
+  openGameOverlay("Focus Dodge", "Type keys on ✅ FOCUS bubbles. Avoid ❌ DISTRACTION bubbles.");
   renderFocusDodge();
 }
+
 function renderFocusDodge(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  let taps = 0;
+  const keys = ["A","S","D","F","J","K","L",";"];
+  let alive = true;
+  let t = 0;
   let good = 0;
+  let bad = 0;
 
-  const draw = (msg="") => {
-    if(taps >= 20){
-      const xp = 12 + good;
-      addXP(xp);
-      area.innerHTML = `
-        <p class="big">✅ Finished!</p>
-        <p class="muted">Good taps: <strong>${good}</strong> / 20</p>
-        <p class="muted">XP earned: <strong>${xp}</strong></p>
-      `;
-      const restartBtn = overlay.querySelector("#go-restart");
-      if(restartBtn) restartBtn.style.display = "inline-block";
-      return;
-    }
-    const isFocus = Math.random() < 0.65;
-    area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Tap ${taps+1} / 20</p>
-      <button class="choiceBtn" id="fd-btn" type="button" style="text-align:center; font-size:18px;">
-        ${isFocus ? "✅ Focus" : "❌ Distraction"}
-      </button>
-      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
-    `;
-    area.querySelector("#fd-btn")?.addEventListener("click", () => {
-      taps++;
-      if(isFocus){
-        good++;
-        gameScore += 8;
-        draw("Nice focus ✅");
-      }else{
-        gameScore = Math.max(0, gameScore - 4);
-        draw("Oof — dodge distractions.");
-      }
-      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+  const bubbles = []; // {id,key,type,lifeMs}
+  let spawnId = null;
+  let tickId = null;
+
+  const spawnBubble = () => {
+    const key = keys[Math.floor(Math.random()*keys.length)];
+    const isFocus = Math.random() < 0.62;
+    bubbles.push({
+      id: uid(),
+      key,
+      type: isFocus ? "focus" : "distract",
+      life: isFocus ? 2200 : 2500
     });
   };
 
-  draw();
+  const draw = (msg="") => {
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">
+        Time: <strong>${t}s</strong> / 35s • Good: <strong>${good}</strong> • Bad: <strong>${bad}</strong>
+      </p>
+
+      <div class="card" style="background: rgba(255,255,255,0.06);">
+        <p class="muted" style="margin:0 0 8px;">Keys: ${keys.join(" ")}</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          ${bubbles.map(b => `
+            <div class="chip"
+              style="
+                border:1px solid rgba(255,255,255,0.18);
+                background:${b.type==="focus" ? "rgba(68,215,182,0.18)" : "rgba(255,85,119,0.18)"};
+                font-weight:900;
+                padding:10px 12px;
+                border-radius:999px;
+              ">
+              ${b.type==="focus" ? "✅ FOCUS" : "❌ DISTRACT"} — <span style="font-size:18px;">${escapeHtml(b.key)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+  };
+
+  const onKey = (e) => {
+    if(!alive) return;
+    const k = String(e.key || "").toUpperCase();
+    if(!k) return;
+
+    const idx = bubbles.findIndex(b => b.key === k);
+    if(idx < 0) return;
+
+    const b = bubbles[idx];
+    bubbles.splice(idx, 1);
+
+    if(b.type === "focus"){
+      good++;
+      gameScore += 10;
+      draw("✅ Nice hit.");
+    }else{
+      bad++;
+      gameScore = Math.max(0, gameScore - 8);
+      draw("❌ Oops — avoid distraction bubbles.");
+    }
+  };
+
+  window.addEventListener("keydown", onKey);
+
+  draw("Type the key shown on ✅ FOCUS bubbles.");
+
+  // spawn rate ramps up
+  spawnId = setInterval(() => {
+    if(!alive) return;
+    const n = (t < 10) ? 1 : (t < 22) ? 2 : 3;
+    for(let i=0;i<n;i++) spawnBubble();
+    // keep list from getting insane
+    while(bubbles.length > 10) bubbles.shift();
+    draw();
+  }, 650);
+
+  tickId = setInterval(() => {
+    if(!alive) return;
+    t++;
+
+    // decay bubble lifetimes
+    for(const b of bubbles) b.life -= 1000;
+    for(let i=bubbles.length-1;i>=0;i--){
+      if(bubbles[i].life <= 0){
+        // missed a focus bubble = penalty, missed distract bubble = ok
+        if(bubbles[i].type === "focus"){
+          bad++;
+          gameScore = Math.max(0, gameScore - 5);
+        }
+        bubbles.splice(i,1);
+      }
+    }
+
+    if(t >= 35){
+      alive = false;
+      clearInterval(spawnId);
+      clearInterval(tickId);
+      window.removeEventListener("keydown", onKey);
+
+      const xp = 12 + good * 2 - bad;
+      addXP(Math.max(5, xp));
+
+      area.innerHTML += `
+        <p class="big">✅ Finished!</p>
+        <p class="muted">Good: <strong>${good}</strong> • Bad: <strong>${bad}</strong> • XP: <strong>${Math.max(5,xp)}</strong></p>
+      `;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+    }else{
+      draw();
+    }
+  }, 1000);
+
+  setGameCleanup(() => {
+    alive = false;
+    if(spawnId) clearInterval(spawnId);
+    if(tickId) clearInterval(tickId);
+    window.removeEventListener("keydown", onKey);
+  });
 }
+
 
 /* =========================================================
    GAME: GOAL BUILDER
@@ -2009,64 +2348,157 @@ function renderFocusDodge(){
 function startGoalBuilder(){
   gameMode = "goal-builder";
   gameScore = 0;
-  openGameOverlay("Goal Builder", "Pick a goal + a tiny step you’ll actually do.");
+  openGameOverlay("Goal Builder", "Build a plan fast, while distractions try to derail you.");
   renderGoalBuilder();
 }
+
 function renderGoalBuilder(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
   const goals = ["Sleep better", "Less scrolling", "Stop on time (games)", "Handle stress", "Say no to pressure"];
-  const steps = ["Set a 10‑minute timer", "4 slow breaths", "Drink water first", "Text a supportive person", "Do a 5‑minute starter task"];
+  const steps = ["Set a 10‑minute timer", "4 slow breaths", "Drink water first", "Text support", "5‑minute starter task"];
+  const blockers = [
+    "You feel bored and want to bail.",
+    "A friend messages ‘lol do it’",
+    "You think ‘this won’t matter anyway.’",
+    "You feel a spike of stress.",
+  ];
 
-  let g = null, s = null;
+  const rng = mulberry32(9001 + state.xp);
+  const goal = goals[Math.floor(rng()*goals.length)];
+  const bestStep = steps[Math.floor(rng()*steps.length)];
+
+  let pickedGoal = null;
+  let pickedStep = null;
+  let t = 30;
+  let loopId = null;
+  let alive = true;
+  let strikes = 0;
+  let interruptions = 0;
 
   const draw = (msg="") => {
+    const built = `${pickedGoal ?? "____"} → ${pickedStep ?? "____"}`;
     area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Pick 1 goal and 1 tiny step.</p>
+      <p class="muted" style="margin-top:0;">
+        Time: <strong>${t}s</strong> • Strikes: <strong>${strikes}</strong> • Interrupts: <strong>${interruptions}</strong>
+      </p>
 
       <div class="card" style="background: rgba(255,255,255,0.06);">
-        <p class="muted" style="margin:0 0 8px;">Goal</p>
-        ${goals.map((x,i)=>`<button class="choiceBtn" data-g="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
-      </div>
-
-      <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
-        <p class="muted" style="margin:0 0 8px;">Tiny step</p>
-        ${steps.map((x,i)=>`<button class="choiceBtn" data-s="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
+        <p class="muted" style="margin:0 0 6px;">Target goal</p>
+        <p style="font-weight:900; margin:0;">${escapeHtml(goal)}</p>
       </div>
 
       <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
         <p class="muted" style="margin:0 0 6px;">Your plan</p>
-        <p style="font-weight:900; margin:0;">${escapeHtml(g ?? "—")} → ${escapeHtml(s ?? "—")}</p>
+        <p style="font-weight:900; font-size:18px; margin:0;">${escapeHtml(built)}</p>
+      </div>
+
+      <div style="margin-top:12px; display:grid; gap:10px;">
+        <div class="card" style="background: rgba(255,255,255,0.05);">
+          <p class="muted" style="margin:0 0 8px;">Pick goal</p>
+          ${goals.map((x,i)=>`<button class="choiceBtn" data-g="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
+        </div>
+
+        <div class="card" style="background: rgba(255,255,255,0.05);">
+          <p class="muted" style="margin:0 0 8px;">Pick tiny step</p>
+          ${steps.map((x,i)=>`<button class="choiceBtn" data-s="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
+        </div>
       </div>
 
       <div class="actions" style="margin-top:12px;">
-        <button class="btn primary" id="gb-done" type="button" ${(!g || !s) ? "disabled" : ""}>Done</button>
+        <button class="btn primary" id="gb-submit" type="button" ${(!pickedGoal || !pickedStep) ? "disabled" : ""}>Lock it in</button>
       </div>
 
       <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
     `;
-    area.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => { g = goals[Number(b.getAttribute("data-g"))]; draw(); }));
-    area.querySelectorAll("[data-s]").forEach(b => b.addEventListener("click", () => { s = steps[Number(b.getAttribute("data-s"))]; draw(); }));
-    area.querySelector("#gb-done")?.addEventListener("click", () => {
-      addXP(20);
-      gameScore += 30;
+
+    area.querySelectorAll("[data-g]").forEach(b =>
+      b.addEventListener("click", () => { pickedGoal = goals[Number(b.getAttribute("data-g"))]; draw(); })
+    );
+    area.querySelectorAll("[data-s]").forEach(b =>
+      b.addEventListener("click", () => { pickedStep = steps[Number(b.getAttribute("data-s"))]; draw(); })
+    );
+
+    area.querySelector("#gb-submit")?.addEventListener("click", () => {
+      if(!alive) return;
+      alive = false;
+      if(loopId) clearInterval(loopId);
+
+      const goalOK = pickedGoal === goal;
+      const stepOK = pickedStep === bestStep;
+
+      let score = 0;
+      if(goalOK) score += 40; else score += 15;
+      if(stepOK) score += 40; else score += 15;
+      score -= strikes * 8;
+
+      gameScore += Math.max(0, score);
       overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-      area.innerHTML += `<p class="big">✅ Plan saved in your brain.</p><p class="muted">Try it today.</p>`;
+
+      const xp = 15 + Math.max(0, Math.floor(gameScore / 20));
+      addXP(xp);
+
+      area.innerHTML += `
+        <p class="big">✅ Plan locked</p>
+        <p class="muted">Goal match: <strong>${goalOK ? "Yes" : "No"}</strong> • Step match: <strong>${stepOK ? "Yes" : "No"}</strong></p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
       const restartBtn = overlay.querySelector("#go-restart");
       if(restartBtn) restartBtn.style.display = "inline-block";
     });
   };
 
-  draw();
+  const interrupt = () => {
+    if(!alive) return;
+    interruptions++;
+    const line = blockers[Math.floor(rng()*blockers.length)];
+    // “answer” the interruption: keep plan vs bail
+    const keep = Math.random() < 0.7;
+    if(keep){
+      gameScore += 6;
+      draw(`Distraction: “${line}” → You stay on track. (+6)`);
+    }else{
+      strikes++;
+      gameScore = Math.max(0, gameScore - 5);
+      draw(`Distraction: “${line}” → It shook you a bit. (-5)`);
+    }
+    overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+  };
+
+  draw("Build a plan before time runs out.");
+
+  loopId = setInterval(() => {
+    if(!alive) return;
+    t--;
+    if(t <= 0){
+      alive = false;
+      clearInterval(loopId);
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      area.innerHTML += `<p class="big">⏰ Time!</p><p class="muted">Try again and lock a plan faster.</p>`;
+      return;
+    }
+    // occasional interruptions
+    if(t % 7 === 0) interrupt();
+    draw();
+  }, 1000);
+
+  setGameCleanup(() => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+  });
 }
+
 
 /* =========================================================
    GAME: FRIENDSHIP SIGNALS (quiz)
 ========================================================= */
 function startFriendshipQuiz(){
   gameMode = "friendship-quiz";
+  gameRestartFn = startStressLab;   // ✅ add this
+
   gameScore = 0;
   openGameOverlay("Friendship Signals", "Spot healthy vs pressure behaviors.");
   renderFriendshipQuiz();
@@ -2136,65 +2568,109 @@ function renderFriendshipQuiz(){
 function startStressLab(){
   gameMode = "stress-lab";
   gameScore = 0;
-  openGameOverlay("Stress Lab", "Try tools and see what lowers stress.");
+  openGameOverlay("Stress Lab", "Stress rises over time. Use tools to keep it low.");
   renderStressLab();
 }
+
 function renderStressLab(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  let stress = 60;
-  let tries = 0;
+  let stress = 45;
+  let t = 0;
+  let alive = true;
+  let loopId = null;
+  let uses = 0;
 
   const tools = [
-    { name:"🫁 4 Breaths", delta:-14, msg:"Breathing lowers the body alarm." },
-    { name:"💧 Water", delta:-8, msg:"Hydration helps your brain steady." },
-    { name:"🚶 2‑Minute Move", delta:-12, msg:"Movement burns off stress energy." },
-    { name:"📱 Text Support", delta:-18, msg:"Support makes it easier." },
-    { name:"🧠 Time‑Zoom", delta:-10, msg:"Zooming out reduces urgency." },
+    { name:"🫁 4 Breaths", delta:-16, score:+8,  msg:"Breathing lowers the body alarm." },
+    { name:"💧 Water",    delta:-10, score:+5,  msg:"Hydration helps your brain steady." },
+    { name:"🚶 Move",     delta:-14, score:+7,  msg:"Movement burns off stress energy." },
+    { name:"📱 Text help",delta:-20, score:+10, msg:"Support makes it easier." },
+    { name:"🧠 Time‑Zoom",delta:-12, score:+6,  msg:"Zooming out reduces urgency." },
   ];
 
   const draw = (msg="") => {
     area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Try <strong>3</strong> tools (or keep going).</p>
+      <p class="muted" style="margin-top:0;">
+        Survive <strong>45s</strong> while keeping stress under <strong>90</strong>.
+        • Time: <strong>${t}s</strong> • Uses: <strong>${uses}</strong>
+      </p>
+
       <div class="card" style="background: rgba(255,255,255,0.06);">
-        <div style="display:flex; justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div><strong>Stress:</strong> ${stress} / 100</div>
-          <div><strong>Tries:</strong> ${tries}</div>
+          <div><strong>Score:</strong> ${gameScore}</div>
         </div>
         <div style="height:12px; border-radius:999px; background: rgba(255,255,255,0.08); margin-top:10px; overflow:hidden;">
-          <div style="height:100%; width:${stress}%; background:${stress<35?"rgba(68,215,182,0.9)":stress<70?"rgba(255,220,90,0.9)":"rgba(255,85,119,0.9)"};"></div>
+          <div style="height:100%; width:${stress}%; background:${stress<40?"rgba(68,215,182,0.9)":stress<75?"rgba(255,220,90,0.9)":"rgba(255,85,119,0.9)"};"></div>
         </div>
       </div>
+
       <div class="hqRow" style="margin-top:12px;">
-        ${tools.map((t,idx)=>`<button class="btn small" data-tool="${idx}" type="button">${escapeHtml(t.name)}</button>`).join("")}
+        ${tools.map((tt,idx)=>`<button class="btn small" data-tool="${idx}" type="button">${escapeHtml(tt.name)}</button>`).join("")}
       </div>
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn primary" id="sl-done" type="button" ${tries < 3 ? "disabled" : ""}>Finish</button>
-      </div>
+
       <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
     `;
+
     area.querySelectorAll("[data-tool]").forEach(b => {
       b.addEventListener("click", () => {
-        const t = tools[Number(b.getAttribute("data-tool"))];
-        tries++;
-        stress = clamp(stress + t.delta, 0, 100);
-        gameScore += Math.max(2, Math.floor(Math.abs(t.delta) / 2));
+        if(!alive) return;
+        const tool = tools[Number(b.getAttribute("data-tool"))];
+        uses++;
+        stress = clamp(stress + tool.delta, 0, 100);
+        gameScore += tool.score;
         overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-        draw(t.msg);
+        draw(tool.msg);
       });
-    });
-    area.querySelector("#sl-done")?.addEventListener("click", () => {
-      const xp = 15 + Math.max(0, (60 - stress)); // lower stress -> more XP
-      addXP(xp);
-      area.innerHTML += `<p class="big">✅ Lab complete!</p><p class="muted">XP earned: <strong>${xp}</strong></p>`;
-      const restartBtn = overlay.querySelector("#go-restart");
-      if(restartBtn) restartBtn.style.display = "inline-block";
     });
   };
 
-  draw("Pick a tool to try.");
+  const end = (win) => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+
+    const restartBtn = overlay.querySelector("#go-restart");
+    if(restartBtn) restartBtn.style.display = "inline-block";
+
+    if(win){
+      const xp = 20 + Math.max(0, (90 - stress)); // lower ending stress -> more XP
+      addXP(xp);
+      area.innerHTML += `
+        <p class="big">✅ Lab cleared!</p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      gameScore += 25;
+    }else{
+      area.innerHTML += `<p class="big">⚠️ Overloaded</p><p class="muted">Try using tools earlier and more often.</p>`;
+      gameScore = Math.max(0, gameScore - 10);
+    }
+    overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+  };
+
+  // loop: stress rises constantly
+  draw("Stress rises over time — stay ahead of it.");
+
+  loopId = setInterval(() => {
+    if(!alive) return;
+    t++;
+    // ramps up over time
+    const rise = (t < 15) ? 3 : (t < 30) ? 4 : 5;
+    stress = clamp(stress + rise, 0, 100);
+
+    if(stress >= 90) return end(false);
+    if(t >= 45) return end(true);
+
+    draw();
+  }, 1000);
+
+  // ✅ cleanup on exit/restart
+  setGameCleanup(() => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+  });
 }
 
 
@@ -2203,6 +2679,8 @@ function renderStressLab(){
 ========================================================= */
 function startPressureMeter(){
   gameMode = "pressuremeter";
+  gameRestartFn = startStressLab;   // ✅ add this
+
   gameScore = 0;
   openGameOverlay("Pressure Meter", "Use calm + exit moves to keep pressure low.");
   renderPressureMeter();
@@ -2279,6 +2757,8 @@ function renderPressureMeter(){
 ========================================================= */
 function startBreathing(){
   gameMode = "breathing";
+  gameRestartFn = startStressLab;   // ✅ add this
+
   gameScore = 0;
   openGameOverlay("Breathing Buddy", "Calm your body for 60 seconds.");
 
@@ -2351,7 +2831,7 @@ function startBreathing(){
 function startResponseBuilder(){
   gameMode = "responsebuilder";
   gameScore = 0;
-  openGameOverlay("Response Builder", "Build a strong response to pressure.");
+  openGameOverlay("Response Builder", "Build a strong response fast. Keep your combo alive.");
   renderResponseBuilder();
 }
 
@@ -2381,32 +2861,43 @@ function renderResponseBuilder(){
     }
   ];
 
-  const rng = mulberry32(7777 + state.xp);
+  const rng = mulberry32(7777 + state.xp + Math.floor(Math.random()*999));
   const round = sets[Math.floor(rng() * sets.length)];
   let picks = [null,null,null];
 
-  const render = () => {
+  let alive = true;
+  let t = 22;
+  let loopId = null;
+  let combo = 0;
+
+  const draw = (msg="") => {
     const built = picks.map((p,i) => (p==null ? "____" : round.parts[i][p])).join(" ");
+
     area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Time: <strong>${t}s</strong> • Combo: <strong>${combo}</strong></p>
       <p style="font-weight:900;">${escapeHtml(round.prompt)}</p>
+
       <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
         <p class="muted" style="margin:0 0 8px;">Your response:</p>
         <p style="font-weight:900; font-size:18px; margin:0;">${escapeHtml(built)}</p>
       </div>
+
       <div style="margin-top:12px;">
         ${round.parts.map((opts, i) => `
           <div class="card" style="margin:10px 0; background: rgba(255,255,255,0.05);">
             <p class="muted" style="margin:0 0 8px;">Pick part ${i+1}</p>
-            ${opts.map((t, oi) => `
-              <button class="choiceBtn" data-part="${i}" data-opt="${oi}" type="button">${escapeHtml(t)}</button>
+            ${opts.map((tt, oi) => `
+              <button class="choiceBtn" data-part="${i}" data-opt="${oi}" type="button">${escapeHtml(tt)}</button>
             `).join("")}
           </div>
         `).join("")}
       </div>
+
       <div class="actions">
         <button class="btn primary" id="rb-submit" type="button" ${picks.some(p=>p==null) ? "disabled" : ""}>Submit</button>
       </div>
-      <p class="muted" id="rb-msg" style="margin-top:10px;"></p>
+
+      <p class="muted" id="rb-msg" style="margin-top:10px;">${escapeHtml(msg)}</p>
     `;
 
     area.querySelectorAll("button[data-part]").forEach(btn => {
@@ -2414,29 +2905,55 @@ function renderResponseBuilder(){
         const part = Number(btn.getAttribute("data-part"));
         const opt  = Number(btn.getAttribute("data-opt"));
         picks[part] = opt;
-        render();
+        draw();
       });
     });
 
     area.querySelector("#rb-submit")?.addEventListener("click", () => {
+      if(!alive) return;
       const ok = picks.every((p,i) => p === round.best[i]);
-      const msg = area.querySelector("#rb-msg");
+
       if(ok){
-        gameScore += 25;
-        addXP(20);
-        if(msg) msg.textContent = "✅ Strong response. Clear ‘no’ + switch. Nice.";
+        combo++;
+        const timeBonus = Math.max(0, t);
+        const gain = 18 + combo*4 + Math.floor(timeBonus/3);
+        gameScore += gain;
+        addXP(12 + Math.min(18, combo*2));
+        area.querySelector("#rb-msg").textContent = `✅ Strong. +${gain} score (time bonus!)`;
+        const restartBtn = overlay?.querySelector("#go-restart");
+        if(restartBtn) restartBtn.style.display = "inline-block";
       }else{
-        gameScore = Math.max(0, gameScore - 5);
-        if(msg) msg.textContent = "Almost. Make it clearer and safer.";
+        combo = 0;
+        gameScore = Math.max(0, gameScore - 6);
+        area.querySelector("#rb-msg").textContent = "Almost. Make it clearer: ‘No’ + reason + switch.";
       }
+
       overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-      const restartBtn = overlay?.querySelector("#go-restart");
-      if(restartBtn) restartBtn.style.display = "inline-block";
     });
   };
 
-  render();
+  draw("Build it fast and clean.");
+
+  loopId = setInterval(() => {
+    if(!alive) return;
+    t--;
+    if(t <= 0){
+      alive = false;
+      clearInterval(loopId);
+      area.innerHTML += `<p class="big">⏰ Time!</p><p class="muted">Restart to try for a combo.</p>`;
+      const restartBtn = overlay?.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      return;
+    }
+    draw();
+  }, 1000);
+
+  setGameCleanup(() => {
+    alive = false;
+    if(loopId) clearInterval(loopId);
+  });
 }
+
 
 /* =========================================================
    HABIT QUEST SAVE SLOTS
@@ -2632,6 +3149,7 @@ function renderHabitQuest(){
 
   const nodeId = safeStr(state.habitQuest.nodeId, "hq_start");
   const node = window.HQ.getNode(nodeId, ctx);
+  area.querySelector("#hq-read")?.addEventListener("click", () => hqReadAloud(node, ctx));
 
   hqMarkVisited(nodeId);
   saveState();
@@ -2646,6 +3164,10 @@ function renderHabitQuest(){
 
   area.innerHTML = `
     <div class="hqRow">
+      <div class="hqChip">
+        <button class="btn small" id="hq-read" type="button">🔊 Read Aloud</button>
+      </div>
+
       <div class="hqChip">📖 ${escapeHtml(node.chapter || "Habit Quest")}</div>
       <div class="hqChip">🧭 Node: <strong>${escapeHtml(nodeId)}</strong></div>
       <div class="hqChip">❤️ Hearts: <strong>${hearts}</strong></div>
@@ -2764,6 +3286,29 @@ function renderHabitQuest(){
   const restartBtn = overlay.querySelector("#go-restart");
   if(restartBtn) restartBtn.style.display = "inline-block";
 }
+
+function hqReadAloud(node, ctx){
+  if(!("speechSynthesis" in window)) return alert("Read aloud not supported in this browser.");
+
+  // stop anything currently speaking
+  window.speechSynthesis.cancel();
+
+  const parts = [];
+  parts.push(String(node?.chapter || "Habit Quest"));
+  parts.push(String(node?.text ? node.text(ctx) : ""));
+  const choices = Array.isArray(node?.choices) ? node.choices : [];
+  if(choices.length){
+    parts.push("Choices:");
+    choices.forEach((c,i)=> parts.push(`Option ${i+1}: ${c.text}`));
+  }
+
+  const utter = new SpeechSynthesisUtterance(parts.join(". "));
+  utter.rate = 1.0;
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+  window.speechSynthesis.speak(utter);
+}
+
 
 /* =========================================================
    STORY MAP VIEW (simple)
@@ -3014,6 +3559,25 @@ function renderProfile(){
   const title = $("#profile-title");
   if(title) title.textContent = `${name} 👤`;
 
+  const wrapRef = document.getElementById("profile-reflections");
+  if(wrapRef){
+    const entries = Object.entries(state.reflections || {})
+      .sort((a,b)=> Number(b[0]) - Number(a[0]));
+    if(!entries.length){
+      wrapRef.innerHTML = `<p class="muted">No reflections yet.</p>`;
+    }else{
+      wrapRef.innerHTML = entries.slice(0, 14).map(([day, v])=>`
+        <div class="card" style="background: rgba(255,255,255,0.05); margin-top:10px;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <strong>Day ${escapeHtml(day)}</strong>
+            <span class="muted">${escapeHtml(v.savedISO || "")}</span>
+          </div>
+          <div style="white-space:pre-wrap; margin-top:8px;">${escapeHtml(v.text || "")}</div>
+        </div>
+      `).join("");
+    }
+  }
+
   const selectedCustom = getSelectedCustomAvatar();
   const usingCustom = !!(selectedCustom && selectedCustom.dataURL);
 
@@ -3066,7 +3630,158 @@ function renderProfile(){
   bindProfileNameEditor();
   renderProgress();
   updateHomeStats();
+  renderProgressChart();
 }
+
+function buildProgressReportData(){
+  // Group completedDays by track
+  const completed = (state.completedDays || []).map(k => {
+    const [track, dayStr] = String(k).split(":");
+    return { track, day: Number(dayStr) };
+  }).filter(x => x.track && Number.isFinite(x.day));
+
+  // Mistakes grouped by lesson
+  const mistakes = Object.values(state.mistakes || {}).map(m => ({
+    track: m.track,
+    day: m.day,
+    q: m.q,
+    options: m.options,
+    answerIndex: m.answer,
+    wrongCount: m.wrongCount,
+    lastWrongISO: m.lastWrongISO,
+    firstWrongISO: m.firstWrongISO
+  }));
+
+  // Reflections by day
+  const reflections = Object.entries(state.reflections || {}).map(([day, r]) => ({
+    day: Number(day),
+    text: r?.text || "",
+    savedISO: r?.savedISO || ""
+  })).sort((a,b)=>a.day-b.day);
+
+  return {
+    generatedISO: isoDate(new Date()),
+    profileName: state.profileName,
+    selectedTrack: state.selectedTrack,
+    xp: state.xp,
+    level: state.level,
+    streak: state.streak,
+    lastCompletedISO: state.lastCompletedISO,
+    ratings: state.ratings,
+    completedDays: completed,
+    quizAttempts: state.quizAttempts || {},
+    mistakes,
+    reflections
+  };
+}
+
+function downloadJSON(filename, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+}
+
+function openPrintableReport(){
+  const data = buildProgressReportData();
+
+  const byTrack = {};
+  data.completedDays.forEach(x => {
+    byTrack[x.track] = byTrack[x.track] || [];
+    byTrack[x.track].push(x.day);
+  });
+
+  const w = window.open("", "_blank");
+  if(!w) return alert("Popup blocked—allow popups to generate the report.");
+
+  const esc = (s)=> String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+
+  w.document.write(`
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Progress Report</title>
+<style>
+  body{ font-family: system-ui, -apple-system, Segoe UI, Roboto; padding:24px; color:#111; }
+  h1{ margin:0 0 6px; }
+  .muted{ color:#555; }
+  .card{ border:1px solid #ddd; border-radius:12px; padding:14px; margin:12px 0; }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ text-align:left; padding:8px; border-bottom:1px solid #eee; vertical-align:top; }
+  code{ background:#f3f3f3; padding:2px 6px; border-radius:6px; }
+  @media print { button{ display:none; } }
+</style>
+</head>
+<body>
+  <h1>Progress Report</h1>
+  <div class="muted">Generated: ${esc(data.generatedISO)}</div>
+
+  <div class="card">
+    <h2>Summary</h2>
+    <p><strong>Name:</strong> ${esc(data.profileName)}<br/>
+       <strong>Track:</strong> ${esc(data.selectedTrack)}<br/>
+       <strong>XP / Level:</strong> ${esc(data.xp)} / ${esc(data.level)}<br/>
+       <strong>Streak:</strong> ${esc(data.streak)} day(s)<br/>
+       <strong>Last completed:</strong> ${esc(data.lastCompletedISO || "—")}
+    </p>
+    <p><strong>Rating:</strong> ${data.ratings?.count ? (data.ratings.total/data.ratings.count).toFixed(1) : "—"}
+       (${esc(data.ratings?.count || 0)} rating(s))</p>
+    <button onclick="window.print()">Print / Save as PDF</button>
+    <button onclick="window.opener && window.opener.downloadJSON('progress_report_${esc(data.generatedISO)}.json', ${JSON.stringify(data).replaceAll("</","<\\/")})">Download JSON</button>
+  </div>
+
+  <div class="card">
+    <h2>Lessons Completed</h2>
+    ${Object.keys(byTrack).length ? Object.entries(byTrack).map(([t,days])=>`
+      <p><strong>${esc(t)}</strong>: ${esc(days.sort((a,b)=>a-b).join(", "))}</p>
+    `).join("") : `<p class="muted">None yet.</p>`}
+  </div>
+
+  <div class="card">
+    <h2>Quiz Attempts</h2>
+    <table>
+      <thead><tr><th>Lesson</th><th>Attempts</th><th>Total Wrong</th><th>Last</th></tr></thead>
+      <tbody>
+        ${Object.entries(data.quizAttempts||{}).map(([k,v])=>`
+          <tr>
+            <td><code>${esc(k)}</code></td>
+            <td>${esc(v.attempts||0)}</td>
+            <td>${esc(v.wrongTotal||0)}</td>
+            <td>${esc(v.lastISO||"—")}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="4" class="muted">No attempts recorded.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Mistakes Bank</h2>
+    ${data.mistakes.length ? data.mistakes.map(m=>`
+      <p><strong>${esc(m.track)} Day ${esc(m.day)}</strong> (missed ${esc(m.wrongCount)}x, last ${esc(m.lastWrongISO||"—")})<br/>
+      Q: ${esc(m.q)}</p>
+    `).join("") : `<p class="muted">No mistakes saved.</p>`}
+  </div>
+
+  <div class="card">
+    <h2>Reflections</h2>
+    ${data.reflections.length ? data.reflections.map(r=>`
+      <p><strong>Day ${esc(r.day)}</strong> <span class="muted">(${esc(r.savedISO||"—")})</span><br/>
+      ${esc(r.text)}</p>
+    `).join("") : `<p class="muted">No reflections saved.</p>`}
+  </div>
+</body>
+</html>
+  `);
+
+  w.document.close();
+}
+
+
 
 /* =========================================================
    SHOP
@@ -3191,6 +3906,7 @@ function bindReset(){
 function init(){
   document.body.style.overflow = "";
   $("#year") && ($("#year").textContent = new Date().getFullYear());
+  document.getElementById("btn-progress-report")?.addEventListener("click", openPrintableReport);
 
   state = normalizeState(loadState());
   recalcLevel();

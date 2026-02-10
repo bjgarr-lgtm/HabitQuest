@@ -20,7 +20,6 @@
     <nav class="tabs" aria-label="Main navigation">
       <button class="tab active" data-view="home">Home</button>
       <button class="tab" data-view="lesson">Today’s Lesson</button>
-      <button class="tab" data-view="tracks">Tracks</button>
       <button class="tab" data-view="games">Mini‑Games</button>
       <button class="tab" data-view="habitquest">Habit Quest</button>
       <button class="tab" data-view="profile">Profile</button>
@@ -63,10 +62,35 @@
     <!-- LESSON -->
     <section class="view hidden" id="view-lesson">
       <div class="card">
-        <div class="lessonHeader">
+        <div class="lessonHeader"></div>
           <h2 id="lesson-title">Today’s Lesson</h2>
           <span class="badge" id="lesson-day">Day 1</span>
         </div>
+
+        <div class="card" style="margin:12px 0 0; background: rgba(255,255,255,0.05);">
+          <h3 style="margin-top:0;">Focus Track</h3>
+          <p class="muted" style="margin-top:0;">
+            Optional: switch what today’s lessons focus on. You can change anytime.
+          </p>
+
+          <label class="muted" for="track-select">Focus track</label>
+          <select id="track-select" class="select">
+            <option value="general">General (recommended)</option>
+            <option value="nicotine">Nicotine / Vaping</option>
+            <option value="alcohol">Alcohol</option>
+            <option value="gaming">Gaming / Screen habits</option>
+            <option value="socialmedia">Social media / Scrolling</option>
+            <option value="caffeine">Caffeine / Energy drinks</option>
+          </select>
+
+          <p class="muted" id="track-preview" style="margin-top:10px;"></p>
+
+          <div class="actions">
+            <button class="btn primary" id="btn-apply-track" type="button">Use this track</button>
+            <button class="btn" id="btn-clear-track" type="button">Back to General</button>
+          </div>
+        </div>
+
 
         <p class="muted" id="lesson-goal">Goal: …</p>
         <div class="lessonBody" id="lesson-content"></div>
@@ -99,34 +123,6 @@
           <span class="muted" id="reflection-status" style="align-self:center;"></span>
         </div>
 
-      </div>
-    </section>
-
-    <!-- TRACKS -->
-    <section class="view hidden" id="view-tracks">
-      <div class="card">
-        <h2>Choose a Focus Track</h2>
-        <p class="muted">Optional: pick a topic to focus your lessons. You can switch anytime.</p>
-
-        <label class="muted" for="track-select">Focus track</label>
-        <select id="track-select" class="select">
-          <option value="general">General (recommended)</option>
-          <option value="nicotine">Nicotine / Vaping</option>
-          <option value="alcohol">Alcohol</option>
-          <option value="gaming">Gaming / Screen habits</option>
-          <option value="socialmedia">Social media / Scrolling</option>
-          <option value="caffeine">Caffeine / Energy drinks</option>
-        </select>
-
-        <div class="divider"></div>
-
-        <h3>What you’ll see</h3>
-        <p class="muted" id="track-preview"></p>
-
-        <div class="actions">
-          <button class="btn primary" id="btn-apply-track">Use this track</button>
-          <button class="btn" id="btn-clear-track">Back to General</button>
-        </div>
       </div>
     </section>
 
@@ -199,8 +195,6 @@
                 <input id="profile-name-input" class="textInput" type="text" maxlength="24" placeholder="Your name" />
                 <button class="btn small" id="btn-save-name" type="button">Save</button>
               </div>
-
-              <p class="muted" style="margin:8px 0 0;">This is shown on your profile.</p>
             </div>
           </div>
 
@@ -261,6 +255,14 @@
 
           <h3 style="margin:0;">Completed Days</h3>
           <div id="completed-list" class="chips" style="margin-top:10px;"></div>
+          <canvas id="progress-chart" width="600" height="220" style="width:100%; max-width:900px;"></canvas>
+          <button class="btn" id="btn-progress-report" type="button">Generate Progress Report</button>
+        
+        <div class="card">
+          <h3>Saved reflections</h3>
+          <div id="profile-reflections"></div>
+        </div>
+
         </div>
 
       </div>
@@ -305,16 +307,25 @@
           No ads. No paywalls.
         </p>
 
-        <h3>Donations (Optional)</h3>
-        <p class="muted">
-          In a future version, you can add a donation button that supports addiction prevention efforts.
-          (We’ll keep it safe + parent‑friendly.)
-        </p>
+        <h3>Additional Resources</h3>
+        <ul>
+          <li>A Kids Book About Addiction by Nicole Lendo from A Kids Co. Publishing</li>
+          <li>Addiction Resources for Families - https://www.hazeldenbettyford.org/resources/children-family</li>
+          </li>Beamer`s World (Hazelden Betty Ford): A character-driven program for children to learn about addiction through stories and activities.</li>
+          <li>Alateen (part of Al-Anon): Support meetings specifically for teenagers affected by a family member's alcoholism.</li>
+          <li>Narateen: Support groups for teens affected by a loved one's drug use.</li>
+          <li>Substance Abuse and Mental Health Services Administration (SAMHSA) Helpline: 1-800-662-HELP (4357) - <li>
+          </li>A confidential, free, 24/7 helpline for individuals and families facing mental health and substance use disorders.</li>
+          <li>NIDA for Teens: Educational resources from the National Institute on Drug Abuse to help youth understand the effects of drugs on the brain.</li>
+          <li>If you want help beyond this app, consider talking with a trusted adult or a healthcare professional.</li>
+        </ul>
+
 
         <h3>Credits</h3>
         <ul class="muted">
-          <li>Built with HTML/CSS/JavaScript</li>
-          <li>Hosted on Cloudflare (planned)</li>
+          <li>Developed by Odin and Ben Garrett</li>
+          <li>Built with HTML/CSS/JavaScript with ChatGPT</li>
+          <li>Hosted on Cloudflare</li>
           <li>Version control on GitHub</li>
         </ul>
       </div>
