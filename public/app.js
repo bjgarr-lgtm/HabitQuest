@@ -2675,12 +2675,17 @@ function renderStoryMap(){
   if(!wrap) return;
 
   const visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
-  const nodes = Object.entries(window.HQ.NODES).map(([id, node]) => ({
-    id,
-    chapter: safeStr(node.chapter, ""),
-    visited: !!visited[id],
-    outs: nodeOutgoing(node),
-  }));
+  const ids = window.HQ.listNodeIds();
+  const nodes = ids.map(id => {
+    const node = window.HQ.getNode(id, hqCtx()); // safe to pass ctx
+    return {
+      id,
+      chapter: safeStr(node.chapter, ""),
+      visited: !!visited[id],
+      outs: nodeOutgoing(node),
+    };
+  });
+
 
 
   nodes.sort((a,b) => (a.chapter.localeCompare(b.chapter) || a.id.localeCompare(b.id)));
