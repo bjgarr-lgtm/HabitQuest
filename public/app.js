@@ -2408,157 +2408,6 @@ function renderResponseBuilder(){
 }
 
 /* =========================================================
-   HABIT QUEST (unchanged node graph; your existing content)
-   NOTE: Keeping HQ_NODES as-is from your file is fine; it’s not the quiz system.
-========================================================= */
-function getLastLessonTitle(){
-  const day = safeNum(state.habitQuest.lastLessonDay, 0);
-  if(day <= 0) return "";
-  const track = state.selectedTrack || "general";
-  const list = (LESSONS_BY_TRACK[track] || LESSONS_BY_TRACK.general) || [];
-  const l = list.find(x => x.day === day);
-  return l ? l.title : "";
-
-}
-
-function hqCtx(){
-  const avatarDataURL = getSelectedAvatarDataURL();
-  const usingCustom = !!avatarDataURL;
-  const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "🙂";
-  return {
-    avatarIsCustom: usingCustom,
-    avatarImg: avatarDataURL,
-    avatarEmoji: emoji,
-    name: state.profileName || "Player",
-    completed: state.completedDays.length,
-    lastLessonTitle: getLastLessonTitle(),
-    tokens: safeNum(state.habitQuest.tokens,0),
-    flags: state.habitQuest.flags || {},
-  };
-}
-
-function hqMarkVisited(nodeId){
-  state.habitQuest.visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
-  state.habitQuest.visited[nodeId] = true;
-  state.habitQuest.history = Array.isArray(state.habitQuest.history) ? state.habitQuest.history : [];
-  state.habitQuest.history.push(nodeId);
-  state.habitQuest.history = state.habitQuest.history.slice(-80);
-}
-
-function hqSetFlag(key, value){
-  state.habitQuest.flags = (state.habitQuest.flags && typeof state.habitQuest.flags === "object") ? state.habitQuest.flags : {};
-  state.habitQuest.flags[key] = value;
-}
-
-function hqHasFlag(key){
-  return !!(state.habitQuest.flags && state.habitQuest.flags[key]);
-}
-
-function hqCan(choice){
-  const req = choice.require || null;
-  if(!req) return true;
-  const tok = safeNum(req.token, 0);
-  if(tok > 0 && safeNum(state.habitQuest.tokens,0) < tok) return false;
-  if(req.flag && !hqHasFlag(req.flag)) return false;
-  if(req.notFlag && hqHasFlag(req.notFlag)) return false;
-  const minW = safeNum(req.minWisdom, 0);
-  if(minW > 0 && safeNum(state.habitQuest.wisdom,0) < minW) return false;
-  return true;
-}
-
-const HQ_NODES = {
-  hq_start: {
-    chapter: "Chapter 1: The First Steps",
-    text: () => `You arrive at Sunny Town. A friend says, “Want to do something risky to feel cool?”`,
-    choices: [
-      { text:"Say no calmly and suggest a safe activity.", good:true,  effects:{ wisdom:+1, xp:+15 }, why:"Clear no + switch.", next:"hq_mentor" },
-      { text:"Say yes to fit in.",                         good:false, effects:{ hearts:-1 },        why:"Fitting in isn’t worth it.", next:"hq_mentor" },
-      { text:"Walk away and find a trusted adult.",        good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"askedAdult", value:true } }, why:"Asking for help is strong.", next:"hq_mentor" },
-    ]
-  },
-  hq_mentor: {
-    chapter: "Chapter 1: The First Steps",
-    text: () => `A mentor appears: “When you feel pressure, try: Pause → No → Switch.” Want to practice?`,
-    choices: [
-      { text:"Practice the 3‑step ‘No’ out loud.", good:true,  effects:{ wisdom:+1, xp:+12, flag:{ key:"practicedNo", value:true } }, why:"Practice makes real life easier.", next:"hq_kid_stressed" },
-      { text:"Ignore them and scroll forever.",    good:false, effects:{ hearts:-1 }, why:"Escapes can become habits.", next:"hq_kid_stressed" },
-    ]
-  },
-  hq_kid_stressed: {
-    chapter: "Chapter 1: The First Steps",
-    text: (ctx) => {
-      const last = ctx.lastLessonTitle ? `You remember your last lesson: “${ctx.lastLessonTitle}.”` : "You remember: small choices add up.";
-      return `${last} A kid nearby looks stressed. What do you do?`;
-    },
-    choices: [
-      { text:"Offer a calm tool: 4 slow breaths together.", good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"helpedKid", value:true } }, why:"Calm tools help fast.", next:"hq_gate" },
-      { text:"Say “deal with it” and leave.",               good:false, effects:{ hearts:-1 },        why:"Kindness matters.", next:"hq_gate" },
-      { text:"Help them find a trusted adult.",             good:true,  effects:{ wisdom:+1, xp:+10, flag:{ key:"askedAdult", value:true } }, why:"Support is powerful.", next:"hq_gate" },
-    ]
-  },
-  hq_gate: {
-    chapter: "Chapter 1: The First Steps",
-    text: () => `Gatekeeper: “To enter the next area, you need a Lesson Token.”`,
-    choices: [
-      { text:"Use 1 token to open the gate.", require:{ token:1 }, good:true, effects:{ tokens:-1, xp:+20 }, why:"Nice! Lesson power unlocked.", next:"hq_forest_intro" },
-      { text:"Exit and earn a token by completing a lesson.",      good:true, end:true,                      why:"Finish a lesson to earn a token." },
-    ]
-  },
-  hq_forest_intro: {
-    chapter: "Chapter 2: The Focus Forest",
-    text: () => `In Focus Forest, someone offers “instant fun” that could turn into a bad habit.`,
-    choices: [
-      { text:"Pause and ask: “Will this help Future Me?”", good:true,  effects:{ wisdom:+1, xp:+15, flag:{ key:"usedFutureMe", value:true } }, why:"That question protects you.", next:"hq_forest_boss" },
-      { text:"Do it without thinking.",                    good:false, effects:{ hearts:-1 },               why:"Pausing is your superpower.", next:"hq_forest_boss" },
-      { text:"Take a side path to get support + a plan.",  good:true,  effects:{ xp:+8 },                   why:"A plan beats pressure.", next:"hq_forest_boss" },
-    ]
-  },
-  hq_forest_boss: {
-    chapter: "Chapter 2: The Focus Forest",
-    text: (ctx) => {
-      const bonus = ctx.flags && ctx.flags.helpedKid ? "You feel proud you helped someone earlier—confidence boost." : "You take a steady breath.";
-      return `Boss moment: a crowd pressures you. ${bonus}`;
-    },
-    choices: [
-      { text:"Say: “No thanks. I’m heading out.”", good:true,  effects:{ wisdom:+1, xp:+20 }, why:"Clear + calm + exit.", next:"hq_win" },
-      { text:"Say yes so nobody laughs.",          good:false, effects:{ hearts:-1 },        why:"Real friends don’t demand proof.", next:"hq_win" },
-    ]
-  },
-  hq_win: {
-    chapter: "Chapter 3+: Coming Soon",
-    text: () => `You made it through the demo branch! We can extend this graph with more nodes, chapters, and backgrounds.`,
-    choices: [
-      { text:"Finish Habit Quest (for now).", good:true, effects:{ xp:+40 }, why:"Great job!", end:true },
-    ]
-  },
-};
-
-function hqGetNode(nodeId){
-  return HQ_NODES[nodeId] || HQ_NODES.hq_start;
-}
-
-function hqApplyEffects(eff){
-  const e = eff || {};
-  if(e.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(e.hearts,0), 0, 5);
-  if(e.wisdom) state.habitQuest.wisdom = Math.max(0, safeNum(state.habitQuest.wisdom,0) + safeNum(e.wisdom,0));
-  if(e.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(e.tokens,0));
-  if(e.flag && typeof e.flag === "object"){
-    const key = safeStr(e.flag.key, "");
-    if(key) hqSetFlag(key, e.flag.value);
-  }
-}
-
-function hqResetRun(){
-  state.habitQuest.nodeId = "hq_start";
-  state.habitQuest.hearts = 3;
-  state.habitQuest.wisdom = 0;
-  state.habitQuest.flags = {};
-  state.habitQuest.visited = {};
-  state.habitQuest.history = [];
-  saveState();
-}
-
-/* =========================================================
    HABIT QUEST SAVE SLOTS
 ========================================================= */
 function hqSnapshot(){
@@ -2647,7 +2496,7 @@ function renderHabitQuest(){
   }
 
   const nodeId = safeStr(state.habitQuest.nodeId, "hq_start");
-  const node = hqGetNode(nodeId);
+  const node = window.HQ.getNode(nodeId);
 
   hqMarkVisited(nodeId);
   saveState();
@@ -2800,12 +2649,13 @@ function renderStoryMap(){
   if(!wrap) return;
 
   const visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
-  const nodes = Object.entries(HQ_NODES).map(([id, node]) => ({
+  const nodes = Object.entries(window.HQ.NODES).map(([id, node]) => ({
     id,
     chapter: safeStr(node.chapter, ""),
     visited: !!visited[id],
     outs: nodeOutgoing(node),
   }));
+
 
   nodes.sort((a,b) => (a.chapter.localeCompare(b.chapter) || a.id.localeCompare(b.id)));
   const visCount = nodes.filter(n => n.visited).length;
@@ -2854,7 +2704,7 @@ function renderStoryMap(){
   wrap.querySelector("#btn-map-jump")?.addEventListener("click", () => {
     const id = prompt("Jump to which nodeId? (example: hq_start)")?.trim();
     if(!id) return;
-    if(!HQ_NODES[id]) return alert("That nodeId does not exist in HQ_NODES.");
+    if(!window.HQ.NODES[id]) return alert("That nodeId does not exist.");
     state.habitQuest.nodeId = id;
     saveState();
     startHabitQuest();
