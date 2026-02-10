@@ -766,7 +766,6 @@ function showView(name){
   }
   if(name === "progress") name = "home";
   if(name === "shop")     renderShop();
-  if(name === "rate")     renderRate();
   if(name === "map")      renderStoryMap();
   if(name === "home")     renderHomeRecommendation();
   if(name === "habitquest"){
@@ -785,7 +784,6 @@ function bindNav(){
   });
 
   $("#btn-open-lesson")?.addEventListener("click", () => showView("lesson"));
-  $("#btn-open-rate")?.addEventListener("click", () => showView("rate"));
   $("#btn-start-lesson")?.addEventListener("click", () => showView("lesson"));
   $("#btn-start-game")?.addEventListener("click", () => showView("games"));
   $("#btn-open-habitquest-tab")?.addEventListener("click", () => showView("habitquest"));
@@ -3804,42 +3802,6 @@ function renderShop(){
   });
 }
 
-/* =========================================================
-   RATE
-========================================================= */
-function bindRatingStarsOnce(){
-  if(window.__starsBound) return;
-  window.__starsBound = true;
-
-  const wrap = $("#stars");
-  if(!wrap) return;
-
-  wrap.addEventListener("click", (e) => {
-    const btn = e.target.closest(".star");
-    if(!btn) return;
-
-    const stars = Number(btn.dataset.star);
-    if(!Number.isFinite(stars)) return;
-
-    state.ratings.total = safeNum(state.ratings.total,0) + stars;
-    state.ratings.count = safeNum(state.ratings.count,0) + 1;
-    saveState();
-
-    $("#rating-thanks") && ($("#rating-thanks").textContent = "Thanks for rating! ⭐");
-    renderRate();
-  });
-}
-
-function renderRate(){
-  if(!$("#rating-average")) return;
-
-  const total = safeNum(state.ratings?.total, 0);
-  const count = safeNum(state.ratings?.count, 0);
-  const avg = (count > 0) ? (total / count) : null;
-
-  $("#rating-average").textContent = avg ? avg.toFixed(1) + " / 5" : "—";
-  $("#rating-count").textContent = count === 0 ? "No ratings yet" : `${count} rating${count===1?"":"s"}`;
-}
 
 /* =========================================================
    PROGRESS
