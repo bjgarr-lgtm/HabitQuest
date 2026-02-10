@@ -2245,136 +2245,56 @@ function renderFocusDodge(){
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  const keys = ["A","S","D","F","J","K","L",";"];
-  let alive = true;
-  let t = 0;
+  let taps = 0;
   let good = 0;
-  let bad = 0;
+  let locked = false;           // ✅ add
+  const COOLDOWN_MS = 550;      // ✅ slower (tweak 400–800)
 
-  const bubbles = []; // {id,key,type,lifeMs}
-  let spawnId = null;
-  let tickId = null;
+  const draw = (msg="") => {
+    if(taps >= 20){
+      const xp = 12 + good;
+      addXP(xp);
+      area.innerHTML = `
+        <p class="big">✅ Finished!</p>
+        <p class="muted">Good taps: <strong>${good}</strong> / 20</p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      overlay.querySelector("#go-restart").style.display = "inline-block";
+      return;
+    }
 
-  const spawnBubble = () => {
-    const key = keys[Math.floor(Math.random()*keys.length)];
-    const isFocus = Math.random() < 0.62;
-    bubbles.push({
-      id: uid(),
-      key,
-      type: isFocus ? "focus" : "distract",
-      life: isFocus ? 2200 : 2500
+    const isFocus = Math.random() < 0.65;
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Tap ${taps+1} / 20</p>
+      <button class="choiceBtn" id="fd-btn" type="button"
+        style="text-align:center; font-size:18px; ${locked ? "opacity:0.7;" : ""}"
+        ${locked ? "disabled" : ""}>
+        ${isFocus ? "✅ Focus" : "❌ Distraction"}
+      </button>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+
+    area.querySelector("#fd-btn")?.addEventListener("click", () => {
+      if(locked) return;
+      locked = true;
+
+      taps++;
+      if(isFocus){
+        good++;
+        gameScore += 8;
+        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+        gameSetTimeout(() => { locked = false; draw("Nice focus ✅"); }, COOLDOWN_MS);
+      }else{
+        gameScore = Math.max(0, gameScore - 4);
+        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+        gameSetTimeout(() => { locked = false; draw("Oof — dodge distractions."); }, COOLDOWN_MS);
+      }
     });
   };
 
-  const draw = (msg="") => {
-    area.innerHTML = `
-      <p class="muted" style="margin-top:0;">
-        Time: <strong>${t}s</strong> / 35s • Good: <strong>${good}</strong> • Bad: <strong>${bad}</strong>
-      </p>
-
-      <div class="card" style="background: rgba(255,255,255,0.06);">
-        <p class="muted" style="margin:0 0 8px;">Keys: ${keys.join(" ")}</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          ${bubbles.map(b => `
-            <div class="chip"
-              style="
-                border:1px solid rgba(255,255,255,0.18);
-                background:${b.type==="focus" ? "rgba(68,215,182,0.18)" : "rgba(255,85,119,0.18)"};
-                font-weight:900;
-                padding:10px 12px;
-                border-radius:999px;
-              ">
-              ${b.type==="focus" ? "✅ FOCUS" : "❌ DISTRACT"} — <span style="font-size:18px;">${escapeHtml(b.key)}</span>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-
-      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
-    `;
-    overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-  };
-
-  const onKey = (e) => {
-    if(!alive) return;
-    const k = String(e.key || "").toUpperCase();
-    if(!k) return;
-
-    const idx = bubbles.findIndex(b => b.key === k);
-    if(idx < 0) return;
-
-    const b = bubbles[idx];
-    bubbles.splice(idx, 1);
-
-    if(b.type === "focus"){
-      good++;
-      gameScore += 10;
-      draw("✅ Nice hit.");
-    }else{
-      bad++;
-      gameScore = Math.max(0, gameScore - 8);
-      draw("❌ Oops — avoid distraction bubbles.");
-    }
-  };
-
-  window.addEventListener("keydown", onKey);
-
-  draw("Type the key shown on ✅ FOCUS bubbles.");
-
-  // spawn rate ramps up
-  spawnId = setInterval(() => {
-    if(!alive) return;
-    const n = (t < 10) ? 1 : (t < 22) ? 2 : 3;
-    for(let i=0;i<n;i++) spawnBubble();
-    // keep list from getting insane
-    while(bubbles.length > 10) bubbles.shift();
-    draw();
-  }, 650);
-
-  tickId = setInterval(() => {
-    if(!alive) return;
-    t++;
-
-    // decay bubble lifetimes
-    for(const b of bubbles) b.life -= 1000;
-    for(let i=bubbles.length-1;i>=0;i--){
-      if(bubbles[i].life <= 0){
-        // missed a focus bubble = penalty, missed distract bubble = ok
-        if(bubbles[i].type === "focus"){
-          bad++;
-          gameScore = Math.max(0, gameScore - 5);
-        }
-        bubbles.splice(i,1);
-      }
-    }
-
-    if(t >= 35){
-      alive = false;
-      gclearInterval(spawnId);
-      gclearInterval(tickId);
-      window.removeEventListener("keydown", onKey);
-
-      const xp = 12 + good * 2 - bad;
-      addXP(Math.max(5, xp));
-
-      area.innerHTML += `
-        <p class="big">✅ Finished!</p>
-        <p class="muted">Good: <strong>${good}</strong> • Bad: <strong>${bad}</strong> • XP: <strong>${Math.max(5,xp)}</strong></p>
-      `;
-      const restartBtn = overlay.querySelector("#go-restart");
-      if(restartBtn) restartBtn.style.display = "inline-block";
-    }else{
-      draw();
-    }
-  }, 1000);
-
-  setGameCleanup(() => {
-    alive = false;
-    if(spawnId) gclearInterval(spawnId);
-    if(tickId) gclearInterval(tickId);
-    window.removeEventListener("keydown", onKey);
-  });
+  draw();
 }
+
 
 
 /* =========================================================
@@ -2412,6 +2332,8 @@ function renderGoalBuilder(){
   let alive = true;
   let strikes = 0;
   let interruptions = 0;
+  let locked = false;           // ✅ add
+  const COOLDOWN_MS = 800;      // ✅ slower (tweak 400–800)
 
   const draw = (msg="") => {
     const built = `${pickedGoal ?? "____"} → ${pickedStep ?? "____"}`;
