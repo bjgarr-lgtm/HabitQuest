@@ -1595,6 +1595,40 @@ let gameRestartFn = null;
 
 function overlayEl(){ return document.getElementById("game-overlay"); }
 
+// =========================================================
+// GAME TIMER MANAGER (prevents "flashing / auto-switching")
+// =========================================================
+const GAME_TIMERS = {
+  intervals: new Set(),
+  timeouts: new Set(),
+};
+
+function gSetInterval(fn, ms){
+  const id = setInterval(fn, ms);
+  GAME_TIMERS.intervals.add(id);
+  return id;
+}
+function gClearInterval(id){
+  if(id) gclearInterval(id);
+  GAME_TIMERS.intervals.delete(id);
+}
+function gSetTimeout(fn, ms){
+  const id = gsetTimeout(fn, ms);
+  GAME_TIMERS.timeouts.add(id);
+  return id;
+}
+function gClearTimeout(id){
+  if(id) clearTimeout(id);
+  GAME_TIMERS.timeouts.delete(id);
+}
+function gClearAllTimers(){
+  GAME_TIMERS.intervals.forEach(id => gclearInterval(id));
+  GAME_TIMERS.timeouts.forEach(id => clearTimeout(id));
+  GAME_TIMERS.intervals.clear();
+  GAME_TIMERS.timeouts.clear();
+}
+
+
 function ensureGameOverlay(){
   const old = overlayEl();
   if(old) old.remove();
@@ -1735,6 +1769,8 @@ function ensureGameOverlay(){
 }
 
 function openGameOverlay(title, subtitle=""){
+  gClearAllTimers(); // ✅ STOP any previous game loops before starting a new one
+
   const overlay = overlayEl();
   if(!overlay) return;
   overlay.style.display = "block";
@@ -1755,6 +1791,10 @@ function openGameOverlay(title, subtitle=""){
 function closeGameOverlay(){
   const overlay = overlayEl();
   if(!overlay) return;
+
+  // ✅ stop ALL running timers from any game
+  gClearAllTimers();
+
   overlay.style.display = "none";
   overlay.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
@@ -1762,15 +1802,12 @@ function closeGameOverlay(){
   const c = overlay.querySelector("#go-content");
   if(c) c.innerHTML = "";
 
-  if(breathingTimerId){
-    clearInterval(breathingTimerId);
-    breathingTimerId = null;
-  }
-
-  gameMode = null;
+  gameMode = null;    
   gameRestartFn = null;
 
 }
+
+
 
 /* =========================================================
    GAMES CATALOG
@@ -1935,7 +1972,7 @@ function renderMemoryMatch(){
         const second = c;
         const same = first.text === second.text && first.id !== second.id;
 
-        setTimeout(() => {
+        gsetTimeout(() => {
           if(same){
             first.matched = true;
             second.matched = true;
@@ -1945,7 +1982,7 @@ function renderMemoryMatch(){
 
             if(matches >= pairsCount){
               alive = false;
-              if(loopId) clearInterval(loopId);
+              if(loopId) gclearInterval(loopId);
 
               // XP scales with level + remaining time
               const xp = 10 + level*3 + Math.max(0, t);
@@ -1981,12 +2018,12 @@ function renderMemoryMatch(){
 
   draw("Match pairs before time runs out.");
 
-  loopId = setInterval(() => {
+  loopId = gsetInterval(() => {
     if(!alive) return;
     t--;
     if(t <= 0){
       alive = false;
-      clearInterval(loopId);
+      gclearInterval(loopId);
       draw("⏰ Time! Restart to retry this level.");
       const restartBtn = overlay.querySelector("#go-restart");
       if(restartBtn) restartBtn.style.display = "inline-block";
@@ -1997,7 +2034,7 @@ function renderMemoryMatch(){
 
   setGameCleanup(() => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
   });
 }
 
@@ -2110,7 +2147,7 @@ function renderStreakRun(){
     el.style.marginTop = "8px";
     el.innerHTML = "🎉✨🎉✨🎉";
     area.appendChild(el);
-    setTimeout(() => el.remove(), 700);
+    gsetTimeout(() => el.remove(), 700);
   };
 
   const draw = (stateMsg="", mode="wait") => {
@@ -2153,7 +2190,7 @@ function renderStreakRun(){
       gameScore += gain;
       overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
       confetti();
-      setTimeout(nextRound, 450);
+      gsetTimeout(nextRound, 550);
       draw(`Reaction: ${rt}ms (+${gain})`, "wait");
     });
   };
@@ -2178,7 +2215,7 @@ function renderStreakRun(){
     draw("Wait…", "wait");
 
     const delay = 650 + Math.floor(Math.random()*1400);
-    setTimeout(() => {
+    gsetTimeout(() => {
       if(!alive) return;
       waiting = false;
       startAt = performance.now();
@@ -2313,8 +2350,8 @@ function renderFocusDodge(){
 
     if(t >= 35){
       alive = false;
-      clearInterval(spawnId);
-      clearInterval(tickId);
+      gclearInterval(spawnId);
+      gclearInterval(tickId);
       window.removeEventListener("keydown", onKey);
 
       const xp = 12 + good * 2 - bad;
@@ -2333,8 +2370,8 @@ function renderFocusDodge(){
 
   setGameCleanup(() => {
     alive = false;
-    if(spawnId) clearInterval(spawnId);
-    if(tickId) clearInterval(tickId);
+    if(spawnId) gclearInterval(spawnId);
+    if(tickId) gclearInterval(tickId);
     window.removeEventListener("keydown", onKey);
   });
 }
@@ -2422,7 +2459,7 @@ function renderGoalBuilder(){
     area.querySelector("#gb-submit")?.addEventListener("click", () => {
       if(!alive) return;
       alive = false;
-      if(loopId) clearInterval(loopId);
+      if(loopId) gclearInterval(loopId);
 
       const goalOK = pickedGoal === goal;
       const stepOK = pickedStep === bestStep;
@@ -2467,12 +2504,12 @@ function renderGoalBuilder(){
 
   draw("Build a plan before time runs out.");
 
-  loopId = setInterval(() => {
+  loopId = gsetInterval(() => {
     if(!alive) return;
     t--;
     if(t <= 0){
       alive = false;
-      clearInterval(loopId);
+      gclearInterval(loopId);
       const restartBtn = overlay.querySelector("#go-restart");
       if(restartBtn) restartBtn.style.display = "inline-block";
       area.innerHTML += `<p class="big">⏰ Time!</p><p class="muted">Try again and lock a plan faster.</p>`;
@@ -2485,7 +2522,7 @@ function renderGoalBuilder(){
 
   setGameCleanup(() => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
   });
 }
 
@@ -2628,7 +2665,7 @@ function renderStressLab(){
 
   const end = (win) => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
 
     const restartBtn = overlay.querySelector("#go-restart");
     if(restartBtn) restartBtn.style.display = "inline-block";
@@ -2651,7 +2688,7 @@ function renderStressLab(){
   // loop: stress rises constantly
   draw("Stress rises over time — stay ahead of it.");
 
-  loopId = setInterval(() => {
+  loopId = gsetInterval(() => {
     if(!alive) return;
     t++;
     // ramps up over time
@@ -2667,7 +2704,7 @@ function renderStressLab(){
   // ✅ cleanup on exit/restart
   setGameCleanup(() => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
   });
 }
 
@@ -2723,7 +2760,7 @@ function renderPressureMeter(){
 
   const end = (win) => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
 
     const restartBtn = overlay.querySelector("#go-restart");
     if(restartBtn) restartBtn.style.display = "inline-block";
@@ -2739,7 +2776,7 @@ function renderPressureMeter(){
   };
 
   draw();
-  loopId = setInterval(() => {
+  loopId = gsetInterval(() => {
     if(!alive) return;
     t += 1;
     pressure = clamp(pressure + (t < 10 ? 4 : t < 20 ? 5 : 6), 0, 100);
@@ -2792,7 +2829,7 @@ function startBreathing(){
   let phaseT = 0;
   let finished = false;
 
-  if(breathingTimerId) clearInterval(breathingTimerId);
+  if(breathingTimerId) gclearInterval(breathingTimerId);
   breathingTimerId = setInterval(() => {
     timerText.textContent = `Time left: ${t}s`;
     ring.textContent = phase;
@@ -2809,7 +2846,7 @@ function startBreathing(){
 
     t -= 1;
     if(t < 0){
-      clearInterval(breathingTimerId);
+      getBlueprintclearInterval(breathingTimerId);
       breathingTimerId = null;
       ring.textContent = "Nice!";
       timerText.textContent = "Done. You just practiced calming your body.";
@@ -2932,12 +2969,12 @@ function renderResponseBuilder(){
 
   draw("Build it fast and clean.");
 
-  loopId = setInterval(() => {
+  loopId = gsetInterval(() => {
     if(!alive) return;
     t--;
     if(t <= 0){
       alive = false;
-      clearInterval(loopId);
+      gclearInterval(loopId);
       area.innerHTML += `<p class="big">⏰ Time!</p><p class="muted">Restart to try for a combo.</p>`;
       const restartBtn = overlay?.querySelector("#go-restart");
       if(restartBtn) restartBtn.style.display = "inline-block";
@@ -2948,7 +2985,7 @@ function renderResponseBuilder(){
 
   setGameCleanup(() => {
     alive = false;
-    if(loopId) clearInterval(loopId);
+    if(loopId) gclearInterval(loopId);
   });
 }
 
@@ -3681,7 +3718,7 @@ function downloadJSON(filename, obj){
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+  gsetTimeout(()=>URL.revokeObjectURL(a.href), 500);
 }
 
 function openPrintableReport(){
