@@ -1563,7 +1563,10 @@ function ensureGameOverlay(){
   overlay.querySelector("#go-restart")?.addEventListener("click", (e) => {
     e.preventDefault();
     if(gameMode === "breathing") startBreathing();
-    if(gameMode === "habitquest") startHabitQuest();
+    if(gameMode === "habitquest"){
+      if(typeof hqResetRun === "function") hqResetRun();
+      startHabitQuest();
+    }
     if(gameMode === "responsebuilder") startResponseBuilder();
     if(gameMode === "pressuremeter") startPressureMeter();
   });
