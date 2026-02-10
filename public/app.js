@@ -2473,6 +2473,32 @@ function startHabitQuest(){
   renderHabitQuest();
 }
 
+function getLastLessonTitle(){
+  const day = safeNum(state.habitQuest.lastLessonDay, 0);
+  if(day <= 0) return "";
+  const track = state.selectedTrack || "general";
+  const list = (LESSONS_BY_TRACK[track] || LESSONS_BY_TRACK.general) || [];
+  const l = list.find(x => x.day === day);
+  return l ? l.title : "";
+}
+
+function hqCtx(){
+  const avatarDataURL = getSelectedAvatarDataURL();
+  const usingCustom = !!avatarDataURL;
+  const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "🙂";
+  return {
+    avatarIsCustom: usingCustom,
+    avatarImg: avatarDataURL,
+    avatarEmoji: emoji,
+    name: state.profileName || "Player",
+    completed: state.completedDays.length,
+    lastLessonTitle: getLastLessonTitle(),
+    tokens: safeNum(state.habitQuest.tokens,0),
+    flags: state.habitQuest.flags || {},
+  };
+}
+
+
 function renderHabitQuest(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
@@ -2496,7 +2522,7 @@ function renderHabitQuest(){
   }
 
   const nodeId = safeStr(state.habitQuest.nodeId, "hq_start");
-  const node = window.HQ.getNode(nodeId);
+  const node = window.HQ.getNode(nodeId, ctx);
 
   hqMarkVisited(nodeId);
   saveState();
@@ -2704,7 +2730,7 @@ function renderStoryMap(){
   wrap.querySelector("#btn-map-jump")?.addEventListener("click", () => {
     const id = prompt("Jump to which nodeId? (example: hq_start)")?.trim();
     if(!id) return;
-    if(!window.HQ.NODES[id]) return alert("That nodeId does not exist.");
+    if(!(window.HQ?.NODES && window.HQ.NODES[id])) return alert("That nodeId does not exist.");
     state.habitQuest.nodeId = id;
     saveState();
     startHabitQuest();
