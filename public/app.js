@@ -269,16 +269,22 @@ const QUIZ_STEMS = {
   ]
 };
 
-function getHardcodedQuiz(day, track) {
-  const ALL = window.QUIZZES || {};
-  const QB = ALL[track] || ALL.general;  // <-- fallback
+function getHardcodedQuiz(day, track){
+  const QB =
+    window.CURR?.QUIZZES_BY_TRACK?.[track] ??
+    window.QUIZZES?.[track];
 
-  if (!QB) return null;
+  if(!QB) return null;
 
-  // Object map: { "1": [...], "2": [...] }
+  if(Array.isArray(QB)){
+    const q = QB[day - 1];
+    return Array.isArray(q) ? q : null;
+  }
+
   const q = QB[String(day)] ?? QB[day];
   return Array.isArray(q) ? q : null;
 }
+
 
 
 
@@ -465,7 +471,9 @@ function normalizeState(s){
     .filter(a => a && typeof a.id === "string" && typeof a.dataURL === "string" && a.dataURL.startsWith("data:image/"))
     .map(a => ({ id: a.id, dataURL: a.dataURL, createdISO: safeStr(a.createdISO, isoDate(new Date())) }));
   merged.mistakes = (merged.mistakes && typeof merged.mistakes === "object") ? merged.mistakes : {};
-  mistakeStats: (safe.mistakeStats && typeof safe.mistakeStats === "object") ? safe.mistakeStats : { byLesson:{}, byConcept:{} },
+  merged.mistakeStats = (safe.mistakeStats && typeof safe.mistakeStats === "object")
+    ? safe.mistakeStats
+    : { byLesson:{}, byConcept:{} };
   merged.reviewMode = (merged.reviewMode && typeof merged.reviewMode === "object") ? merged.reviewMode : { active:false, queue:[], idx:0, lastBuiltISO:null };
   merged.reviewMode.active = !!merged.reviewMode.active;
   merged.reviewMode.queue = Array.isArray(merged.reviewMode.queue) ? merged.reviewMode.queue : [];
@@ -852,8 +860,8 @@ function renderHomeRecommendation(){
 function logQuizMistake(lesson, qIndex, item){
   if(!lesson || !item) return;
   const nowISO = isoDate(new Date());
-  const qKey = makeQKey(lesson, qIndex, item);
-
+  const qKey = makeQKey(lesson.track, lesson.day, qIndex);
+  
   state.mistakes = (state.mistakes && typeof state.mistakes === "object") ? state.mistakes : {};
   const prev = state.mistakes[qKey];
 
@@ -1254,7 +1262,7 @@ function getWrongItemsForCurrentLesson(){
 function updateLessonStatus(trackId, day){
   const el = $("#lesson-status");
   if(!el) return;
-  const done = isLessonComplete(state.selectedTrack || "general", day);
+  const done = isLessonComplete(trackId, day);
   el.textContent = done
     ? "✅ Well Done!"
     : "Not completed yet — answer all questions correctly, then click “Mark Lesson Complete”.";
@@ -1303,7 +1311,7 @@ function bindLessonButtons(){
 
     if (wrong > 0) {
       // ✅ track-aware stats key
-      recordQuizAttempt(lessonKey(lesson.track, lesson.day), wrong);
+      recordQuizAttempt(lesson.track, lesson.day, wrong);
 
       $("#lesson-status") && ($("#lesson-status").textContent =
         `Almost! Quiz score: ${score.correct}/${score.total}. Fix the missed ones and try again.`);

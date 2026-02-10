@@ -892,7 +892,8 @@ const CAFFEINE = [
     alcohol:     ALCOHOL.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
     caffeine:    CAFFEINE.map(x => ({ day:x.day, toolName:x.toolName, scenario:x.scenario, safePlan:x.safePlan, boundaryLine:x.boundaryLine, myth:x.myth, tinyStep:x.tinyStep, reflection:x.reflection })),
   };
-  const QUIZZES_BY_TRACK = window.QUIZZES || {};
+  window.QUIZZES = window.QUIZZES || {};
+  const QUIZZES_BY_TRACK = window.QUIZZES; // keep the shared reference
 
   const out = { TRACKS, CURRICULUM_BY_TRACK, BLUEPRINTS_BY_TRACK, QUIZZES_BY_TRACK };
   console.log("curriculum.js finished OK", out);
