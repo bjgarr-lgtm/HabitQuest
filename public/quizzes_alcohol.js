@@ -4,7 +4,7 @@
 */
 "use strict";
 window.QUIZZES = window.QUIZZES || {};
-window.QUIZZES.general = {
+window.QUIZZES.alcohol = {
   "1": [
     {
       "q": "Day 1 — \"Party Plan Basics\": What is today’s goal in plain words?",

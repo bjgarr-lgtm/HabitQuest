@@ -4,7 +4,7 @@
 */
 "use strict";
 window.QUIZZES = window.QUIZZES || {};
-window.QUIZZES.general = {
+window.QUIZZES.nicotine = {
   "1": [
     {
       "q": "Day 1 — \"Cravings Aren’t Commands\": What is today’s goal in plain words?",
