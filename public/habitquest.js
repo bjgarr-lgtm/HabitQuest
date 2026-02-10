@@ -69,6 +69,18 @@
     }
   };
 
+  // Authored node library (overrides generator)
+const AUTHORED_NODES = {}; // nodeId -> node object
+
+function registerNodes(map){
+  if(!map || typeof map !== "object") return;
+  for(const [id, node] of Object.entries(map)){
+    if(!id || !node) continue;
+    AUTHORED_NODES[id] = node;
+  }
+}
+
+
   // ---------------------------------------------------------
   // 60-day generator: creates 1 “mini story” per day with branches
   // nodeId format: hq_day_<N>, plus internal nodes hq_day_<N>_a/_b/_c
@@ -201,24 +213,30 @@
   function getNode(nodeId, ctx){
     const id = safeStr(nodeId, "hq_start");
 
-    // day nodes are generated on demand using ctx.track
-    // expected ids: hq_day_1, hq_day_1_a, hq_day_1_end, etc.
+    // 1) authored overrides win
+    if(AUTHORED_NODES[id]) return AUTHORED_NODES[id];
+
+    // 2) generated day nodes
     const m = id.match(/^hq_day_(\d+)(?:_(a|b|c|end))?$/);
     if(m){
       const day = clamp(safeNum(m[1], 1), 1, 60);
       const track = safeStr(ctx?.track, "general");
       const dayNodes = buildDayNodes(track, day);
+
+      // allow overriding generated subnodes too (if you want)
+      if(AUTHORED_NODES[id]) return AUTHORED_NODES[id];
+
       return dayNodes[id] || dayNodes[`hq_day_${day}`];
     }
 
+    // 3) base nodes
     const base = BASE_NODES[id] || BASE_NODES.hq_start;
-    // patch AUTO nexts so app.js doesn’t need to know about them
-    const patched = {
+    return {
       ...base,
       choices: (base.choices || []).map(c => ({ ...c, next: resolveAutoNext(c.next, ctx) }))
     };
-    return patched;
   }
+
 
   function listNodeIds(){
     // list base nodes + “day shells” so map can show something
@@ -226,8 +244,5 @@
   }
 
   // Expose the engine
-  window.HQ = {
-    getNode,
-    listNodeIds,
-  };
+  window.HQ = { getNode, listNodeIds, registerNodes };
 })();
