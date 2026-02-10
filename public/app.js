@@ -357,17 +357,16 @@ function makeLessonContent(day, title, goal, track){
    GAMES CATALOG
 ========================================================= */
 const GAMES = [
-  { id:"choicequest", title:"Choice Quest",    desc:"Quick practice: pick the healthiest choice.", status:"ready", unlock:{ type:"free" } },
   { id:"breathing",   title:"Breathing Buddy", desc:"60‑second calm timer that earns XP.",         status:"ready", unlock:{ type:"free" } },
   { id:"responsebuilder", title:"Response Builder", desc:"Build a strong response to pressure.",  status:"ready", unlock:{ type:"free" } },
   { id:"pressuremeter", title:"Pressure Meter", desc:"Keep pressure low using healthy moves.",    status:"ready", unlock:{ type:"lessons", lessons:3 } },
-  { id:"memory",      title:"Memory Match",    desc:"Match healthy coping tools.",                status:"soon", unlock:{ type:"xp", xp:250 } },
-  { id:"coping-sort", title:"Coping Sort",     desc:"Sort coping tools into helpful vs not.",     status:"soon", unlock:{ type:"lessons", lessons:5 } },
-  { id:"streak-run",  title:"Streak Run",      desc:"Quick reaction game to keep your streak.",   status:"soon", unlock:{ type:"level", level:4 } },
-  { id:"focus-dodge", title:"Focus Dodge",     desc:"Avoid distractions; build focus.",           status:"soon", unlock:{ type:"level", level:5 } },
-  { id:"goal-builder",title:"Goal Builder",    desc:"Pick goals + tiny steps to reach them.",     status:"soon", unlock:{ type:"xp", xp:600 } },
-  { id:"friendship-quiz", title:"Friendship Signals", desc:"Spot healthy vs unhealthy friend behaviors.", status:"soon", unlock:{ type:"lessons", lessons:10 } },
-  { id:"stress-lab",  title:"Stress Lab",      desc:"Try safe stress tools and see what works.",  status:"soon", unlock:{ type:"xp", xp:900 } },
+  { id:"streak-run",  title:"Streak Run",      desc:"Quick reaction game to keep your streak.",   status:"ready", unlock:{ type:"level", level:4 } },
+  { id:"coping-sort", title:"Coping Sort", desc:"Sort coping tools into helpful vs risky.", status:"ready", unlock:{ type:"lessons", lessons:5 } },
+  { id:"focus-dodge", title:"Focus Dodge", desc:"Avoid distractions and stay focused.", status:"ready", unlock:{ type:"level", level:5 } },
+  { id:"memory", title:"Memory Match", desc:"Match healthy coping tools.", status:"ready", unlock:{ type:"xp", xp:250 } },
+  { id:"goal-builder",title:"Goal Builder",    desc:"Pick goals + tiny steps to reach them.",     status:"ready", unlock:{ type:"xp", xp:600 } },
+  { id:"friendship-quiz", title:"Friendship Signals", desc:"Spot healthy vs unhealthy friend behaviors.", status:"ready", unlock:{ type:"lessons", lessons:10 } },
+  { id:"stress-lab",  title:"Stress Lab",      desc:"Try safe stress tools and see what works.",  status:"ready", unlock:{ type:"xp", xp:900 } },
 ];
 
 /* =========================================================
@@ -1535,7 +1534,6 @@ function ensureGameOverlay(){
 
   overlay.querySelector("#go-restart")?.addEventListener("click", (e) => {
     e.preventDefault();
-    if(gameMode === "choicequest") startChoiceQuest();
     if(gameMode === "breathing") startBreathing();
     if(gameMode === "habitquest") startHabitQuest();
     if(gameMode === "responsebuilder") startResponseBuilder();
@@ -1654,13 +1652,520 @@ function renderGamesCatalog(){
 }
 
 function launchGame(id){
-  if(id === "choicequest") return startChoiceQuest();
   if(id === "breathing") return startBreathing();
   if(id === "habitquest") return startHabitQuest();
   if(id === "responsebuilder") return startResponseBuilder();
   if(id === "pressuremeter") return startPressureMeter();
+  if(id === "memory") return startMemoryMatch();
+  if(id === "coping-sort") return startCopingSort();
+  if(id === "streak-run") return startStreakRun();
+  if(id === "focus-dodge") return startFocusDodge();
+  if(id === "goal-builder") return startGoalBuilder();
+  if(id === "friendship-quiz") return startFriendshipQuiz();
+  if(id === "stress-lab") return startStressLab();
   alert("This game is coming soon. Keep earning XP to unlock more!");
 }
+
+
+/* =========================================================
+   GAME: MEMORY MATCH (tools)
+========================================================= */
+function startMemoryMatch(){
+  gameMode = "memory";
+  gameScore = 0;
+  openGameOverlay("Memory Match", "Match coping tools. Finish all pairs to earn XP.");
+  renderMemoryMatch();
+}
+function renderMemoryMatch(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const pairs = [
+    ["🫁 Breathing","🫁 Breathing"],
+    ["💧 Water","💧 Water"],
+    ["🚪 Exit Plan","🚪 Exit Plan"],
+    ["🔁 Switch Plan","🔁 Switch Plan"],
+    ["🧠 Time‑Zoom","🧠 Time‑Zoom"],
+    ["🤝 Ask for Help","🤝 Ask for Help"],
+  ];
+  const cards = pairs.flat().map((t,i)=>({ id:i, text:t, matched:false }));
+  const rng = mulberry32(4242 + state.xp);
+  shuffleInPlace(cards, rng);
+
+  let first = null;
+  let lock = false;
+  let matches = 0;
+
+  const draw = (msg="") => {
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Matches: <strong>${matches}</strong> / 6</p>
+      <div style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px; margin-top:10px;">
+        ${cards.map(c => `
+          <button class="choiceBtn" type="button"
+            data-id="${c.id}"
+            style="text-align:center; min-height:64px; font-weight:900;"
+            ${c.matched ? "disabled" : ""}>
+            ${c.matched ? c.text : "❓"}
+          </button>
+        `).join("")}
+      </div>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    area.querySelectorAll("button[data-id]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if(lock) return;
+        const id = Number(btn.getAttribute("data-id"));
+        const c = cards.find(x => x.id === id);
+        if(!c || c.matched) return;
+
+        // reveal temporarily
+        btn.textContent = c.text;
+
+        if(!first){
+          first = c;
+          return;
+        }
+        // second pick
+        lock = true;
+        const second = c;
+        const same = first.text === second.text && first.id !== second.id;
+
+        setTimeout(() => {
+          if(same){
+            first.matched = true;
+            second.matched = true;
+            matches += 1;
+            gameScore += 10;
+            if(matches >= 6){
+              addXP(25);
+              overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+              const restartBtn = overlay.querySelector("#go-restart");
+              if(restartBtn) restartBtn.style.display = "inline-block";
+              area.innerHTML += `<p class="big">✅ Complete!</p><p class="muted">You matched every tool.</p>`;
+              lock = false;
+              first = null;
+              return;
+            }
+            draw("Nice match ✅");
+          }else{
+            draw("Not a match — try again.");
+          }
+          overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+          first = null;
+          lock = false;
+        }, 550);
+      });
+    });
+  };
+
+  draw("Pick two cards to find a match.");
+}
+
+/* =========================================================
+   GAME: COPING SORT
+========================================================= */
+function startCopingSort(){
+  gameMode = "coping-sort";
+  gameScore = 0;
+  openGameOverlay("Coping Sort", "Sort choices: helps now & later vs costs later.");
+  renderCopingSort();
+}
+function renderCopingSort(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const items = [
+    { t:"Take 4 slow breaths", good:true },
+    { t:"Drink water", good:true },
+    { t:"Text a trusted adult", good:true },
+    { t:"Go for a short walk", good:true },
+    { t:"Keep it secret so nobody knows", good:false },
+    { t:"Argue until you win", good:false },
+    { t:"Do something risky to escape feelings", good:false },
+    { t:"Skip sleep and hope tomorrow works out", good:false },
+    { t:"Use an exit plan", good:true },
+    { t:"Switch to a safer activity", good:true },
+  ];
+  const rng = mulberry32(5151 + state.xp);
+  shuffleInPlace(items, rng);
+
+  let i = 0;
+  let correct = 0;
+
+  const draw = (msg="") => {
+    const cur = items[i];
+    if(!cur){
+      const xp = 10 + correct * 2;
+      addXP(xp);
+      area.innerHTML = `
+        <p class="big">✅ Finished!</p>
+        <p class="muted">Score: <strong>${correct}</strong> / ${items.length}</p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      return;
+    }
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Item ${i+1} / ${items.length}</p>
+      <div class="card" style="background: rgba(255,255,255,0.06);">
+        <p style="font-weight:900; margin:0;">${escapeHtml(cur.t)}</p>
+      </div>
+      <div class="hqRow" style="margin-top:12px;">
+        <button class="btn small" id="cs-good" type="button">✅ Helps now & later</button>
+        <button class="btn small" id="cs-bad" type="button">⚠️ Costs later</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    area.querySelector("#cs-good")?.addEventListener("click", () => {
+      const ok = cur.good === true;
+      if(ok){ correct++; gameScore += 6; }
+      else{ gameScore = Math.max(0, gameScore - 2); }
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      i++;
+      draw(ok ? "Correct ✅" : "Not quite — that one tends to backfire.");
+    });
+    area.querySelector("#cs-bad")?.addEventListener("click", () => {
+      const ok = cur.good === false;
+      if(ok){ correct++; gameScore += 6; }
+      else{ gameScore = Math.max(0, gameScore - 2); }
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      i++;
+      draw(ok ? "Correct ✅" : "Not quite — that one helps long-term.");
+    });
+  };
+
+  draw();
+}
+
+/* =========================================================
+   GAME: STREAK RUN (reaction)
+========================================================= */
+function startStreakRun(){
+  gameMode = "streak-run";
+  gameScore = 0;
+  openGameOverlay("Streak Run", "Tap FAST when ‘GO!’ appears. 12 rounds.");
+  renderStreakRun();
+}
+function renderStreakRun(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const total = 12;
+  let round = 0;
+  let waiting = true;
+  let startAt = 0;
+
+  const nextRound = () => {
+    round++;
+    if(round > total){
+      const xp = 10 + Math.floor(gameScore / 10);
+      addXP(xp);
+      area.innerHTML = `
+        <p class="big">✅ Done!</p>
+        <p class="muted">Final score: <strong>${gameScore}</strong></p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      return;
+    }
+    waiting = true;
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Round ${round} / ${total}</p>
+      <div class="card" style="background: rgba(255,255,255,0.06); text-align:center;">
+        <p style="font-weight:900; font-size:22px; margin:6px 0;">Wait…</p>
+        <button class="btn primary" id="sr-btn" type="button" disabled>GO!</button>
+      </div>
+      <p class="muted" id="sr-msg" style="margin-top:10px;">Don’t click early.</p>
+    `;
+    const btn = area.querySelector("#sr-btn");
+    const msg = area.querySelector("#sr-msg");
+    const delay = 700 + Math.floor(Math.random()*1400);
+    setTimeout(() => {
+      if(!btn) return;
+      waiting = false;
+      startAt = performance.now();
+      btn.disabled = false;
+      msg.textContent = "GO!";
+    }, delay);
+
+    // early clicks penalty
+    area.querySelector(".card")?.addEventListener("click", () => {
+      if(waiting){
+        gameScore = Math.max(0, gameScore - 5);
+        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+        if(msg) msg.textContent = "Too early 😅";
+      }
+    });
+
+    btn?.addEventListener("click", () => {
+      if(waiting) return;
+      btn.disabled = true;
+      const rt = Math.max(1, Math.floor(performance.now() - startAt));
+      const gain = rt < 250 ? 20 : rt < 400 ? 15 : rt < 650 ? 10 : 6;
+      gameScore += gain;
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      if(msg) msg.textContent = `Reaction: ${rt}ms (+${gain})`;
+      setTimeout(nextRound, 550);
+    });
+  };
+
+  nextRound();
+}
+
+/* =========================================================
+   GAME: FOCUS DODGE
+========================================================= */
+function startFocusDodge(){
+  gameMode = "focus-dodge";
+  gameScore = 0;
+  openGameOverlay("Focus Dodge", "Tap ✅ Focus. Avoid ❌ Distraction. 20 taps.");
+  renderFocusDodge();
+}
+function renderFocusDodge(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  let taps = 0;
+  let good = 0;
+
+  const draw = (msg="") => {
+    if(taps >= 20){
+      const xp = 12 + good;
+      addXP(xp);
+      area.innerHTML = `
+        <p class="big">✅ Finished!</p>
+        <p class="muted">Good taps: <strong>${good}</strong> / 20</p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      return;
+    }
+    const isFocus = Math.random() < 0.65;
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Tap ${taps+1} / 20</p>
+      <button class="choiceBtn" id="fd-btn" type="button" style="text-align:center; font-size:18px;">
+        ${isFocus ? "✅ Focus" : "❌ Distraction"}
+      </button>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    area.querySelector("#fd-btn")?.addEventListener("click", () => {
+      taps++;
+      if(isFocus){
+        good++;
+        gameScore += 8;
+        draw("Nice focus ✅");
+      }else{
+        gameScore = Math.max(0, gameScore - 4);
+        draw("Oof — dodge distractions.");
+      }
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+    });
+  };
+
+  draw();
+}
+
+/* =========================================================
+   GAME: GOAL BUILDER
+========================================================= */
+function startGoalBuilder(){
+  gameMode = "goal-builder";
+  gameScore = 0;
+  openGameOverlay("Goal Builder", "Pick a goal + a tiny step you’ll actually do.");
+  renderGoalBuilder();
+}
+function renderGoalBuilder(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const goals = ["Sleep better", "Less scrolling", "Stop on time (games)", "Handle stress", "Say no to pressure"];
+  const steps = ["Set a 10‑minute timer", "4 slow breaths", "Drink water first", "Text a supportive person", "Do a 5‑minute starter task"];
+
+  let g = null, s = null;
+
+  const draw = (msg="") => {
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Pick 1 goal and 1 tiny step.</p>
+
+      <div class="card" style="background: rgba(255,255,255,0.06);">
+        <p class="muted" style="margin:0 0 8px;">Goal</p>
+        ${goals.map((x,i)=>`<button class="choiceBtn" data-g="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
+      </div>
+
+      <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
+        <p class="muted" style="margin:0 0 8px;">Tiny step</p>
+        ${steps.map((x,i)=>`<button class="choiceBtn" data-s="${i}" type="button">${escapeHtml(x)}</button>`).join("")}
+      </div>
+
+      <div class="card" style="background: rgba(255,255,255,0.06); margin-top:10px;">
+        <p class="muted" style="margin:0 0 6px;">Your plan</p>
+        <p style="font-weight:900; margin:0;">${escapeHtml(g ?? "—")} → ${escapeHtml(s ?? "—")}</p>
+      </div>
+
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn primary" id="gb-done" type="button" ${(!g || !s) ? "disabled" : ""}>Done</button>
+      </div>
+
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    area.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => { g = goals[Number(b.getAttribute("data-g"))]; draw(); }));
+    area.querySelectorAll("[data-s]").forEach(b => b.addEventListener("click", () => { s = steps[Number(b.getAttribute("data-s"))]; draw(); }));
+    area.querySelector("#gb-done")?.addEventListener("click", () => {
+      addXP(20);
+      gameScore += 30;
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      area.innerHTML += `<p class="big">✅ Plan saved in your brain.</p><p class="muted">Try it today.</p>`;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+    });
+  };
+
+  draw();
+}
+
+/* =========================================================
+   GAME: FRIENDSHIP SIGNALS (quiz)
+========================================================= */
+function startFriendshipQuiz(){
+  gameMode = "friendship-quiz";
+  gameScore = 0;
+  openGameOverlay("Friendship Signals", "Spot healthy vs pressure behaviors.");
+  renderFriendshipQuiz();
+}
+function renderFriendshipQuiz(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  const qs = [
+    { q:"A friend respects your ‘no’ the first time.", a:true },
+    { q:"A friend says “prove you’re loyal” to push a risky choice.", a:false },
+    { q:"A friend helps you leave when a hangout feels unsafe.", a:true },
+    { q:"A friend pressures you and says “don’t tell anyone.”", a:false },
+    { q:"A friend checks in after a rough day and listens.", a:true },
+    { q:"A friend mocks you for protecting sleep or school.", a:false },
+    { q:"A friend offers a safer plan when you say no.", a:true },
+    { q:"A friend keeps arguing after you set a boundary.", a:false },
+  ];
+  const rng = mulberry32(7878 + state.xp);
+  shuffleInPlace(qs, rng);
+
+  let i = 0;
+  let correct = 0;
+
+  const draw = (msg="") => {
+    const cur = qs[i];
+    if(!cur){
+      const xp = 10 + correct * 3;
+      addXP(xp);
+      area.innerHTML = `
+        <p class="big">✅ Done!</p>
+        <p class="muted">Correct: <strong>${correct}</strong> / ${qs.length}</p>
+        <p class="muted">XP earned: <strong>${xp}</strong></p>
+      `;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+      return;
+    }
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Question ${i+1} / ${qs.length}</p>
+      <p style="font-weight:900;">${escapeHtml(cur.q)}</p>
+      <div class="hqRow">
+        <button class="btn small" id="fq-healthy" type="button">✅ Healthy</button>
+        <button class="btn small" id="fq-pressure" type="button">⚠️ Pressure</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    const answer = (val) => {
+      const ok = (val === cur.a);
+      if(ok){ correct++; gameScore += 10; }
+      else{ gameScore = Math.max(0, gameScore - 4); }
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      i++;
+      draw(ok ? "Correct ✅" : "Not quite — pressure ignores your boundaries.");
+    };
+    area.querySelector("#fq-healthy")?.addEventListener("click", () => answer(true));
+    area.querySelector("#fq-pressure")?.addEventListener("click", () => answer(false));
+  };
+
+  draw();
+}
+
+/* =========================================================
+   GAME: STRESS LAB
+========================================================= */
+function startStressLab(){
+  gameMode = "stress-lab";
+  gameScore = 0;
+  openGameOverlay("Stress Lab", "Try tools and see what lowers stress.");
+  renderStressLab();
+}
+function renderStressLab(){
+  const overlay = overlayEl();
+  const area = overlay?.querySelector("#go-content");
+  if(!area) return;
+
+  let stress = 60;
+  let tries = 0;
+
+  const tools = [
+    { name:"🫁 4 Breaths", delta:-14, msg:"Breathing lowers the body alarm." },
+    { name:"💧 Water", delta:-8, msg:"Hydration helps your brain steady." },
+    { name:"🚶 2‑Minute Move", delta:-12, msg:"Movement burns off stress energy." },
+    { name:"📱 Text Support", delta:-18, msg:"Support makes it easier." },
+    { name:"🧠 Time‑Zoom", delta:-10, msg:"Zooming out reduces urgency." },
+  ];
+
+  const draw = (msg="") => {
+    area.innerHTML = `
+      <p class="muted" style="margin-top:0;">Try <strong>3</strong> tools (or keep going).</p>
+      <div class="card" style="background: rgba(255,255,255,0.06);">
+        <div style="display:flex; justify-content:space-between;">
+          <div><strong>Stress:</strong> ${stress} / 100</div>
+          <div><strong>Tries:</strong> ${tries}</div>
+        </div>
+        <div style="height:12px; border-radius:999px; background: rgba(255,255,255,0.08); margin-top:10px; overflow:hidden;">
+          <div style="height:100%; width:${stress}%; background:${stress<35?"rgba(68,215,182,0.9)":stress<70?"rgba(255,220,90,0.9)":"rgba(255,85,119,0.9)"};"></div>
+        </div>
+      </div>
+      <div class="hqRow" style="margin-top:12px;">
+        ${tools.map((t,idx)=>`<button class="btn small" data-tool="${idx}" type="button">${escapeHtml(t.name)}</button>`).join("")}
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn primary" id="sl-done" type="button" ${tries < 3 ? "disabled" : ""}>Finish</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+    `;
+    area.querySelectorAll("[data-tool]").forEach(b => {
+      b.addEventListener("click", () => {
+        const t = tools[Number(b.getAttribute("data-tool"))];
+        tries++;
+        stress = clamp(stress + t.delta, 0, 100);
+        gameScore += Math.max(2, Math.floor(Math.abs(t.delta) / 2));
+        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+        draw(t.msg);
+      });
+    });
+    area.querySelector("#sl-done")?.addEventListener("click", () => {
+      const xp = 15 + Math.max(0, (60 - stress)); // lower stress -> more XP
+      addXP(xp);
+      area.innerHTML += `<p class="big">✅ Lab complete!</p><p class="muted">XP earned: <strong>${xp}</strong></p>`;
+      const restartBtn = overlay.querySelector("#go-restart");
+      if(restartBtn) restartBtn.style.display = "inline-block";
+    });
+  };
+
+  draw("Pick a tool to try.");
+}
+
 
 /* =========================================================
    GAME: PRESSURE METER
@@ -1737,86 +2242,6 @@ function renderPressureMeter(){
   }, 1000);
 }
 
-/* =========================================================
-   GAME: CHOICE QUEST
-========================================================= */
-function startChoiceQuest(){
-  gameMode = "choicequest";
-  gameIndex = 0;
-  gameScore = 0;
-  openGameOverlay("Choice Quest", "Pick the healthiest option.");
-  renderChoiceQuest();
-}
-
-function renderChoiceQuest(){
-  const overlay = overlayEl();
-  const area = overlay?.querySelector("#go-content");
-  if(!area) return;
-
-  area.innerHTML = "";
-  const scenario = GAME_SCENARIOS[gameIndex];
-
-  if(!scenario){
-    area.innerHTML = `
-      <p class="big">🎉 Nice!</p>
-      <p>You finished Choice Quest.</p>
-      <p class="muted">Final score: <strong>${gameScore}</strong></p>
-    `;
-    const restartBtn = overlay.querySelector("#go-restart");
-    if(restartBtn) restartBtn.style.display = "inline-block";
-    if(gameScore > state.highScore){
-      state.highScore = gameScore;
-      saveState();
-    }
-    addXP(25);
-    renderProgress();
-    return;
-  }
-
-  const p = document.createElement("p");
-  p.style.fontWeight = "900";
-  p.textContent = scenario.prompt;
-  area.appendChild(p);
-
-  scenario.choices.forEach((c) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "choiceBtn";
-    btn.textContent = c.text;
-
-    btn.addEventListener("click", () => {
-      $$(".choiceBtn").forEach(x => x.disabled = true);
-      if(c.good){
-        btn.classList.add("choiceGood");
-        gameScore += 10;
-      }else{
-        btn.classList.add("choiceBad");
-        gameScore = Math.max(0, gameScore - 3);
-      }
-
-      overlay.querySelector("#go-score") && (overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`);
-
-      const why = document.createElement("p");
-      why.className = "muted";
-      why.style.marginTop = "10px";
-      why.textContent = c.why;
-      area.appendChild(why);
-
-      const next = document.createElement("button");
-      next.type = "button";
-      next.className = "btn primary";
-      next.style.marginTop = "12px";
-      next.textContent = "Next";
-      next.addEventListener("click", () => {
-        gameIndex += 1;
-        renderChoiceQuest();
-      });
-      area.appendChild(next);
-    });
-
-    area.appendChild(btn);
-  });
-}
 
 /* =========================================================
    GAME: BREATHING BUDDY
@@ -1967,7 +2392,7 @@ function renderResponseBuilder(){
       const msg = area.querySelector("#rb-msg");
       if(ok){
         gameScore += 25;
-        addXP(15);
+        addXP(20);
         if(msg) msg.textContent = "✅ Strong response. Clear ‘no’ + switch. Nice.";
       }else{
         gameScore = Math.max(0, gameScore - 5);
