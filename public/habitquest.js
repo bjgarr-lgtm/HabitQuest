@@ -80,15 +80,69 @@ function registerNodes(map){
   }
 }
 
+function isBossDay(day){
+  day = safeNum(day, 1);
+  return (day % 7 === 0) || (day === 30);
+}
+
+const RANDOM_EVENTS = [
+  {
+    id: "ev_bonus_breath",
+    text: () => "🎁 Random Event: You notice your body is tense. Want a 20‑second reset?",
+    choices: [
+      { text:"Do 4 slow breaths", good:true, effects:{ xp:+8, wisdom:+1 }, why:"Fast calm = better choices.", next:"__RETURN__" },
+      { text:"Skip it",           good:true, effects:{},                 why:"Okay. Keep going.",          next:"__RETURN__" },
+    ]
+  },
+  {
+    id: "ev_friend_check",
+    text: () => "🎁 Random Event: A friend texts ‘you good?’ What do you do?",
+    choices: [
+      { text:"Be honest + ask for a plan", good:true, effects:{ xp:+10, wisdom:+1 }, why:"Support is strength.", next:"__RETURN__" },
+      { text:"Say ‘fine’ and isolate",     good:false,effects:{ hearts:-1 },         why:"Isolation increases risk.", next:"__RETURN__" },
+    ]
+  },
+  {
+    id: "ev_tiny_win",
+    text: () => "🎁 Random Event: Tiny win opportunity. Pick one:",
+    choices: [
+      { text:"Drink water",          good:true, effects:{ xp:+6 }, why:"Energy + mood help choices.", next:"__RETURN__" },
+      { text:"Put phone away 2 min", good:true, effects:{ xp:+6 }, why:"Interrupts autopilot.",       next:"__RETURN__" },
+    ]
+  }
+];
+
+function maybeInjectRandomEvent(rng, chance=0.35){
+  return (rng() < chance) ? pick(rng, RANDOM_EVENTS) : null;
+}
+
+
 
   // ---------------------------------------------------------
   // 60-day generator: creates 1 “mini story” per day with branches
   // nodeId format: hq_day_<N>, plus internal nodes hq_day_<N>_a/_b/_c
   // ---------------------------------------------------------
-  function buildDayNodes(track, day){
+  function buildDayNodes(track, day, ctx){
     const bp = getBlueprint(track, day);
     const seed = (safeNum(day,1) * 9973) ^ (track.length * 101);
     const rng = mulberry32(seed);
+
+    // --- adaptive difficulty inputs ---
+    const boss = (day % 7 === 0); // example: every 7th day is a boss day (change if you want)
+
+    // diff: -1 = struggling, 0 = normal, +1 = thriving
+    // (replace this with your real diff logic if you already have it)
+    const diff = 0;
+
+    // --- derived numbers used by node rewards/penalties ---
+    const heartPenalty = diff <= -1 ? -1 : (boss ? -2 : -1);
+    // struggling => lighter penalty, boss day => heavier penalty
+
+    const xpTool = diff >= 1 ? (boss ? 20 : 12) : (boss ? 18 : 10);
+    const xpSupport = diff <= -1 ? (boss ? 16 : 10) : (boss ? 14 : 8);
+
+    const eventChance = diff <= -1 ? 0.55 : (boss ? 0.55 : 0.35);
+
 
     const tool = safeStr(bp.toolName, "Tool");
     const scenario = safeStr(bp.scenario, "A pressure moment shows up.");
@@ -97,7 +151,7 @@ function registerNodes(map){
     const myth = safeStr(bp.myth, "I have to prove something.");
     const tiny = safeStr(bp.tinyStep, "Do one small step.");
     const reflection = safeStr(bp.reflection, "What will you do differently next time?");
-
+    
     const villains = [
       "The Loop (autopilot)", "The Crowd (pressure)", "The Spike (big emotions)",
       "The Scroll (distraction)", "The Shortcut (bad tradeoffs)", "The Fog (confusion)"
@@ -115,6 +169,7 @@ function registerNodes(map){
     const idB = `hq_day_${day}_b`;
     const idC = `hq_day_${day}_c`;
     const idEnd = `hq_day_${day}_end`;
+    const idEvent = `hq_day_${day}_event`;
 
     const introText = (ctx) => {
       const tName = getTrackName(track);
@@ -128,14 +183,34 @@ function registerNodes(map){
     const nodes = {};
 
     nodes[id0] = {
-      chapter: `Day ${day}`,
-      text: introText,
-      choices: [
-        { text:`Use the tool: ${tool}`, good:true, effects:{ wisdom:+1, xp:+10 }, why:`Tool used: ${tool}`, next:idA },
-        { text:`Go with the crowd / impulse`, good:false, effects:{ hearts:-1 }, why:`That’s how ${villain} wins time/choices.`, next:idB },
-        { text:`Get support (text/ask someone safe)`, good:true, effects:{ wisdom:+1, xp:+8 }, why:`Support makes safer choices easier.`, next:idC },
+      chapter: boss ? `Day ${day} — BOSS` : `Day ${day}`,
+      text: (ctx) => {
+        const tName = getTrackName(track);
+        const header = boss
+          ? `🔥 BOSS DAY ${day} — ${tName}\n\nA harder pressure test shows up. Bigger rewards.`
+          : `Day ${day} — ${tName}`;
+        return `${header}\n\nSetting: ${setting}\nThreat: ${villain}\n\nScenario:\n${scenario}`;
+      },
+      choices: boss ? [
+        { text:`Use the tool under pressure: ${tool}`, good:true, effects:{ wisdom:+2, xp:+18 }, why:`Boss clear: ${tool}`, next:idA },
+        { text:`Freeze / go autopilot`,                good:false, effects:{ hearts:-2 },         why:`Boss days punish autopilot.`, next:idB },
+        { text:`Call in support + exit plan`,          good:true, effects:{ wisdom:+2, xp:+14 }, why:`Support is a boss counter.`, next:idC },
+      ] : [
+        { text:`Use the tool: ${tool}`,               good:true,  effects:{ wisdom:+1, xp: xpTool },   why:`Use ${tool} to stay safe.`,                  next:idA },
+        { text:`Get support (text/ask someone safe)`, good:true,  effects:{ wisdom:+1, xp: xpSupport }, why:"Support helps you choose safer options.",     next:idC },
+        { text:`Go with the crowd / impulse`,         good:false, effects:{ hearts: heartPenalty }, why:"Following impulse may cost you later.",      next:idB }
       ]
     };
+
+    const ev = maybeInjectRandomEvent(rng, boss ? 0.55 : 0.35);
+    if(ev){
+      nodes[idEvent] = {
+        chapter: `Day ${day} — Event`,
+        text: ev.text,
+        choices: ev.choices.map(c => ({ ...c, next: idEnd }))
+      };
+    }
+
 
     nodes[idA] = {
       chapter: `Day ${day}`,
@@ -171,7 +246,15 @@ function registerNodes(map){
         `Day ${day} complete ✅\n\nReflection:\n${reflection}\n\nCome back tomorrow for the next run.`,
       choices: [
         // end:true tells app.js to show Exit button behavior you already have
-        { text:"Exit", good:true, effects:{ xp:+12, tokens:+1 }, why:"Daily progress earned.", end:true }
+        { 
+          text:"Exit",
+          good:true,
+          effects: boss
+            ? { xp:+25, tokens:+2, wisdom:+1 }
+            : { xp:+12, tokens:+1 },
+          why: boss ? "Boss cleared. Big progress." : "Daily progress earned.",
+          end:true
+        }
       ]
     };
 
@@ -221,7 +304,7 @@ function registerNodes(map){
     if(m){
       const day = clamp(safeNum(m[1], 1), 1, 60);
       const track = safeStr(ctx?.track, "general");
-      const dayNodes = buildDayNodes(track, day);
+      const dayNodes = buildDayNodes(track, day, ctx);
 
       // allow overriding generated subnodes too (if you want)
       if(AUTHORED_NODES[id]) return AUTHORED_NODES[id];

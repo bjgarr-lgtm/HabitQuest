@@ -420,6 +420,7 @@ const DEFAULT_STATE = {
     flags: {},
     visited: {},
     history: [],
+    difficulty: 0, // -2..+2
   },
   habitQuestSlots: [blankSaveSlot(), blankSaveSlot(), blankSaveSlot()],
 };
@@ -698,6 +699,32 @@ function bindProfileNameEditor(){
 /* =========================================================
    XP / LEVEL
 ========================================================= */
+
+function applyStreakMilestoneBonus(){
+  const s = safeNum(state.streak, 0);
+  const given = state.__streakMilestonesGiven || [];
+  const milestones = [
+    { day: 7,  xp: 75,  label: "7‑Day Streak Bonus" },
+    { day: 14, xp: 150, label: "14‑Day Streak Bonus" },
+    { day: 30, xp: 300, label: "30‑Day Streak Bonus" },
+  ];
+  state.__streakMilestonesGiven = Array.isArray(given) ? given : [];
+
+  const hit = milestones.find(m => m.day === s);
+  if(!hit) return;
+
+  const key = String(hit.day);
+  if(state.__streakMilestonesGiven.includes(key)) return;
+
+  state.__streakMilestonesGiven.push(key);
+  addXP(hit.xp);
+  saveState();
+
+  const el = document.getElementById("lesson-status");
+  if(el) el.textContent = `🔥 ${hit.label}! +${hit.xp} XP`;
+}
+
+
 function recalcLevel(){
   state.xp = safeNum(state.xp, 0);
   state.level = 1 + Math.floor(state.xp / 200);
@@ -1336,6 +1363,7 @@ function bindLessonButtons(){
       const yesterdayISO = isoDate(yesterday);
       state.streak = (state.lastCompletedISO === yesterdayISO) ? (state.streak + 1) : 1;
       state.lastCompletedISO = todayISO;
+      applyStreakMilestoneBonus();
       applyDailyStreakBonusIfAny(prevLastISO, state.lastCompletedISO);
     }
 
@@ -2464,15 +2492,9 @@ function hqClearSlot(slotIndex){
 }
 
 /* =========================================================
-   HABIT QUEST GAME
+   HABIT QUEST — RUNTIME HELPERS (state lives in app.js)
+   (habitquest.js provides: window.HQ.getNode / listNodeIds)
 ========================================================= */
-function startHabitQuest(){
-  gameMode = "habitquest";
-  gameScore = 0;
-  openGameOverlay("Habit Quest", "Branching story: your choices change the path.");
-  renderHabitQuest();
-}
-
 function getLastLessonTitle(){
   const day = safeNum(state.habitQuest.lastLessonDay, 0);
   if(day <= 0) return "";
@@ -2486,16 +2508,91 @@ function hqCtx(){
   const avatarDataURL = getSelectedAvatarDataURL();
   const usingCustom = !!avatarDataURL;
   const emoji = (!usingCustom && !isCustomAvatarRef(state.avatar)) ? (state.avatar || "🙂") : "🙂";
+
+  const nextDay = clamp(safeNum(state.habitQuest.lastLessonDay, 0) + 1, 1, 60);
+
   return {
+    // generator/hub needs these:
+    track: state.selectedTrack || "general",
+    hqDay: nextDay,
+    difficulty: safeNum(state.habitQuest.difficulty, 0),
+
+    // UI needs these:
     avatarIsCustom: usingCustom,
     avatarImg: avatarDataURL,
     avatarEmoji: emoji,
     name: state.profileName || "Player",
     completed: state.completedDays.length,
     lastLessonTitle: getLastLessonTitle(),
-    tokens: safeNum(state.habitQuest.tokens,0),
+    tokens: safeNum(state.habitQuest.tokens, 0),
     flags: state.habitQuest.flags || {},
   };
+}
+
+
+function hqMarkVisited(nodeId){
+  state.habitQuest.visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
+  state.habitQuest.visited[nodeId] = true;
+  state.habitQuest.history = Array.isArray(state.habitQuest.history) ? state.habitQuest.history : [];
+  state.habitQuest.history.push(nodeId);
+  state.habitQuest.history = state.habitQuest.history.slice(-80);
+}
+
+function hqSetFlag(key, value){
+  state.habitQuest.flags = (state.habitQuest.flags && typeof state.habitQuest.flags === "object") ? state.habitQuest.flags : {};
+  state.habitQuest.flags[key] = value;
+}
+
+function hqHasFlag(key){
+  return !!(state.habitQuest.flags && state.habitQuest.flags[key]);
+}
+
+function hqCan(choice){
+  const req = choice.require || null;
+  if(!req) return true;
+
+  const tok = safeNum(req.token, 0);
+  if(tok > 0 && safeNum(state.habitQuest.tokens,0) < tok) return false;
+
+  if(req.flag && !hqHasFlag(req.flag)) return false;
+  if(req.notFlag && hqHasFlag(req.notFlag)) return false;
+
+  const minW = safeNum(req.minWisdom, 0);
+  if(minW > 0 && safeNum(state.habitQuest.wisdom,0) < minW) return false;
+
+  return true;
+}
+
+function hqApplyEffects(eff){
+  const e = eff || {};
+  if(e.hearts) state.habitQuest.hearts = clamp(safeNum(state.habitQuest.hearts,3) + safeNum(e.hearts,0), 0, 5);
+  if(e.wisdom) state.habitQuest.wisdom = Math.max(0, safeNum(state.habitQuest.wisdom,0) + safeNum(e.wisdom,0));
+  if(e.tokens) state.habitQuest.tokens = Math.max(0, safeNum(state.habitQuest.tokens,0) + safeNum(e.tokens,0));
+  if(e.flag && typeof e.flag === "object"){
+    const k = safeStr(e.flag.key, "");
+    if(k) hqSetFlag(k, e.flag.value);
+  }
+}
+
+function hqResetRun(){
+  state.habitQuest.nodeId = "hq_start";
+  state.habitQuest.hearts = 3;
+  state.habitQuest.wisdom = 0;
+  state.habitQuest.flags = {};
+  state.habitQuest.visited = {};
+  state.habitQuest.history = [];
+  saveState();
+}
+
+/* =========================================================
+   HABIT QUEST GAME
+========================================================= */
+
+function startHabitQuest(){
+  gameMode = "habitquest";
+  gameScore = 0;
+  openGameOverlay("Habit Quest", "Branching story: your choices change the path.");
+  renderHabitQuest();
 }
 
 
@@ -2675,9 +2772,9 @@ function renderStoryMap(){
   if(!wrap) return;
 
   const visited = (state.habitQuest.visited && typeof state.habitQuest.visited === "object") ? state.habitQuest.visited : {};
-  const ids = window.HQ.listNodeIds();
-  const nodes = ids.map(id => {
-    const node = window.HQ.getNode(id, hqCtx()); // safe to pass ctx
+  const ids = window.HQ?.listNodeIds ? window.HQ.listNodeIds() : [];
+  const nodes = ids.map((id) => {
+    const node = window.HQ.getNode(id, hqCtx());
     return {
       id,
       chapter: safeStr(node.chapter, ""),
@@ -2735,7 +2832,13 @@ function renderStoryMap(){
   wrap.querySelector("#btn-map-jump")?.addEventListener("click", () => {
     const id = prompt("Jump to which nodeId? (example: hq_start)")?.trim();
     if(!id) return;
-    if(!(window.HQ?.NODES && window.HQ.NODES[id])) return alert("That nodeId does not exist.");
+    const ok =
+      id === "hq_start" ||
+      id === "hq_daily_hub" ||
+      id === "hq_jump_day" ||
+      /^hq_day_(\d+)(?:_(a|b|c|end|event))?$/.test(id);
+
+    if(!ok) return alert("Unknown nodeId. Try hq_start or hq_day_12");
     state.habitQuest.nodeId = id;
     saveState();
     startHabitQuest();
