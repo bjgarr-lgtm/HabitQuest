@@ -269,50 +269,17 @@ const QUIZ_STEMS = {
   ]
 };
 
-function getHardcodedQuiz(day, track){
-  const byTrack = window.CURR?.QUIZZES_BY_TRACK;
-  if(!byTrack) return null;
+function getHardcodedQuiz(day, track) {
+  const ALL = window.QUIZZES || {};
+  const QB = ALL[track] || ALL.general;  // <-- fallback
 
-  const d = Number(day);
-  if(!Number.isFinite(d) || d < 1) return null;
+  if (!QB) return null;
 
-  const t = String(track || "general").toLowerCase();
-
-  // try direct key, then some common fallbacks
-  const tryKeys = [
-    t,
-    t.replace(/\s+/g, "_"),
-    t.replace(/[^a-z0-9_]/g, ""),
-    "general",
-  ];
-
-  let QB = null;
-  for(const k of tryKeys){
-    if(byTrack[k]){
-      QB = byTrack[k];
-      break;
-    }
-  }
-
-  // last chance: case-insensitive match against existing keys
-  if(!QB){
-    const keys = Object.keys(byTrack);
-    const match = keys.find(k => k.toLowerCase() === t);
-    if(match) QB = byTrack[match];
-  }
-
-  if(!QB) return null;
-
-  // If QB is [ day1Quiz, day2Quiz, ... ]
-  if(Array.isArray(QB)){
-    const q = QB[d - 1];
-    return Array.isArray(q) ? q : null;
-  }
-
-  // If QB is { "1": [...], "2": [...] }
-  const q = QB[String(d)] ?? QB[d];
+  // Object map: { "1": [...], "2": [...] }
+  const q = QB[String(day)] ?? QB[day];
   return Array.isArray(q) ? q : null;
 }
+
 
 
 
