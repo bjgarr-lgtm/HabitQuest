@@ -1,4 +1,16 @@
 :root{
+  --emoji-font: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
+}
+
+body, button, input, textarea{
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, var(--emoji-font), sans-serif;
+}
+
+.choiceBtn, .gameOverlay, .gameOverlayInner{
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, var(--emoji-font), sans-serif;
+}
+
+:root{
   --bg: #0b1220;
   --card: rgba(255,255,255,0.08);
   --card2: rgba(255,255,255,0.12);
