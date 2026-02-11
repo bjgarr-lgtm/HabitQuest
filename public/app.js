@@ -2526,27 +2526,30 @@ function startMemoryMatch(){
         render();
 
         if(flipped.length === 2){
-          const [a,b] = flipped;
-          const ca = cards[a];
-          const cb = cards[b];
+          const [aId, bId] = flipped;
+          const ca = cards.find(c => c.id === aId);
+          const cb = cards.find(c => c.id === bId);
 
-          GameRT.setTimeout(()=>{
-            if(ca && cb && ca.v === cb.v){
-              matched.add(a); matched.add(b);
+          GameRT.setTimeout(() => {
+            if (ca && cb && ca.v === cb.v) {
+              matched.add(aId);
+              matched.add(bId);
               gameScore += 12;
               overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-            }else{
+            } else {
               gameScore = Math.max(0, gameScore - 2);
               overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
             }
 
             flipped = [];
 
-            if(matched.size === cards.length){
+            // ✅ advance when all card IDs are matched
+            if (matched.size >= cards.length) {
               const xp = cfg.xpBase + level * cfg.xpPerLevel;
               addXP(xp);
               level++;
-              if(level > cfg.levels){
+
+              if (level > cfg.levels) {
                 area.innerHTML = `
                   <p class="big">🏁 Finished!</p>
                   <p class="muted">You beat all levels.</p>
@@ -2555,6 +2558,7 @@ function startMemoryMatch(){
                 overlay.querySelector("#go-restart").style.display = "inline-block";
                 return;
               }
+
               buildLevel();
               render(`✅ Level cleared! +${xp} XP`);
               return;
@@ -2562,6 +2566,7 @@ function startMemoryMatch(){
 
             render();
           }, cfg.peekMs);
+
         }
       });
     });
@@ -3963,10 +3968,11 @@ function init(){
   });
 }
 
-// Run init only after the DOM exists
+// Run init when DOM is ready (works with defer OR without)
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init, { once: true });
 } else {
   init();
 }
+
 
