@@ -183,6 +183,7 @@ function getBlueprint(day, track){
   return arr[idx] || arr[0];
 }
 
+let memoryState = null;
 
 /* =========================================================
    QUIZ BUILDER (12 QUESTIONS PER DAY, DAY-SPECIFIC WORDING)
@@ -1893,150 +1894,87 @@ function launchGame(id){
    GAME: MEMORY MATCH (tools)
 ========================================================= */
 function startMemoryMatch(){
+  clearGameTimers();
   gameMode = "memory";
   gameScore = 0;
-  openGameOverlay("Memory Match", "Beat levels 1–10. More cards + less time each level.");
-  // store level in state session (not saved)
-  window.__mmLevel = window.__mmLevel || 1;
+
+  memoryState = {
+    level: 1,
+    flipped: [],
+    matched: new Set(),
+    cards: [],
+  };
+
+  openGameOverlay("Memory Match", "Find all pairs.");
+  initMemoryLevel();
+}
+
+function initMemoryLevel(){
+  const pairs = 2 + memoryState.level; // grows with level
+  const symbols = "🍎🍌🍇🍒🍉🍓🍍🥝🍑🍊🍐🍋".split("").slice(0, pairs);
+  memoryState.cards = [...symbols, ...symbols]
+    .sort(() => Math.random() - 0.5)
+    .map((v,i)=>({ id:i, v }));
+
+  memoryState.flipped = [];
+  memoryState.matched.clear();
   renderMemoryMatch();
 }
+
 
 function renderMemoryMatch(){
   const overlay = overlayEl();
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  let level = clamp(safeNum(window.__mmLevel, 1), 1, 10);
+  area.innerHTML = `
+    <p class="muted">Level ${memoryState.level}</p>
+    <div class="grid" style="grid-template-columns: repeat(4,1fr); gap:8px;">
+      ${memoryState.cards.map(c=>{
+        const open = memoryState.flipped.includes(c.id) || memoryState.matched.has(c.id);
+        return `<button class="choiceBtn"
+          data-id="${c.id}"
+          ${open ? "disabled" : ""}>
+          ${open ? c.v : "❓"}
+        </button>`;
+      }).join("")}
+    </div>
+  `;
 
-  const pool = [
-    "🫁 Breathing","💧 Water","🚪 Exit Plan","🔁 Switch Plan","🧠 Time‑Zoom",
-    "🤝 Ask for Help","📝 Write it down","🎧 Music break","🚶 Walk","🥪 Snack",
-    "🧊 Cold splash","🛡️ Boundary line","📵 Phone away","🌙 Sleep plan",
-  ];
+  area.querySelectorAll("button[data-id]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = Number(btn.dataset.id);
+      if(memoryState.flipped.length >= 2) return;
 
-  const pairsCount = 3 + level;              // level 1 => 4 pairs (8 cards), level 10 => 13 pairs (26 cards)
-  const timeLimit = Math.max(20, 55 - level*3); // shrinks as level rises
+      memoryState.flipped.push(id);
+      renderMemoryMatch();
 
-  const rng = mulberry32(4242 + state.xp + level*999);
-  const chosen = shuffleInPlace(pool.slice(), rng).slice(0, pairsCount);
-  const cards = shuffleInPlace(chosen.flatMap((t, i) => ([
-    { id:`${i}-a`, text:t, matched:false },
-    { id:`${i}-b`, text:t, matched:false },
-  ])), rng);
+      if(memoryState.flipped.length === 2){
+        const [a,b] = memoryState.flipped;
+        const ca = memoryState.cards.find(c=>c.id===a);
+        const cb = memoryState.cards.find(c=>c.id===b);
 
-  let first = null;
-  let lock = false;
-  let matches = 0;
-  let t = timeLimit;
-  let loopId = null;
-  let alive = true;
-
-  const cols = (pairsCount <= 6) ? 4 : (pairsCount <= 10) ? 5 : 6;
-
-  const draw = (msg="") => {
-    const won = matches >= pairsCount;
-    area.innerHTML = `
-      <p class="muted" style="margin-top:0;">
-        Level <strong>${level}</strong> / 10 • Time: <strong>${t}s</strong> • Matches: <strong>${matches}</strong> / ${pairsCount}
-      </p>
-      <div style="display:grid; grid-template-columns: repeat(${cols}, minmax(0,1fr)); gap:10px; margin-top:10px;">
-        ${cards.map(c => `
-          <button class="choiceBtn" type="button"
-            data-id="${escapeHtml(c.id)}"
-            style="text-align:center; min-height:62px; font-weight:900;"
-            ${(!alive || c.matched) ? "disabled" : ""}>
-            ${c.matched ? escapeHtml(c.text) : "❓"}
-          </button>
-        `).join("")}
-      </div>
-      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
-      ${won ? `<p class="big">✅ Level Clear!</p>` : ""}
-    `;
-
-    area.querySelectorAll("button[data-id]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if(!alive || lock) return;
-        const id = btn.getAttribute("data-id");
-        const c = cards.find(x => x.id === id);
-        if(!c || c.matched) return;
-
-        // reveal
-        btn.textContent = c.text;
-
-        if(!first){
-          first = c;
-          return;
-        }
-
-        lock = true;
-        const second = c;
-        const same = first.text === second.text && first.id !== second.id;
-
-        gsetTimeout(() => {
-          if(same){
-            first.matched = true;
-            second.matched = true;
-            matches += 1;
-            gameScore += 12;
-            overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-
-            if(matches >= pairsCount){
-              alive = false;
-              if(loopId) gclearInterval(loopId);
-
-              // XP scales with level + remaining time
-              const xp = 10 + level*3 + Math.max(0, t);
-              addXP(xp);
-
-              area.innerHTML += `
-                <p class="muted">XP earned: <strong>${xp}</strong></p>
-                <div class="actions" style="margin-top:12px;">
-                  <button class="btn primary" id="mm-next" type="button">${level < 10 ? "Next Level" : "Finish"}</button>
-                </div>
-              `;
-              area.querySelector("#mm-next")?.addEventListener("click", () => {
-                window.__mmLevel = (level < 10) ? (level + 1) : 1;
-                renderMemoryMatch();
-              });
-
-              const restartBtn = overlay.querySelector("#go-restart");
-              if(restartBtn) restartBtn.style.display = "inline-block";
-            }else{
-              draw("Nice match ✅");
-            }
-          }else{
-            gameScore = Math.max(0, gameScore - 2);
-            overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-            draw("Not a match — try again.");
+        gameSetTimeout(()=>{
+          if(ca.v === cb.v){
+            memoryState.matched.add(a);
+            memoryState.matched.add(b);
+            gameScore += 10;
           }
-          first = null;
-          lock = false;
-        }, 520);
-      });
+          memoryState.flipped = [];
+
+          if(memoryState.matched.size === memoryState.cards.length){
+            memoryState.level++;
+            addXP(10 + memoryState.level * 2);
+            initMemoryLevel();
+            return;
+          }
+          renderMemoryMatch();
+        }, 700);
+      }
     });
-  };
-
-  draw("Match pairs before time runs out.");
-
-  loopId = gsetInterval(() => {
-    if(!alive) return;
-    t--;
-    if(t <= 0){
-      alive = false;
-      gclearInterval(loopId);
-      draw("⏰ Time! Restart to retry this level.");
-      const restartBtn = overlay.querySelector("#go-restart");
-      if(restartBtn) restartBtn.style.display = "inline-block";
-    }else{
-      draw();
-    }
-  }, 1000);
-
-  setGameCleanup(() => {
-    alive = false;
-    if(loopId) gclearInterval(loopId);
   });
 }
+
 
 
 /* =========================================================
@@ -2234,9 +2172,15 @@ function renderStreakRun(){
    GAME: FOCUS DODGE
 ========================================================= */
 function startFocusDodge(){
+  clearGameTimers();
   gameMode = "focus-dodge";
   gameScore = 0;
-  openGameOverlay("Focus Dodge", "Type keys on ✅ FOCUS bubbles. Avoid ❌ DISTRACTION bubbles.");
+
+  openGameOverlay(
+    "Focus Dodge",
+    "Type the letter for 🟢 FOCUS. Do NOT type 🔴 DISTRACTION."
+  );
+
   renderFocusDodge();
 }
 
@@ -2245,54 +2189,74 @@ function renderFocusDodge(){
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  let taps = 0;
+  let round = 0;
   let good = 0;
-  let locked = false;           // ✅ add
-  const COOLDOWN_MS = 550;      // ✅ slower (tweak 400–800)
+  let activeKey = null;
+  let activeType = null;
+  let locked = false;
 
-  const draw = (msg="") => {
-    if(taps >= 20){
-      const xp = 12 + good;
+  const KEYS = ["A","S","D","F","J","K","L"];
+  const MAX = 15;
+  const COOLDOWN = 650;
+
+  function cleanup(){
+    document.removeEventListener("keydown", onKey);
+  }
+
+  function nextRound(msg=""){
+    if(round >= MAX){
+      cleanup();
+      const xp = 10 + good * 2;
       addXP(xp);
       area.innerHTML = `
-        <p class="big">✅ Finished!</p>
-        <p class="muted">Good taps: <strong>${good}</strong> / 20</p>
-        <p class="muted">XP earned: <strong>${xp}</strong></p>
+        <p class="big">✅ Done!</p>
+        <p>Correct: <strong>${good}</strong> / ${MAX}</p>
+        <p>XP earned: <strong>${xp}</strong></p>
       `;
       overlay.querySelector("#go-restart").style.display = "inline-block";
       return;
     }
 
-    const isFocus = Math.random() < 0.65;
+    round++;
+    locked = false;
+    activeKey = KEYS[Math.floor(Math.random() * KEYS.length)];
+    activeType = Math.random() < 0.65 ? "focus" : "distraction";
+
     area.innerHTML = `
-      <p class="muted" style="margin-top:0;">Tap ${taps+1} / 20</p>
-      <button class="choiceBtn" id="fd-btn" type="button"
-        style="text-align:center; font-size:18px; ${locked ? "opacity:0.7;" : ""}"
-        ${locked ? "disabled" : ""}>
-        ${isFocus ? "✅ Focus" : "❌ Distraction"}
-      </button>
-      <p class="muted" style="margin-top:10px;">${escapeHtml(msg)}</p>
+      <p class="muted">Round ${round} / ${MAX}</p>
+      <div style="font-size:28px; margin:14px 0;">
+        ${activeType === "focus" ? "🟢 FOCUS" : "🔴 DISTRACTION"}
+      </div>
+      <div style="font-size:22px;">Press <strong>${activeKey}</strong></div>
+      <p class="muted">${msg}</p>
     `;
+  }
 
-    area.querySelector("#fd-btn")?.addEventListener("click", () => {
-      if(locked) return;
-      locked = true;
+  function onKey(e){
+    if(locked) return;
+    if(!activeKey) return;
 
-      taps++;
-      if(isFocus){
-        good++;
-        gameScore += 8;
-        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-        gameSetTimeout(() => { locked = false; draw("Nice focus ✅"); }, COOLDOWN_MS);
-      }else{
-        gameScore = Math.max(0, gameScore - 4);
-        overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
-        gameSetTimeout(() => { locked = false; draw("Oof — dodge distractions."); }, COOLDOWN_MS);
-      }
-    });
-  };
+    locked = true;
+    const k = e.key.toUpperCase();
 
-  draw();
+    if(k === activeKey && activeType === "focus"){
+      good++;
+      gameScore += 8;
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      gameSetTimeout(() => nextRound("Nice focus ✅"), COOLDOWN);
+    }
+    else if(k === activeKey && activeType === "distraction"){
+      gameScore = Math.max(0, gameScore - 5);
+      overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
+      gameSetTimeout(() => nextRound("Good dodge 👍"), COOLDOWN);
+    }
+    else{
+      gameSetTimeout(() => nextRound("Missed — stay sharp"), COOLDOWN);
+    }
+  }
+
+  document.addEventListener("keydown", onKey);
+  nextRound();
 }
 
 
