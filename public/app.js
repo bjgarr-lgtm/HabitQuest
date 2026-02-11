@@ -1781,10 +1781,10 @@ const GAME_CFG = {
   friendshipquiz: { xpBase: 10, xpPerCorrect: 3 },
 
   stresslab: {
-    durationS: 45,
+    durationS: 60,
     startStress: 45,
-    loseAt: 90,
-    rise1: 3, rise2: 4, rise3: 5,
+    loseAt: 99,
+    rise1: 10, rise2: 15, rise3: 20,
     tools: [
       { name:"🫁 4 Breaths", delta:-16, score:+8,  msg:"Breathing lowers the body alarm." },
       { name:"💧 Water",    delta:-10, score:+5,  msg:"Hydration helps your brain steady." },
@@ -1805,9 +1805,9 @@ const GAME_CFG = {
   },
 
   focusdodge: {
-    durationS: 35,
-    spawnEveryMs: 900,
-    bubbleLifeMs: 2200,
+    durationS: 60,
+    spawnEveryMs: 1500,
+    bubbleLifeMs: 3500,
     focusChance: 0.65,
     keys: ["A","S","D","F","J","K","L"],
     scoreFocusHit: 12,
@@ -1869,6 +1869,7 @@ function ensureGameOverlay(){
       .gameOverlayTop{ display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap: wrap; }
       .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
       .choiceBtn{ display:block; width:100%; text-align:left; padding: 12px; border-radius: 12px;
+        font-family: system-ui, -apple-system, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
         border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
         color: rgba(255,255,255,0.92); cursor:pointer; margin-top: 10px; font-weight: 800; }
       .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
