@@ -370,9 +370,86 @@ const GAMES = [
   { id:"stress-lab",  title:"Stress Lab",      desc:"Try safe stress tools and see what works.",  status:"ready", unlock:{ type:"xp", xp:900 } },
 ];
 
+// --- game unlock + render (THIS IS WHAT YOU’RE MISSING) ---
+function gameUnlockInfo(g){
+  const u = g?.unlock || { type:"free" };
+  if(u.type === "free") return { ok:true, reason:"" };
+
+  if(u.type === "lessons"){
+    const need = Number(u.lessons || 0);
+    const have = Number(state.completedDays?.length || 0);
+    return { ok: have >= need, reason: `Complete ${need} lesson${need===1?"":"s"} to unlock (you have ${have}).` };
+  }
+
+  if(u.type === "level"){
+    const need = Number(u.level || 1);
+    const have = Number(state.level || 1);
+    return { ok: have >= need, reason: `Reach Level ${need} to unlock (you are Level ${have}).` };
+  }
+
+  if(u.type === "xp"){
+    const need = Number(u.xp || 0);
+    const have = Number(state.xp || 0);
+    return { ok: have >= need, reason: `Earn ${need} XP to unlock (you have ${have}).` };
+  }
+
+  return { ok:true, reason:"" };
+}
+
+function renderGamesCatalog(){
+  // support multiple possible container IDs so your HTML doesn’t have to be perfect
+  const wrap =
+    document.getElementById("games-grid") ||
+    document.getElementById("games-list") ||
+    document.getElementById("mini-games-grid") ||
+    document.getElementById("minigames-grid") ||
+    document.getElementById("games");
+
+  if(!wrap){
+    console.warn("[games] No container found. Add <div id='games-grid'></div> in the Mini-Games view.");
+    return;
+  }
+
+  wrap.innerHTML = "";
+  if(!Array.isArray(GAMES) || !GAMES.length){
+    wrap.innerHTML = `<p class="muted">No games found.</p>`;
+    return;
+  }
+
+  GAMES.forEach(g => {
+    const info = gameUnlockInfo(g);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.background = "rgba(255,255,255,0.06)";
+    card.style.marginTop = "12px";
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900; font-size:18px;">${escapeHtml(g.title || g.id)}</div>
+          <div class="muted" style="margin-top:6px;">${escapeHtml(g.desc || "")}</div>
+          ${info.ok ? "" : `<div class="muted" style="margin-top:8px; color: rgba(255,220,90,0.95);">${escapeHtml(info.reason)}</div>`}
+        </div>
+        <div class="actions" style="margin:0;">
+          <button class="btn primary" type="button" data-play="${escapeHtml(g.id)}" ${info.ok ? "" : "disabled"}>Play</button>
+        </div>
+      </div>
+    `;
+
+    card.querySelector("[data-play]")?.addEventListener("click", () => {
+      const id = g.id;
+      // make sure overlay exists before launching
+      if(!document.getElementById("game-overlay")) ensureGameOverlay();
+      launchGame(id);
+    });
+
+    wrap.appendChild(card);
+  });
+}
 /* =========================================================
    STATE
 ========================================================= */
+
 function blankSaveSlot(){
   return { savedISO: null, label: "", data: null };
 }
