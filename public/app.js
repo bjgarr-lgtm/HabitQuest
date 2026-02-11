@@ -2526,27 +2526,34 @@ function startMemoryMatch(){
         render();
 
         if(flipped.length === 2){
-          const [aId, bId] = flipped;
-          const ca = cards.find(c => c.id === aId);
-          const cb = cards.find(c => c.id === bId);
+
+          // Disable all buttons while resolving (prevents race conditions)
+          area.querySelectorAll("button[data-id]").forEach(b => b.disabled = true);
+
+          const [a,b] = flipped;
+          const ca = cards.find(x => x.id === a);
+          const cb = cards.find(x => x.id === b);
 
           GameRT.setTimeout(() => {
+
             if (ca && cb && ca.v === cb.v) {
-              matched.add(aId);
-              matched.add(bId);
+              matched.add(a);
+              matched.add(b);
               gameScore += 12;
-              overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
             } else {
               gameScore = Math.max(0, gameScore - 2);
-              overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
             }
+
+            overlay.querySelector("#go-score").textContent = `Score: ${gameScore}`;
 
             flipped = [];
 
-            // ✅ advance when all card IDs are matched
-            if (matched.size >= cards.length) {
+            // Check level completion
+            if (matched.size === cards.length) {
+
               const xp = cfg.xpBase + level * cfg.xpPerLevel;
               addXP(xp);
+
               level++;
 
               if (level > cfg.levels) {
@@ -2565,8 +2572,8 @@ function startMemoryMatch(){
             }
 
             render();
-          }, cfg.peekMs);
 
+          }, cfg.peekMs);
         }
       });
     });
@@ -3737,7 +3744,7 @@ function downloadJSON(filename, obj){
   document.body.appendChild(a);
   a.click();
   a.remove();
-  gsetTimeout(()=>URL.revokeObjectURL(a.href), 500);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 500);
 }
 
 function openPrintableReport(){
@@ -3921,6 +3928,10 @@ function bindReset(){
 /* =========================================================
    INIT
 ========================================================= */
+function bindRatingStarsOnce(){ /* optional feature — safe no-op */ }
+function renderRate(){ /* optional feature — safe no-op */ }
+
+
 function init(){
   document.body.style.overflow = "";
   $("#year") && ($("#year").textContent = new Date().getFullYear());
