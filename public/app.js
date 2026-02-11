@@ -1869,12 +1869,11 @@ function ensureGameOverlay(){
       .gameOverlayTop{ display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap: wrap; }
       .gameOverlayStats{ display:flex; gap:10px; align-items:center; }
       .choiceBtn{ display:block; width:100%; text-align:left; padding: 12px; border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
-        color: rgba(255,255,255,0.92); cursor:pointer; margin-top: 10px; font-weight: 800;
-        /* ensure emoji render (fixes boxed question-mark glyphs) */
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial,
-          "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji", sans-serif;
-      }
+              border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
+              color: rgba(255,255,255,0.92); cursor:pointer; margin-top: 10px; font-weight: 800;
+              font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial,
+                "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji", sans-serif; }
+
       .choiceBtn:hover{ background: rgba(255,255,255,0.10); }
       .choiceBtn:disabled{ opacity:0.6; cursor:not-allowed; }
       .choiceGood{ border-color: rgba(80,220,140,0.6); }
@@ -2478,7 +2477,7 @@ function startMemoryMatch(){
   const area = overlay?.querySelector("#go-content");
   if(!area) return;
 
-  const symbols = "🍎🍌🍇🍒🍉🍓🍍🥝🍑🍊🍐🍋🍈🍏🥥🥕🌽🍪🧁🍩🍿".split("");
+  const symbols = Array.from("🍎🍌🍇🍒🍉🍓🍍🥝🍑🍊🍐🍋🍈🍏🥥🥕🌽🍪🧁🍩🍿");
   let level = 1;
 
   let flipped = [];
@@ -3964,9 +3963,10 @@ function init(){
   });
 }
 
-// Run init only after the DOM exists (fixes "Loading..." until tab switch)
+// Run init only after the DOM exists
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", init, { once: true });
 } else {
-  window.addEventListener("DOMContentLoaded", init, { once: true });
+  init();
 }
+
