@@ -1039,19 +1039,24 @@ function logQuizMistake(lesson, qIndex, item){
 }
 
 // Build a daily review queue from stored mistakes (track-aware)
-function buildMistakeReviewQueue({ max=10 } = {}){
+function buildMistakeReviewQueue({ max = 10 } = {}) {
   const track = state.selectedTrack || "general";
   const all = Object.values(state.mistakes || {})
-    .filter(m => m && m.track === track && String(m.q||"").trim().length);
+    .filter(m => m && m.track === track && String(m.q || "").trim().length);
 
-  // Sort: most wrong first, then most recent wrong
-  all.sort((a,b) => {
-    const wc = safeNum(b.wrongCount,0) - safeNum(a.wrongCount,0);
-    if(wc) return wc;
-    return String(b.lastWrongISO||"").localeCompare(String(a.lastWrongISO||""));
+  all.sort((a, b) => {
+    const wc = safeNum(b.wrongCount, 0) - safeNum(a.wrongCount, 0);
+    if (wc) return wc;
+    return String(b.lastWrongISO || "").localeCompare(String(a.lastWrongISO || ""));
   });
 
-  const picked = all.slice(0, Math.max(0, safeNum(max,10))).map(m => m.qKey);
+  const picked = all.slice(0, Math.max(0, safeNum(max, 10))).map(m => m.qKey);
+
+  // ✅ If nothing to review, ensure review mode is OFF
+  if (picked.length === 0) {
+    exitMistakeReview();
+    return [];
+  }
 
   state.reviewMode = (state.reviewMode && typeof state.reviewMode === "object") ? state.reviewMode : {};
   state.reviewMode.active = true;
@@ -1062,13 +1067,17 @@ function buildMistakeReviewQueue({ max=10 } = {}){
   return picked;
 }
 
+
+
 function exitMistakeReview(){
-  state.reviewMode = (state.reviewMode && typeof state.reviewMode === "object") ? state.reviewMode : {};
-  state.reviewMode.active = false;
-  state.reviewMode.queue = [];
-  state.reviewMode.idx = 0;
+  state.reviewMode = {
+    active: false,
+    idx: 0,
+    queue: []
+  };
   saveState();
 }
+
 
 function getCurrentReviewItem(){
   if(!state.reviewMode?.active) return null;
@@ -1191,6 +1200,16 @@ function renderMistakeReviewInQuizPanel(){
    LESSONS + QUIZ RENDERING
 ========================================================= */
 function renderLesson(){
+  // If no mistakes exist, force review mode off
+  if(!state.mistakes || Object.keys(state.mistakes).length === 0){
+    if(state.reviewMode?.active){
+      exitMistakeReview();
+    }
+  }
+  if(state.reviewMode?.active && !(state.reviewMode.queue && state.reviewMode.queue.length)){
+    exitMistakeReview();
+  }
+
   const lessons = getActiveLessons();
   if(!lessons.length) return;
 
@@ -1228,7 +1247,7 @@ function renderLesson(){
 
   renderQuiz(quizData, lesson, track, day);
   // If review mode is active, draw the review question UI in the quiz area
-  if(state.reviewMode?.active){
+  if(state.reviewMode?.active && state.reviewMode?.queue?.length > 0){
     renderMistakeReviewInQuizPanel();
   } else {
     // Optional: show inline “what you missed” after a failed attempt
@@ -3938,6 +3957,10 @@ function init(){
   document.getElementById("btn-progress-report")?.addEventListener("click", openPrintableReport);
 
   state = normalizeState(loadState());
+  if (!state.mistakes || Object.keys(state.mistakes).length === 0) {
+    exitMistakeReview();
+  }
+
   recalcLevel();
   applyDailyLoginBonus();
   saveState();
@@ -3947,7 +3970,6 @@ function init(){
   bindTracks();
   bindLessonButtons();
   bindReset();
-  bindRatingStarsOnce();
   bindAvatarUpload();
   bindProfileNameEditor();
 
