@@ -1795,9 +1795,9 @@ const GAME_CFG = {
   },
 
   memory: {
-    levels: 10,
-    // cards = levelPairs*2; level 1 => 3 pairs (6 cards), ramps up
-    startPairs: 3,
+    levels: 16,
+    // cards = levelPairs*2; level 1 => 4 pairs (8 cards), ramps up
+    startPairs: 4,
     pairsPerLevel: 1,
     peekMs: 650,
     xpBase: 8,
@@ -1806,9 +1806,9 @@ const GAME_CFG = {
 
   focusdodge: {
     durationS: 60,
-    spawnEveryMs: 1500,
-    bubbleLifeMs: 3500,
-    focusChance: 0.65,
+    spawnEveryMs: 1100,
+    bubbleLifeMs: 3700,
+    focusChance: 0.58,
     keys: ["A","S","D","F","J","K","L"],
     scoreFocusHit: 12,
     scoreWrongHit: -10,
