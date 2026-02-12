@@ -47,13 +47,12 @@ body{
 }
 
 .brand{ display:flex; gap:12px; align-items:center; max-width:var(--max); margin:0 auto; }
-.logo{
-  width:44px;height:44px;border-radius:14px;
-  background: linear-gradient(135deg, rgba(124,92,255,0.9), rgba(68,215,182,0.9));
-  display:grid; place-items:center;
-  box-shadow: var(--shadow);
-  font-size:22px;
+.logo img {
+  height: 60px;
+  width: auto;
+  display: block;
 }
+
 h1{ margin:0; font-size:18px; }
 .subtitle{ margin:2px 0 0; color:var(--muted); font-size:13px; }
 

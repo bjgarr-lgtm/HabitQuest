@@ -56,6 +56,9 @@ function mulberry32(seed){
   };
 }
 
+document.getElementById("btn-logo-home")?.addEventListener("click", () => {
+  showView("home");
+});
 
 
 function uid(){
