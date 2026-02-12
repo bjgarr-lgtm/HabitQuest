@@ -48,8 +48,8 @@ body{
 
 .brand{ display:flex; gap:12px; align-items:center; max-width:var(--max); margin:0 auto; }
 .logo{
-  width:44px;
-  height:44px;
+  width:250px;
+  height:250px;
   border-radius:14px;
   background: transparent;   /* key */
   box-shadow: none;          /* optional */
