@@ -48,9 +48,9 @@ body{
 
 .brand{ display:flex; gap:12px; align-items:center; max-width:var(--max); margin:0 auto; }
 .logo{
-  width:250px;
-  height:250px;
-  border-radius:14px;
+  width:150px;
+  height:150px;
+  border-radius:4px;
   background: transparent;   /* key */
   box-shadow: none;          /* optional */
   overflow: hidden;
