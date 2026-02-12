@@ -1,4 +1,4 @@
-# How to Avoid Addiction (V1)
+# HabitQuest (V1)
 
 A free, kid-friendly educational web app with **daily lessons**, **mini-quizzes**, and **mini-games**—with **no ads** and **no premium purchases**.
 

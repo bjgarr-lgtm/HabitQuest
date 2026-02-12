@@ -1,4 +1,4 @@
-/* How to Avoid Addiction — V3 (no frameworks)
+/* HabitQuest — V3 (no frameworks)
    Static site. Saves progress in localStorage (device only).
    NOTE: app.js must contain ONLY JavaScript.
 */
